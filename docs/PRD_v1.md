@@ -336,7 +336,7 @@
 **(A) handler 代码 — openid 校验 + allowlist**
 - [ ] FC 函数 `/issue-credential` 接收 `{ code, fragment_id, sha256, size }`，**必填字段缺失返回 400**，含明确错误码
 - [ ] FC 调用 `jscode2session` 成功换得 openid；微信侧返回错误时 FC 返回 401 并透传错误码（如 `INVALID_CODE`）
-- [ ] FC 环境变量 `OPENID_ALLOWLIST` 中硬编码 1 个 openid（本期单用户）
+- [ ] FC 环境变量 `OPENID_ALLOWLIST` 中硬编码 openid 列表（逗号分隔，支持多设备测试）
 - [ ] openid **不在** allowlist → FC 返回 403 `{ "error": "OPENID_NOT_ALLOWED" }`，不再签发任何凭证
 - [ ] openid **在** allowlist → 继续进入 (B) 的凭证签发流程
 - [ ] FC 日志记录每次调用的 openid（哈希后）、fragment_id、判定结果
@@ -440,6 +440,8 @@
 **描述：** 作为用户，我希望在小程序首页点一下就开始录音，再点一下就停止，并能实时看到已录时长，以便随时记录灵感。
 
 **Acceptance Criteria：**
+
+**(A) 代码实现**
 - [ ] 首页有一个明显的圆形录音按钮，处于"未录音"状态时显示"开始录音"
 - [ ] 点击后立即调用 `wx.getRecorderManager()` 开始录音；按钮切换为"停止录音"状态（颜色/文案变化）
 - [ ] 录音过程中页面上实时显示已录时长（`mm:ss`，每秒刷新）
@@ -449,101 +451,156 @@
   - **如机型不支持 MP3**（部分安卓 / 旧机型可能 fallback 为 AAC），不在前端做转码（避免电量与卡顿），保持 AAC 不变，落盘扩展名 `.aac`
   - 不论格式，在 manifest 草案中**显式标注 `audio.original_format`**（`mp3` 或 `aac`）；后续上传 OSS 时 object key 始终用 `.mp3` 扩展名作为统一约定，**真实格式以 manifest 为准**
   - 由 Worker（US-015）在下载后做格式标准化转码（AAC → MP3）
+
+**(B) 自动验证（`make` 命令一键跑完，无需人工操作）**
+- [ ] Typecheck / lint 通过
+
+**(C) 手动验证清单（用户在 DevTools / 真机上操作）**
 - [ ] **微信开发者工具验证**：在 DevTools 模拟器中点击"开始录音"→ 等 3 秒 → 点击"停止录音"，控制台无报错，能在 `wx.env.USER_DATA_PATH` 或同等路径下看到生成的音频文件，文件扩展名与 manifest 中 `audio.original_format` 一致
 - [ ] **真机预览验证**：用真机扫码预览，授权录音权限后完成一次开始→停止流程，页面状态正常切换，无 JS 报错；vConsole 打印出 `original_format` 字段
 - [ ] **多机型验证**：在至少 1 台 iOS 真机 + 1 台 Android 真机上分别录一次，记录各自得到的 `original_format` 到 runbook（用于 US-015 转码逻辑决定是否需要兜底）
-- [ ] Typecheck / lint 通过
 
 #### US-008: 录音中断保护（锁屏 / 来电 / 切后台 / 杀进程 自动 stop + 保存草稿）
 
 **描述：** 作为用户，我录音时如果被电话、锁屏、微信切后台、系统杀进程打断，希望已经录到的部分**自动**被保存为草稿，而不是丢失。
 
 **Acceptance Criteria：**
+
+**(A) 代码实现**
 - [ ] 小程序在录音开始时已注册 `RecorderManager.onInterruptionBegin` 回调
 - [ ] 中断事件触发时，前端调用 `recorderManager.stop()` 并把当时的临时音频文件落到本地存储，状态标记为"草稿（被中断保存）"
 - [ ] 回到前台后页面给出明确提示：「上次录音被中断，已自动保存草稿，是否保留 / 丢弃 / 继续新录？」三个按钮可点击
+
+**(B) 自动验证（`make` 命令一键跑完，无需人工操作）**
+- [ ] Typecheck / lint 通过
+- [ ] 单元测试覆盖：`onInterruptionBegin` 回调注册逻辑、中断时 stop + 落盘逻辑
+
+**(C) 手动验证清单（用户在 DevTools / 真机上操作）**
 - [ ] **模拟器中断验证**：DevTools 中触发"模拟切后台"或调用 `onInterruptionBegin` 钩子，可以看到草稿被生成
 - [ ] **真机中断验证（至少跑通一种）**：录音中按下电源键锁屏 → 解锁回到小程序 → 看到草稿存在且时长与中断前一致；控制台 / vConsole 无未捕获异常
 - [ ] **真机中断验证（另一种）**：录音中收到来电（或切到微信外的其他 App） → 回到小程序 → 看到草稿被保留
 - [ ] 同时连续两次中断（先切后台再来电）→ 不会重复生成两份草稿，只保留最后状态
-- [ ] Typecheck / lint 通过
 
 #### US-009: 草稿管理（试听 / 重录 / 删除 / 保存并上传）
 
 **描述：** 作为用户，我录完音后希望先在草稿态预览（试听 / 重录 / 删除），确认满意后再点"保存并上传"晋升为正式 Fragment 并开始上传。
 
 **Acceptance Criteria：**
+
+**(A) 代码实现**
 - [ ] 停止录音后页面进入"草稿确认态"，显示：试听按钮、重录按钮、删除按钮、保存并上传按钮
 - [ ] 点击试听 → 调用 `wx.createInnerAudioContext` 播放本地临时音频；点击暂停能暂停
 - [ ] 点击重录 → 当前草稿被销毁（本地文件清理），回到 US-007 的录音初始态
 - [ ] 点击删除 → 当前草稿被销毁，无任何 Fragment 记录被上传或落盘
 - [ ] 点击保存并上传 → 草稿被冻结，生成 `fragment_id`（US-011），进入上传流程（US-012），并自动跳转到上传列表（US-014）
+
+**(B) 自动验证（`make` 命令一键跑完，无需人工操作）**
+- [ ] Typecheck / lint 通过
+
+**(C) 手动验证清单（用户在 DevTools / 真机上操作）**
 - [ ] **DevTools 验证**：录音 5 秒 → 试听能播放出原声 → 点击重录 → 旧文件消失（USER_DATA_PATH 下查不到）；再录 5 秒 → 点击删除 → 同样消失；再录 5 秒 → 点击保存并上传 → 上传列表里出现一条"上传中"记录
 - [ ] **真机验证**：同上流程，三种分支（重录 / 删除 / 保存并上传）都能正常切换，控制台无报错
 - [ ] 删除 / 重录后，无任何残留草稿文件出现在本地缓存中（可在下次冷启动后再次确认）
-- [ ] Typecheck / lint 通过
 
 #### US-010: 长录音自动分片（≥ 10 分钟自动切片，共享 session_id）
 
 **描述：** 作为用户，我有时会一口气说很久；当录音超过 10 分钟时，前端应该**对我透明地**把它切成多个 Fragment（每个 ≤ 10 分钟），共享一个 session_id，UI 上仍显示为"一段录音"。
 
 **Acceptance Criteria：**
+
+**(A) 代码实现**
 - [ ] 录音开始时分配一个 `session_id`（ULID）
 - [ ] 录音每达到配置时长（默认 600 秒）时，前端自动调用一次 stop + 立即 start，把已录的部分作为一个 chunk 落地，chunk_seq 从 1 递增
 - [ ] 最终用户点击停止时，最后一片的 chunk 状态被正确写入，并把 chunk_total 回填到所有 chunk 的 manifest 草案中
 - [ ] 单条 chunk 时长 ≤ 10 分 5 秒（容忍一点点切片误差），不会出现 25 分钟单条
+
+**(B) 自动验证（`make` 命令一键跑完，无需人工操作）**
+- [ ] Typecheck / lint 通过
+- [ ] 单元测试覆盖：session_id 分配、chunk_seq 递增、chunk_total 回填逻辑
+
+**(C) 手动验证清单（用户在 DevTools / 真机上操作）**
 - [ ] **真机验证（关键）**：录制 25 分钟的录音 → 自动生成 **3 条** Fragment，三条共享同一 `session_id`，`chunk_seq` 分别为 1/2/3，`chunk_total` = 3
 - [ ] 上传列表（US-014）能把这 3 条聚合为 1 行"长录音"展示，点开能看到 3 个子 chunk 的状态
 - [ ] 切片过程中没有音频丢失（3 条音频拼起来 ≈ 25 分钟，允许 ±2 秒切换间隙）
-- [ ] Typecheck / lint 通过
 
 #### US-011: Fragment ID 生成 + 设备指纹持久化 + 本地 manifest 草案
 
 **描述：** 作为系统设计者，我需要每条 Fragment 在前端生成时就有一个全局唯一、人眼可读的 `fragment_id`，并且 manifest 草案在前端落地，便于后续后端和Worker统一识别。
 
 **Acceptance Criteria：**
+
+**(A) 代码实现**
 - [ ] 小程序首次启动时生成一个 4-8 字符的 `device_short_id`，持久化到 `wx.setStorageSync`，后续启动复用
 - [ ] 每条 Fragment 在"保存并上传"时（US-009）生成 `fragment_id`，格式严格为 `<YYYYMMDDTHHMMSS>_<deviceShortId>_<ulid>`
 - [ ] 同一秒内连续生成 2 条 Fragment 的 `fragment_id` **必须不同**（ULID 的随机性保证）
 - [ ] 本地 manifest 草案（小程序端）至少包含：`fragment_id`、`session_id`、`chunk_seq`、`chunk_total`、`device_id`、`recorded_at`（ISO8601 带时区）、`duration_seconds`、`audio.size_bytes`、`audio.sha256`
 - [ ] 音频 sha256 在前端计算完成（用 WeChat 原生 crypto 或第三方 wasm 库），与后续后端 verify 时使用的 `expected_sha256` 一致
+
+**(B) 自动验证（`make` 命令一键跑完，无需人工操作）**
+- [ ] Typecheck / lint 通过
+- [ ] 单元测试覆盖：device_short_id 生成逻辑、fragment_id 格式校验（正则）、同一秒唯一性、manifest 草案字段完整性、sha256 计算正确性
+
+**(C) 手动验证清单（用户在 DevTools / 真机上操作）**
 - [ ] **DevTools 验证**：连续录 2 条短录音并保存上传 → 在 vConsole 中能打印出 2 条不同的 `fragment_id`，且 `device_short_id` 字段一致
 - [ ] **冷启动验证**：杀掉小程序进程，重新打开，`device_short_id` 仍是同一个值
-- [ ] Typecheck / lint 通过
 
 #### US-012: 静默登录 + 获取 STS 凭证 + 直传 OSS
 
 **描述：** 作为用户，我点击"保存并上传"后，前端应自动完成 `wx.login` → 调 FC `/issue-credential` 拿到单文件级 STS → `wx.uploadFile` 直传 OSS 这条链路，期间我无需手动登录。
 
 **Acceptance Criteria：**
+
+**(A) 代码实现**
 - [ ] 点击保存并上传后，前端依次：① `wx.login` 拿 code → ② POST FC `/issue-credential`（带 code、fragment_id、sha256、size） → ③ 用拿到的 STS 三件套构造 OSS PutObject 签名 → ④ `wx.uploadFile` 直传到 `recordings/<YYYY-MM-DD>/<fragment_id>.mp3`
 - [ ] FC 返回非 200 → 上传状态切换为"待人工重传"，并在列表上展示错误码（如 `OPENID_NOT_ALLOWED`、`INVALID_CODE`）
 - [ ] OSS 返回非 2xx → 进入指数退避自动重试（最多 3 次，间隔 5s / 15s / 45s）
 - [ ] 上传时 UI 显示进度条（百分比），上传完成后状态切换为"待 verify"
-- [ ] **真实闭环验证（关键）**：从 DevTools 录一条 5 秒音频 → 保存并上传 → 用户跑 `make show-oss-object FRAGMENT_ID=<前端打印的 id>` 能 stat 到该对象 + 大小与前端记录的 `audio.size_bytes` 一致；**用户无需打开 OSS 控制台**
-- [ ] **安全反例验证（脚本化）**：AI 提供 `make test-sts-escape` 脚本——脚本自动模拟"小程序拿到 STS 凭证后试图写另一个 object key"的场景（用 oss2 SDK 直接调用，跳过小程序 UI），期望返回 `AccessDenied`（验证 US-003 (B) 的单 key 级别 policy 生效）
-- [ ] vConsole / 控制台无未捕获异常
+
+**(B) 自动验证（`make` 命令一键跑完，无需人工操作）**
 - [ ] Typecheck / lint 通过
+- [ ] 单元测试覆盖：指数退避重试逻辑（mock）、FC 错误码映射、STS 签名构造
+- [ ] `make test-sts-escape`：脚本自动模拟"小程序拿到 STS 凭证后试图写另一个 object key"的场景（用 oss2 SDK 直接调用，跳过小程序 UI），期望返回 `AccessDenied`（验证 US-003 (B) 的单 key 级别 policy 生效）
 
-#### US-013: 上传后 verify + 本地缓存 48 小时保留
+**(C) 手动验证清单（用户在 DevTools / 真机上操作）**
+- [ ] **真实闭环验证（关键）**：从 DevTools 录一条 5 秒音频 → 保存并上传 → 用户跑 `make show-oss-object FRAGMENT_ID=<前端打印的 id>` 能 stat 到该对象 + 大小与前端记录的 `audio.size_bytes` 一致；**用户无需打开 OSS 控制台**
+- [ ] 上传时 UI 显示进度条，上传完成后状态切换为"待 verify"
+- [ ] vConsole / 控制台无未捕获异常
 
-**描述：** 作为系统所有者，我需要前端在 OSS 200 后立即调用 FC `/verify-upload` 拿到最终签收回执；无论 verify 是否通过，**本地草稿/上传记录至少保留 48 小时**才允许清理。
+#### US-013: 上传后 verify + 本地缓存保留策略
+
+**描述：** 作为系统所有者，我需要前端在 OSS 200 后立即调用 FC `/verify-upload` 拿到最终签收回执；本地缓存**仅在 verify 通过且超过 48 小时后**才允许自动清理，verify 未通过的文件永不自动删除（防止数据丢失），但用户可手动删除。
 
 **Acceptance Criteria：**
+
+**(A) 代码实现**
 - [ ] `wx.uploadFile` 收到 200 后，前端立即 POST FC `/verify-upload`（带 code、fragment_id、expected_sha256、expected_size）
 - [ ] 收到 `verified: true` → 本地 manifest 草案标记 `upload.verified_at` 为当前时间；上传列表状态切换为"上传成功"
 - [ ] 收到 `verified: false` → 上传列表状态切换为"待重传"，错误原因展示给用户
 - [ ] FC 调用本身失败（超时 / 网络错误） → 进入重试队列，最多 3 次；3 次仍失败 → 状态切换为"待人工 verify"
-- [ ] **本地保留策略**：无论 verify 是否通过，本地音频缓存文件（`wx.env.USER_DATA_PATH` 下）**至少保留 48 小时**；超过 48 小时且 `verified: true` 时才允许清理
-- [ ] **真实闭环验证（脚本化）**：上传一条短录音 → 状态显示"上传成功" → 用户跑 `make oss-delete-obj FRAGMENT_ID=<前端打印的 id>` 删除该对象（**无需打开 OSS 控制台**）→ 在小程序上重新点击该条记录的"重新 verify" → 状态切换为"待重传"，错误码 `OBJECT_NOT_FOUND`
-- [ ] **保留策略验证**：上传一条短录音 → verify 通过 → 在 DevTools 中把本地时间偏移设到 24 小时后 → 触发清理逻辑 → 文件**仍存在**；偏移到 49 小时后再触发 → 文件被清理
+- [ ] **本地保留策略（自动清理）**：
+  - **仅当** `verified: true` **且** `verified_at` 距当前时间 **≥ 48 小时** 时，才允许自动清理本地音频缓存文件（`wx.env.USER_DATA_PATH` 下）
+  - **verify 未通过**（`verified: false` / 待重传 / 待人工 verify）的文件 **永不自动删除**，无论过了多久
+  - **verify 通过但不足 48 小时** 的文件 **不允许自动删除**
+- [ ] **手动删除（异常兜底）**：上传列表中每条记录提供"删除本地缓存"操作入口（长按或滑动），用户确认后可手动删除任何状态的本地文件（含 verify 未通过的）；删除前弹出二次确认：「该录音尚未成功上传到云端，删除后无法恢复，确定删除？」（仅 verify 未通过时弹出，已通过的直接删除不二次确认）
+
+**(B) 自动验证（`make` 命令一键跑完，无需人工操作）**
 - [ ] Typecheck / lint 通过
+- [ ] 单元测试覆盖：verify 调用逻辑、重试队列、保留策略三种分支（时间 mock）
+
+**(C) 手动验证清单（用户在 DevTools / 真机上操作）**
+- [ ] **真实闭环验证**：上传一条短录音 → 状态显示"上传成功" → 用户跑 `make oss-delete-obj FRAGMENT_ID=<前端打印的 id>` 删除该对象（**无需打开 OSS 控制台**）→ 在小程序上重新点击该条记录的"重新 verify" → 状态切换为"待重传"，错误码 `OBJECT_NOT_FOUND`
+- [ ] **保留策略验证（verify 通过 + 48h 内不删）**：上传一条短录音 → verify 通过 → 在 DevTools 中把本地时间偏移设到 24 小时后 → 触发清理逻辑 → 文件**仍存在**
+- [ ] **保留策略验证（verify 通过 + 48h 后可删）**：偏移到 49 小时后再触发 → 文件被自动清理
+- [ ] **保留策略验证（verify 未通过永不自动删）**：模拟一条 verify 失败的录音 → 偏移到 7 天后 → 触发清理逻辑 → 文件**仍存在**
+- [ ] **手动删除验证**：对一条"待重传"状态的记录执行手动删除 → 弹出二次确认 → 确认后文件被删除 + 列表中该条消失
 
 #### US-014: 上传列表页（5 种状态展示 + 失败 3 次转人工 + 离线醒目提示）
 
 **描述：** 作为用户，我希望有一个独立的"上传列表"页面，能清晰看到每条录音处在哪个状态，特别是当多条录音未上传 / 上传失败时给我醒目提醒。
 
 **Acceptance Criteria：**
+
+**(A) 代码实现**
 - [ ] 上传列表页能展示每条 Fragment 的五种状态之一：`草稿` / `上传中` / `上传成功（verified）` / `上传失败` / `待人工重传`
 - [ ] 上传失败连续 3 次自动重试后切换为"待人工重传"，列表中**红色标记**，并显示"点击手动重传"按钮
 - [ ] 点击"手动重传"按钮 → 重置重试计数，重新走 US-012 + US-013 完整流程
@@ -559,11 +616,15 @@
   - `mock-fc-url-broken`：让所有 FC 请求强制返回失败
   - `mock-network-offline`：模拟离线（即使真实网络通畅）
   - `mock-verify-fail`：让 `/verify-upload` 永远返回 `verified: false`
-- [ ] **DevTools 验证**：通过故障注入开关依次制造 3 种场景（全成功 / 自动失败 3 次 / 离线录音后联网） → 列表上 5 种状态都能正确出现且文案正确
-- [ ] **真机验证**：开飞行模式录 2 条 → 列表显示离线积压 + 顶部红色提示 → 关闭飞行模式 → 自动开始上传，状态依次切换
-- [ ] **真机验证**：在故障注入菜单打开 `mock-fc-url-broken` → 录一条 → 自动重试 3 次失败 → 列表变红 + 出现"点击手动重传"按钮 → 关闭故障注入 → 手动重传成功
-- [ ] 控制台 / vConsole 无未捕获异常
+
+**(B) 自动验证（`make` 命令一键跑完，无需人工操作）**
 - [ ] Typecheck / lint 通过
+
+**(C) 手动验证清单（用户在 DevTools / 真机上操作）**
+- [ ] **DevTools 验证**：通过故障注入开关依次制造 3 种场景（全成功 / 自动失败 3 次 / 离线录音后联网） → 列表上 5 种状态都能正确出现且文案正确
+- [ ] **真机验证（离线）**：开飞行模式录 2 条 → 列表显示离线积压 + 顶部红色提示 → 关闭飞行模式 → 自动开始上传，状态依次切换
+- [ ] **真机验证（故障注入）**：在故障注入菜单打开 `mock-fc-url-broken` → 录一条 → 自动重试 3 次失败 → 列表变红 + 出现"点击手动重传"按钮 → 关闭故障注入 → 手动重传成功
+- [ ] 控制台 / vConsole 无未捕获异常
 
 ---
 
@@ -574,6 +635,8 @@
 **描述：** 作为Worker，我需要按 `config.yaml` 配置的频率轮询 OSS，发现新 object 时下载到临时文件，校验完整后做**格式标准化**（如果是 AAC 用 ffmpeg 转码为 MP3，如果已经是 MP3 直接保留），最终原子 rename 到 `audio.mp3`。
 
 **Acceptance Criteria：**
+
+**(A) 代码实现**
 - [ ] 脚本启动后按 `poll.interval_seconds`（默认 60）周期轮询 OSS，列出 `recordings/` 前缀下所有对象
 - [ ] 对每个**本地尚未存在**或**本地存在但无 `.done`** 的对象：
   - 下载到 `~/SoniScope/inbox/<fragment_id>.part`
@@ -584,20 +647,29 @@
     - **转码失败**（ffmpeg 非零退出 / 输出文件为 0 字节）→ 不写入 fragments 目录，把 `.part` 移到 `inbox/failed/<fragment_id>.part` 留档，日志报错并跳过该 Fragment（下次扫描会重试）
   - 在 manifest 中记录：`audio.original_format`（来自前端上报或检测结果）、`audio.format`（始终 `mp3`）、`audio.sha256`（最终 audio.mp3 的）、`upload.original_sha256`（OSS 上对象的，与 FC verify 一致）、`upload.original_size_bytes`
 - [ ] **OSS 永不删除**：脚本任何路径下都**不会**调用 `DeleteObject` 或 `oss2.Bucket.delete_object`（用 `rg "delete_object|DeleteObject"` 应只在测试 mock 中出现）
-- [ ] **可配置验证**：把 `poll.interval_seconds` 改为 30 → 重启脚本 → 日志显示每 30 秒一次扫描
-- [ ] **下载中断验证**：脚本下载过程中 `kill -9` → 重启后 `inbox/` 残留 `.part` 文件被识别为下载中断，重新下载，最终能完成
-- [ ] **MP3 直通验证**：上传一段真实 MP3 → Worker 下载后跳过 ffmpeg → `audio.sha256` == `upload.original_sha256`
-- [ ] **AAC 转码验证**：用 `tests/fixtures/audio/sample-aac.aac`（US-001 F 块新增的 fixture，或本 story 实施时新增）模拟 AAC 上传 → Worker 下载后调用 ffmpeg → 生成 `audio.mp3` → `ffprobe audio.mp3` 显示 codec=mp3 + duration ≈ 原 AAC duration ± 0.2s
-- [ ] **转码失败验证**：上传一段被截断的 AAC（人为 corrupt） → Worker ffmpeg 失败 → `inbox/failed/` 下有留档 + 日志报错；不污染 fragments 目录
-- [ ] **重复扫描验证**：脚本不重启的情况下，扫描周期内已 `.done` 的 Fragment 不会被重新下载（通过日志或 OSS 调用计数验证）
 - [ ] **ffmpeg 依赖检查**：Worker 启动时检测 `ffmpeg` 和 `ffprobe` 可用，缺失则启动失败并给出明确提示
+
+**(B) 自动验证（`make` 命令一键跑完，无需人工操作）**
 - [ ] Typecheck / lint 通过
+- [ ] 单元测试覆盖：sha256 校验、格式检测分支、转码失败处理、重复扫描跳过逻辑
+- [ ] **可配置验证**：`make test-poll-interval` → 把 `poll.interval_seconds` 改为 30 → 重启脚本 → 日志显示每 30 秒一次扫描
+- [ ] **下载中断验证**：`make test-download-interrupt` → 脚本下载过程中 `kill -9` → 重启后 `inbox/` 残留 `.part` 文件被识别为下载中断，重新下载，最终能完成
+- [ ] **MP3 直通验证**：`make test-mp3-passthrough` → 上传一段真实 MP3 → Worker 下载后跳过 ffmpeg → `audio.sha256` == `upload.original_sha256`
+- [ ] **AAC 转码验证**：`make test-aac-transcode` → 用 `tests/fixtures/audio/sample-aac.aac` 模拟 AAC 上传 → Worker 下载后调用 ffmpeg → 生成 `audio.mp3` → `ffprobe audio.mp3` 显示 codec=mp3 + duration ≈ 原 AAC duration ± 0.2s
+- [ ] **转码失败验证**：`make test-transcode-fail` → 上传一段被截断的 AAC（人为 corrupt） → Worker ffmpeg 失败 → `inbox/failed/` 下有留档 + 日志报错；不污染 fragments 目录
+- [ ] **重复扫描验证**：`make test-no-redownload` → 脚本不重启的情况下，扫描周期内已 `.done` 的 Fragment 不会被重新下载（通过日志或 OSS 调用计数验证）
+
+**(C) 手动验证清单**
+
+> 本 story 无需手动验证，所有 AC 均可通过自动化脚本完成。
 
 #### US-016: 启动恢复扫描 + 文件状态机三段式协议
 
 **描述：** 作为系统所有者，我需要Worker在每次启动时扫描 `~/SoniScope/fragments/`，根据每个目录里 `.part` / `audio.mp3` / `transcript.json.tmp` / `transcript.json` / `.done` 的组合，准确判断该 Fragment 处在哪个阶段，并从中断处继续。
 
 **Acceptance Criteria：**
+
+**(A) 代码实现**
 - [ ] 启动时遍历 `~/SoniScope/fragments/**/`，对每个 fragment 目录按下表判定：
 
   | 目录内容 | 判定 | 动作 |
@@ -611,10 +683,17 @@
   - 下载：先写 `<id>.part` → sha256 校验 → 原子 `rename` 为 `audio.mp3`
   - 转写：先写 `transcript.json.tmp` → 原子 `rename` 为 `transcript.json`
   - 完成：上述都成功后才写 `.done`（空文件）
-- [ ] **崩溃恢复验证（关键）**：录入一条音频，等Worker下载完 `audio.mp3` 但还在调用云端 API 转写时 `kill -9` → 重启脚本 → 自动重新调用 API 转写并写出 `transcript.json` + `.done`
-- [ ] **崩溃恢复验证（脚本化）**：跑 `make simulate-worker-crash CASE=missing-done FRAGMENT_ID=<id>` → 等价于删掉 `.done` 标记 → 重启 Worker → 该条会被重新转写并补回 `.done`
-- [ ] **崩溃恢复验证（脚本化）**：跑 `make simulate-worker-crash CASE=stale-part FRAGMENT_ID=<id>` → 等价于残留 `.part` 空文件 → 重启 Worker → 该残留被识别并重下，不会因此污染下游 `audio.mp3`
+
+**(B) 自动验证（`make` 命令一键跑完，无需人工操作）**
 - [ ] Typecheck / lint 通过
+- [ ] 单元测试覆盖：启动扫描 4 种状态判定、三段式协议各阶段原子性
+- [ ] **崩溃恢复验证（关键）**：`make test-crash-recovery` → 录入一条音频，等Worker下载完 `audio.mp3` 但还在调用云端 API 转写时 `kill -9` → 重启脚本 → 自动重新调用 API 转写并写出 `transcript.json` + `.done`
+- [ ] **崩溃恢复验证（missing-done）**：`make simulate-worker-crash CASE=missing-done FRAGMENT_ID=<id>` → 等价于删掉 `.done` 标记 → 重启 Worker → 该条会被重新转写并补回 `.done`
+- [ ] **崩溃恢复验证（stale-part）**：`make simulate-worker-crash CASE=stale-part FRAGMENT_ID=<id>` → 等价于残留 `.part` 空文件 → 重启 Worker → 该残留被识别并重下，不会因此污染下游 `audio.mp3`
+
+**(C) 手动验证清单**
+
+> 本 story 无需手动验证，所有 AC 均可通过自动化脚本完成。
 
 #### US-017: Transcriber 抽象接口 + CloudSpeechTranscriber 实现（云端 API 优先）
 
@@ -623,6 +702,8 @@
 **描述：** 作为系统设计者，我需要把"转写器"抽象成接口 `Transcriber.transcribe(audio_path) -> TranscriptResult`，本期实现 `CloudSpeechTranscriber`（调用 US-001 注册的云端语音转文字 API），并预留 `WhisperLocalTranscriber` 占位骨架，便于下一阶段切换到本地推理。
 
 **Acceptance Criteria：**
+
+**(A) 代码实现**
 - [ ] 存在 `Transcriber` 抽象基类（ABC 或 Protocol），定义方法 `transcribe(audio_path: Path, oss_object_key: str | None) -> TranscriptResult`；`TranscriptResult` 是结构化 dataclass，含 `segments`、`language`、`duration`、`model`、`params_version`、`provider`（如 `aliyun-nls`）
 - [ ] **音频传递方式（OQ-7 决议：方案 A）**：
   - **首选方案 A（OSS 签名 URL）**：`CloudSpeechTranscriber` 优先用 `oss2.Bucket.sign_url('GET', object_key, expires=3600)` 生成 OSS 临时签名 URL（**注意：传给 NLS 的是 OSS 上的原始 object，不是 Worker 本地转码后的 audio.mp3**——因为 NLS API 也支持 MP3/AAC 等多种格式，且原始对象本身就在 OSS 上，省一次上传）
@@ -633,38 +714,56 @@
 - [ ] `CloudSpeechTranscriber` 失败重试策略：网络错误 / 5xx 自动指数退避重试 3 次（间隔 5s/15s/45s）；4xx（鉴权 / 配额）立即失败并打印明确错误码
 - [ ] `WhisperLocalTranscriber` **占位类**存在（`raise NotImplementedError("Local Whisper deferred to next phase")`），证明接口预留可扩展，但本期不调用
 - [ ] 转写器实例由 `config.yaml` 中的 `transcriber.name` 决定（工厂方法）；当前默认 `cloud-speech`，未来切到 `whisper-local` 时不需要改业务代码
-- [ ] **真实闭环验证（关键）**：取 US-001 (E) 中跑通的同一段 10 秒测试 MP3 → 在 Worker 中调用 `CloudSpeechTranscriber.transcribe()`（**用 OSS URL 方案**）→ 返回的文字内容与 US-001 (E) 控制台验证结果一致（允许小幅模型版本差异，但**主干文字必须能对得上**）
-- [ ] **方案 A 验证**：日志显示 `mode=oss-url`；用 OSS 控制台或 `make show-oss-object` 能看到该对象在转写时段的访问日志（NLS 真的来拉过了）；Worker 端**不产生**上行流量到 NLS（用 `nethogs` 或同等工具确认转写期间 Worker 上行流量极小）
-- [ ] **降级方案 B 验证**：临时改 `config.yaml` 中 `transcriber.upload_mode = 'direct'` → 重新转写一条 → 日志显示 `mode=direct-upload`；转写结果与方案 A 一致
-- [ ] **性能验证（替代 P-01）**：用一段 1 分钟标准音频跑 `CloudSpeechTranscriber.transcribe()` → 端到端耗时 ≤ 60 秒（含 NLS 排队 + 处理；视服务商不同可调整阈值，写进 runbook 作为基线）
 - [ ] **成本可观测**：每次调用后日志输出"本次预估消耗时长 / 调用次数 / 累计成本（估算）"，便于运行过程中监控免费额度
 - [ ] 输出的 `transcript.json` 结构稳定，至少包含：`segments[].start`、`segments[].end`、`segments[].text`、`language`、`model`、`params_version`、`provider`
-- [ ] Typecheck / lint 通过；单元测试覆盖：工厂方法、方案 A/B 切换、签名 URL 过期续签、`CloudSpeechTranscriber` 失败重试逻辑（mock API）、`WhisperLocalTranscriber` 调用时抛 `NotImplementedError`
+
+**(B) 自动验证（`make` 命令一键跑完，无需人工操作）**
+- [ ] Typecheck / lint 通过
+- [ ] 单元测试覆盖：工厂方法、方案 A/B 切换、签名 URL 过期续签、`CloudSpeechTranscriber` 失败重试逻辑（mock API）、`WhisperLocalTranscriber` 调用时抛 `NotImplementedError`
+- [ ] **真实闭环验证（关键）**：`make test-transcribe` → 取 US-001 (E) 中跑通的同一段 10 秒测试 MP3 → 在 Worker 中调用 `CloudSpeechTranscriber.transcribe()`（**用 OSS URL 方案**）→ 返回的文字内容与 US-001 (E) 控制台验证结果一致（允许小幅模型版本差异，但**主干文字必须能对得上**）
+- [ ] **方案 A 验证**：`make test-transcribe-oss-url` → 日志显示 `mode=oss-url`；用 `make show-oss-object` 能看到该对象在转写时段的访问日志（NLS 真的来拉过了）；Worker 端**不产生**上行流量到 NLS（用 `nethogs` 或同等工具确认转写期间 Worker 上行流量极小）
+- [ ] **降级方案 B 验证**：`make test-transcribe-direct` → 临时改 `config.yaml` 中 `transcriber.upload_mode = 'direct'` → 重新转写一条 → 日志显示 `mode=direct-upload`；转写结果与方案 A 一致
+- [ ] **性能验证（替代 P-01）**：`make test-transcribe-perf` → 用一段 1 分钟标准音频跑 `CloudSpeechTranscriber.transcribe()` → 端到端耗时 ≤ 60 秒（含 NLS 排队 + 处理；视服务商不同可调整阈值，写进 runbook 作为基线）
+
+**(C) 手动验证清单**
+
+> 本 story 无需手动验证，所有 AC 均可通过自动化脚本完成。
 
 #### US-018: 幂等四元组判断 + 显式触发重转
 
 **描述：** 作为系统所有者，我需要Worker在每次扫描时基于 `(audio_sha256, transcriber_name, model_version, params_version)` 四元组判断是否需要重新转写，避免重复消耗算力；同时允许我通过修改配置显式触发存量重转。
 
 **Acceptance Criteria：**
+
+**(A) 代码实现**
 - [ ] 转写前从 `manifest.json` 读取已有的 `transcription` 字段：若四元组与当前配置**完全一致**且 `transcript.json` 存在 → 跳过转写
 - [ ] 任一字段不一致（如 `model` 从 `large-v3` 改成 `large-v4`） → 重新转写并覆盖 `transcript.json`，同时更新 manifest 的 `transcription` 字段
 - [ ] OSS 端去重：同一 object key 重复下载只会覆盖本地 `audio.mp3`，不会产生新目录
-- [ ] **重复扫描验证（F-08）**：脚本完成一条 Fragment 的转写后，重启或等待下一轮扫描 → 该 Fragment 不会再次进入 transcriber.transcribe()（通过日志或调用计数验证）
-- [ ] **显式全量重转验证（F-10）**：修改 `config.yaml` 中 `transcriber.params_version` 从 `v1` → `v2` → 下次扫描时，**所有存量 Fragment** 都被重新转写，`transcript.json` 内容被覆盖，manifest 的 `params_version` 字段更新为 `v2`，`.done` 重新刷新
 - [ ] **单条强制重转 CLI（OQ-3 决议）**：提供 `python -m soniscope_worker retranscribe <fragment_id> [--all-from <YYYY-MM-DD>] [--force]` 子命令（顶层 `make retranscribe FRAGMENT_ID=<id>` 别名）：
   - 不带 `--force` 时：若该 Fragment 四元组与当前配置一致且 `.done` 存在 → 提示"已是最新，使用 --force 强制重转"
   - 带 `--force` 时：忽略四元组判断，直接进入转写流程，覆盖 `transcript.json`、更新 manifest、刷新 `.done`
   - 支持 `--all-from <YYYY-MM-DD>` 批量强制重转某日期起的全部 Fragment（按目录批扫描，逐条转写，遇到失败继续下一条并最后汇总）
   - 命令运行期间 Worker 主轮询线程可继续工作（不互斥），但同一 fragment_id 不会被同时转两遍（用 file lock 防并发）
-- [ ] **CLI 验证**：跑一条 Fragment → 显式 `make retranscribe FRAGMENT_ID=<id> ARGS=--force` → 日志显示重转 + 新 `transcript.json` 覆盖；manifest 的 `transcription.completed_at` 时间戳更新
 - [ ] 显式重转过程中老的 `transcript.json` 不会"半覆盖"（始终通过 `.tmp` + rename 保证原子性）
-- [ ] Typecheck / lint 通过；单元测试覆盖：`retranscribe` 幂等性、`--force` 行为、file lock 并发保护
+
+**(B) 自动验证（`make` 命令一键跑完，无需人工操作）**
+- [ ] Typecheck / lint 通过
+- [ ] 单元测试覆盖：`retranscribe` 幂等性、`--force` 行为、file lock 并发保护
+- [ ] **重复扫描验证（F-08）**：`make test-idempotent-skip` → 脚本完成一条 Fragment 的转写后，重启或等待下一轮扫描 → 该 Fragment 不会再次进入 transcriber.transcribe()（通过日志或调用计数验证）
+- [ ] **显式全量重转验证（F-10）**：`make test-bulk-retranscribe` → 修改 `config.yaml` 中 `transcriber.params_version` 从 `v1` → `v2` → 下次扫描时，**所有存量 Fragment** 都被重新转写，`transcript.json` 内容被覆盖，manifest 的 `params_version` 字段更新为 `v2`，`.done` 重新刷新
+- [ ] **CLI 验证**：`make retranscribe FRAGMENT_ID=<id> ARGS=--force` → 日志显示重转 + 新 `transcript.json` 覆盖；manifest 的 `transcription.completed_at` 时间戳更新
+
+**(C) 手动验证清单**
+
+> 本 story 无需手动验证，所有 AC 均可通过自动化脚本完成。
 
 #### US-019: `manifest.json` 单向写入 + `transcript.json` + `.done` 完成标记
 
 **描述：** 作为系统所有者，我需要每个 Fragment 目录最终包含完整的 `manifest.json`（权威状态来源）、`transcript.json`（结构化转写）、`transcript.txt`（从 transcript.json 派生的纯文本）和 `.done`（完成标记），且字段格式与 requirements_v4 第 7.5 节完全一致。
 
 **Acceptance Criteria：**
+
+**(A) 代码实现**
 - [ ] `manifest.json` 字段至少包含：
   - **顶层**：`fragment_id`、`session_id`、`chunk_seq`、`chunk_total`、`device_id`、`recorded_at`、`duration_seconds`
   - **`audio`**（最终落盘后的 `audio.mp3`）：`format`（始终 `mp3`）、`original_format`（`mp3` 或 `aac`，来自 US-007 决策 1）、`size_bytes`、`sha256`（最终 audio.mp3 的，用于幂等四元组）
@@ -676,9 +775,16 @@
 - [ ] `transcript.json` 是结构化 JSON（segments + 时间戳 + 模型版本），不是纯文本
 - [ ] `transcript.txt` 从 `transcript.json` 派生（拼接 segments.text），便于人眼直接读
 - [ ] `.done` 是 0 字节空文件，仅作为"全流程完成"的旗标
-- [ ] **完整性验证**：跑完一条 Fragment 后，目录里**同时**存在以下 5 个文件：`audio.mp3` / `manifest.json` / `transcript.json` / `transcript.txt` / `.done`，且 manifest 中所有字段都已填充（无 null 残留，除非业务允许）
-- [ ] 用一段固定测试音频跑两次（同样 MP3 输入），**得到的 `manifest.json` 中除时间戳字段外，其他字段完全一致**（fragment_id 一致、所有 sha256 一致、segments 数量一致）
+
+**(B) 自动验证（`make` 命令一键跑完，无需人工操作）**
 - [ ] Typecheck / lint 通过
+- [ ] 单元测试覆盖：manifest schema 校验、MP3/AAC 两种路径的 sha256 一致性断言、原子写入逻辑
+- [ ] **完整性验证**：`make test-fragment-integrity` → 跑完一条 Fragment 后，目录里**同时**存在以下 5 个文件：`audio.mp3` / `manifest.json` / `transcript.json` / `transcript.txt` / `.done`，且 manifest 中所有字段都已填充（无 null 残留，除非业务允许）
+- [ ] **幂等性验证**：`make test-manifest-idempotent` → 用一段固定测试音频跑两次（同样 MP3 输入），**得到的 `manifest.json` 中除时间戳字段外，其他字段完全一致**（fragment_id 一致、所有 sha256 一致、segments 数量一致）
+
+**(C) 手动验证清单**
+
+> 本 story 无需手动验证，所有 AC 均可通过自动化脚本完成。
 
 ---
 
@@ -691,28 +797,39 @@
 **描述：** 作为系统所有者，我需要在真实环境下连续跑 100 条录音，验证整条链路（小程序录音 → 草稿确认 → 上传 OSS → FC verify → Worker下载 → **云端 API 转写** → `.done`）成功率达到 100%，无一条丢失或残留中间态。
 
 **Acceptance Criteria：**
+
+**(A) 自动验证（`make` 命令一键跑完，无需人工操作）**
+
+> 以下脚本在用户完成手动录音操作后运行，自动校验后端全链路结果。
+
+- [ ] `make list-oss-objects DATE=<YYYY-MM-DD>` 能列出**完整的 100 个 `.mp3` 对象**（脚本化输出 + 计数 = 100），文件名与前端 `fragment_id` 一一对应；**用户无需打开 OSS 控制台**
+- [ ] `make verify-e2e-integrity` → 本地 `~/SoniScope/fragments/` 下能看到**完整的 100 个 Fragment 目录**，每个目录都包含 `audio.mp3` / `manifest.json` / `transcript.json` / `transcript.txt` / `.done`
+- [ ] `make verify-e2e-sha256` → 每条 Fragment 的本地 `audio.mp3` sha256 与 OSS `ETag` 与小程序前端 `manifest.audio.sha256` **三者一致**
+- [ ] `make verify-e2e-fields` → 每条 Fragment 的 `manifest.upload.verified_at` 非空、`manifest.transcription.completed_at` 非空
+- [ ] **跑 1 周后再次确认**（R-07）：`make verify-oss-retention` → OSS 上对象数 ≥ 本地 fragments 目录数；Worker日志中无任何 `DeleteObject` 调用记录
+
+**(B) 手动验证清单（用户在真机上操作）**
 - [ ] **真机操作**：在真机上连续录制 100 条 30~90 秒的录音，依次点击"保存并上传"
 - [ ] 所有 100 条 Fragment 在小程序上传列表中状态最终都是"上传成功（verified）"
-- [ ] 跑 `make list-oss-objects DATE=<YYYY-MM-DD>` 能列出**完整的 100 个 `.mp3` 对象**（脚本化输出 + 计数 = 100），文件名与前端 `fragment_id` 一一对应；**用户无需打开 OSS 控制台**
-- [ ] 本地 `~/SoniScope/fragments/` 下能看到**完整的 100 个 Fragment 目录**，每个目录都包含 `audio.mp3` / `manifest.json` / `transcript.json` / `transcript.txt` / `.done`
-- [ ] 每条 Fragment 的本地 `audio.mp3` sha256 与 OSS `ETag` 与小程序前端 `manifest.audio.sha256` **三者一致**
-- [ ] 每条 Fragment 的 `manifest.upload.verified_at` 非空、`manifest.transcription.completed_at` 非空
 - [ ] 没有任何"待人工重传"或"待 verify"状态残留
 - [ ] 跑完后再等 48 小时 + 1 小时 → 真机本地的 100 条音频缓存自动清理；OSS 上的 100 个对象**仍然存在**
-- [ ] **跑 1 周后再次确认**（R-07）：OSS 上对象数 ≥ 本地 fragments 目录数；Worker日志中无任何 `DeleteObject` 调用记录
 
 #### US-021: 异常路径端到端闭环（中断 / 重试 / 崩溃 / 重转）
 
 **描述：** 作为系统所有者，我需要在真实环境下覆盖所有关键异常路径——录音中断、上传失败重试、脚本崩溃恢复、显式重转——验证系统在每种异常下都能正确恢复，无数据丢失、无重复转写。
 
 **Acceptance Criteria：**
+
+**(A) 自动验证（`make` 命令一键跑完，无需人工操作）**
+- [ ] **脚本崩溃恢复闭环**（F-09 + R-04）：`make test-e2e-crash-recovery` → Worker运行中，对一条正在转写的 Fragment 执行 `kill -9` → 该目录残留 `audio.mp3` 但无 `.done` → 重启脚本 → 自动重新转写并补回 `.done` + 完整的 `transcript.json`
+- [ ] **显式重转闭环**（F-10）：`make test-e2e-retranscribe` → 修改 `config.yaml` 的 `transcriber.params_version` v1 → v2 → 下次扫描时**所有存量 Fragment** 被重新转写，新的 `transcript.json` 覆盖旧的，`manifest.transcription.params_version` 全部变为 v2
+- [ ] **安全反例闭环**（S-03 + S-05）：`make test-e2e-security` → 用未在 allowlist 中的另一个微信号调用 FC → 收到 403；用合法 STS 凭证尝试 PutObject 到其他 key → OSS 返回 AccessDenied
+- [ ] **完整性扫描**：`make verify-no-stale` → 所有异常路径跑完后：OSS 上对象数 ≥ 本地 Fragment 目录数，未出现任何"半成品"目录（即不存在"有 `.part` 又有 `audio.mp3`"或"有 `transcript.json.tmp` 残留"的目录）
+
+**(B) 手动验证清单（用户在真机上操作）**
 - [ ] **中断保护闭环**（F-04 + R-06）：真机开飞行模式 → 录音 60 秒 → 中途按电源键锁屏 → 解锁 → 弹出中断恢复提示 → 选择"保留" → 草稿存在且时长 ≈ 锁屏前的时长 → 关闭飞行模式 → 上传成功
 - [ ] **长录音分片闭环**（F-05）：真机连续录制 25 分钟 → 自动切片为 3 条 Fragment（chunk_total = 3）→ 全部上传成功 + 本地全部转写完成 + 3 条 `manifest.session_id` 一致
-- [ ] **失败重试闭环**（R-05，脚本化）：在小程序中打开「开发者菜单 → 故障注入」开关（AI 在 US-014 提供）→ 选「FC URL 失效」→ 录音上传 → 自动重试 3 次失败 → 上传列表红色提示 + "点击手动重传"按钮 → 关闭故障注入 → 手动重传 → 上传成功 + Worker落盘完成；**用户无需修改源码**
-- [ ] **脚本崩溃恢复闭环**（F-09 + R-04）：Worker运行中，对一条正在转写的 Fragment 执行 `kill -9` → 该目录残留 `audio.mp3` 但无 `.done` → 重启脚本 → 自动重新转写并补回 `.done` + 完整的 `transcript.json`
-- [ ] **显式重转闭环**（F-10）：修改 `config.yaml` 的 `transcriber.params_version` v1 → v2 → 下次扫描时**所有存量 Fragment** 被重新转写，新的 `transcript.json` 覆盖旧的，`manifest.transcription.params_version` 全部变为 v2
-- [ ] **安全反例闭环**（S-03 + S-05）：用未在 allowlist 中的另一个微信号调用 FC → 收到 403；用合法 STS 凭证尝试 PutObject 到其他 key → OSS 返回 AccessDenied
-- [ ] 所有异常路径跑完后：OSS 上对象数 ≥ 本地 Fragment 目录数，未出现任何"半成品"目录（即不存在"有 `.part` 又有 `audio.mp3`"或"有 `transcript.json.tmp` 残留"的目录）
+- [ ] **失败重试闭环**（R-05）：在小程序中打开「开发者菜单 → 故障注入」开关（AI 在 US-014 提供）→ 选「FC URL 失效」→ 录音上传 → 自动重试 3 次失败 → 上传列表红色提示 + "点击手动重传"按钮 → 关闭故障注入 → 手动重传 → 上传成功 + Worker落盘完成；**用户无需修改源码**
 
 ---
 
@@ -727,7 +844,7 @@
 - **FR-5**：每条 Fragment 在前端生成时**必须**得到全局唯一的 `fragment_id = <YYYYMMDDTHHMMSS>_<deviceShortId>_<ulid>`（US-011）。
 - **FR-6**：FC `/issue-credential` **必须**先用 `wx.login` 的 code 换 `openid` → 检查 allowlist → 通过后才用 STS 签发**精确到单个 object key** 的临时凭证，凭证有效期 ≤ 15 分钟（US-003）。
 - **FR-7**：FC `/verify-upload` **必须**用 HeadObject 校验 OSS 对象存在 + 大小一致；失败时返回明确原因码（US-005）。
-- **FR-8**：小程序**必须**在收到 OSS 200 后立即调用 `/verify-upload`，并**至少保留本地缓存 48 小时**才允许清理（US-013）。
+- **FR-8**：小程序**必须**在收到 OSS 200 后立即调用 `/verify-upload`；本地缓存**仅在 verify 通过且超过 48 小时后**才允许自动清理，verify 未通过的文件永不自动删除；用户可手动删除任何状态的本地文件（US-013）。
 - **FR-9**：上传连续失败 3 次后**必须**切换为"待人工重传"红色提示状态（US-014）。
 - **FR-10**：Worker**必须**按 `config.yaml` 中可配置的 `poll.interval_seconds`（默认 60）周期轮询 OSS（US-015）。
 - **FR-11**：Worker**绝不**调用 OSS `DeleteObject`，OSS 文件永久保留（US-015 + US-020）。
@@ -797,7 +914,7 @@
 |---|---|---|
 | 端到端成功率 | 100 条录音 → 100 条本地落盘，0 丢失 | R-01 |
 | FC `/verify-upload` 通过率 | 真实路径下 verify 通过 ≥ 99% | R-02 |
-| 本地缓存保留 | verify 通过后仍保留 ≥ 48 小时 | R-03 |
+| 本地缓存保留 | verify 通过后仍保留 ≥ 48 小时；verify 未通过永不自动删除 | R-03 |
 | `.done` 缺失恢复率 | 删除 `.done` 后重启脚本，能自动补齐 100% | R-04 |
 | 3 次失败转人工 | 100% 触发，红色提示明显 | R-05 |
 | OSS 文件永不删除 | 1 周后 OSS 对象数 ≥ 本地数 | R-07 |
