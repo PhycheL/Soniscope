@@ -1,6 +1,6 @@
 # PRD: 日观声记 MVP（SoniScope）
 
-> 本 PRD 基于 `docs/requirements/requirements_v4.md` 拆分而来，**仅覆盖本期 MVP 范围**（第五章定义的最小闭环：录音 → 草稿 → 上传 OSS → 上传确认 → 本地下载 → **云端 API 转写** → 落盘）。**本期不部署本地 Whisper**，转写走公共云端语音转文字 API；本地模型推迟到流程跑通后再评估。下一阶段计划（LLM 润色、加密、多用户、SQLite 索引、自定义域名等）见原需求文档第八、九章，本 PRD 不展开。
+> 本 PRD 基于 `docs/requirements/requirements_v5.md` 拆分而来，**仅覆盖本期 MVP 范围**（第五章定义的最小闭环：录音 → 草稿 → 上传 OSS → 上传确认 → 本地下载 → **云端 API 转写** → 落盘）。**本期不部署本地 Whisper**，转写走公共云端语音转文字 API；本地模型推迟到流程跑通后再评估。下一阶段计划（LLM 润色、加密、多用户、SQLite 索引、自定义域名等）见原需求文档第八、九章，本 PRD 不展开。
 
 ---
 
@@ -632,22 +632,22 @@
 
 #### US-015: OSS 轮询 + 下载到 `.part` + 格式标准化（AAC → MP3）+ 原子 rename 为 `audio.mp3`
 
-**描述：** 作为Worker，我需要按 `config.yaml` 配置的频率轮询 OSS，发现新 object 时下载到临时文件，校验完整后做**格式标准化**（如果是 AAC 用 ffmpeg 转码为 MP3，如果已经是 MP3 直接保留），最终原子 rename 到 `audio.mp3`。
+**描述：** 作为Worker，我需要按 `config.yaml` 配置的频率轮询 OSS，发现新 object 时下载到临时文件，校验完整后做**格式标准化**（如果是 AAC 转码为 MP3，如果已经是 MP3 直接保留），最终原子 rename 到 `audio.mp3`。
 
 **Acceptance Criteria：**
 
 **(A) 代码实现**
-- [ ] 脚本启动后按 `poll.interval_seconds`（默认 60）周期轮询 OSS，列出 `recordings/` 前缀下所有对象
+
+- [ ] 脚本启动后按 `poll.interval_seconds`（默认 600）周期轮询 OSS，列出 `recordings/` 前缀下所有对象
 - [ ] 对每个**本地尚未存在**或**本地存在但无 `.done`** 的对象：
   - 下载到 `~/SoniScope/inbox/<fragment_id>.part`
   - 下载完成后计算 **`original_sha256`**；与 OSS 上的 ETag/Content-Length 比对一致；不一致 → 删除 `.part`，下一轮重下
   - **格式检测**（用 `ffprobe` 或文件头 magic bytes）：
     - 若是 **MP3** → 直接原子 rename `.part` 为 `~/SoniScope/fragments/<YYYY-MM-DD>/<fragment_id>/audio.mp3`，`audio.sha256` = `original_sha256`
-    - 若是 **AAC**（或其他非 MP3 格式）→ 用 `ffmpeg -i <input> -codec:a libmp3lame -q:a 2 <output>.tmp` 转码到 `inbox/<fragment_id>.mp3.tmp` → 计算转码后的 `audio.sha256` → 原子 rename 为 `audio.mp3`
-    - **转码失败**（ffmpeg 非零退出 / 输出文件为 0 字节）→ 不写入 fragments 目录，把 `.part` 移到 `inbox/failed/<fragment_id>.part` 留档，日志报错并跳过该 Fragment（下次扫描会重试）
+    - 若是 **AAC**（或其他非 MP3 格式）→ 转码到 `inbox/<fragment_id>.mp3.tmp` → 计算转码后的 `audio.sha256` → 原子 rename 为 `audio.mp3`
+    - **转码失败** → 不写入 fragments 目录，把 `.part` 移到 `inbox/failed/<fragment_id>.part` 留档，日志报错并跳过该 Fragment（下次扫描会重试）
   - 在 manifest 中记录：`audio.original_format`（来自前端上报或检测结果）、`audio.format`（始终 `mp3`）、`audio.sha256`（最终 audio.mp3 的）、`upload.original_sha256`（OSS 上对象的，与 FC verify 一致）、`upload.original_size_bytes`
 - [ ] **OSS 永不删除**：脚本任何路径下都**不会**调用 `DeleteObject` 或 `oss2.Bucket.delete_object`（用 `rg "delete_object|DeleteObject"` 应只在测试 mock 中出现）
-- [ ] **ffmpeg 依赖检查**：Worker 启动时检测 `ffmpeg` 和 `ffprobe` 可用，缺失则启动失败并给出明确提示
 
 **(B) 自动验证（`make` 命令一键跑完，无需人工操作）**
 - [ ] Typecheck / lint 通过
@@ -655,8 +655,8 @@
 - [ ] **可配置验证**：`make test-poll-interval` → 把 `poll.interval_seconds` 改为 30 → 重启脚本 → 日志显示每 30 秒一次扫描
 - [ ] **下载中断验证**：`make test-download-interrupt` → 脚本下载过程中 `kill -9` → 重启后 `inbox/` 残留 `.part` 文件被识别为下载中断，重新下载，最终能完成
 - [ ] **MP3 直通验证**：`make test-mp3-passthrough` → 上传一段真实 MP3 → Worker 下载后跳过 ffmpeg → `audio.sha256` == `upload.original_sha256`
-- [ ] **AAC 转码验证**：`make test-aac-transcode` → 用 `tests/fixtures/audio/sample-aac.aac` 模拟 AAC 上传 → Worker 下载后调用 ffmpeg → 生成 `audio.mp3` → `ffprobe audio.mp3` 显示 codec=mp3 + duration ≈ 原 AAC duration ± 0.2s
-- [ ] **转码失败验证**：`make test-transcode-fail` → 上传一段被截断的 AAC（人为 corrupt） → Worker ffmpeg 失败 → `inbox/failed/` 下有留档 + 日志报错；不污染 fragments 目录
+- [ ] **AAC 转码验证**：`make test-aac-transcode` → 用 `tests/fixtures/audio/sample-aac.aac` 模拟 AAC 上传 → Worker 下载后转码 → 生成 `audio.mp3` → 验证转码是否成功
+- [ ] **转码失败验证**：`make test-transcode-fail` → 上传一段被截断的 AAC（人为 corrupt） → Worker 转码失败 → `inbox/failed/` 下有留档 + 日志报错；不污染 fragments 目录
 - [ ] **重复扫描验证**：`make test-no-redownload` → 脚本不重启的情况下，扫描周期内已 `.done` 的 Fragment 不会被重新下载（通过日志或 OSS 调用计数验证）
 
 **(C) 手动验证清单**
@@ -729,29 +729,32 @@
 
 > 本 story 无需手动验证，所有 AC 均可通过自动化脚本完成。
 
-#### US-018: 幂等四元组判断 + 显式触发重转
+#### US-018: 幂等判断 + 显式触发重转
 
-**描述：** 作为系统所有者，我需要Worker在每次扫描时基于 `(audio_sha256, transcriber_name, model_version, params_version)` 四元组判断是否需要重新转写，避免重复消耗算力；同时允许我通过修改配置显式触发存量重转。
+**描述：** 作为系统所有者，我需要 Worker 在每次扫描时基于 `.done` 标记判断是否已完成转写，避免重复消耗算力；同时允许我通过 `retranscribe` CLI 命令显式触发存量重转。**更换模型 / 参数版本后，仅新进入的 Fragment 自动使用新配置，已完成的存量 Fragment 不会被自动重转。**
 
 **Acceptance Criteria：**
 
 **(A) 代码实现**
-- [ ] 转写前从 `manifest.json` 读取已有的 `transcription` 字段：若四元组与当前配置**完全一致**且 `transcript.json` 存在 → 跳过转写
-- [ ] 任一字段不一致（如 `model` 从 `large-v3` 改成 `large-v4`） → 重新转写并覆盖 `transcript.json`，同时更新 manifest 的 `transcription` 字段
+- [ ] **正常轮询幂等判断**：转写前检查 `.done` 文件是否存在 → 存在则**直接跳过**（无论当前配置中的模型 / 参数版本是否与 manifest 中记录的一致）
+- [ ] `.done` 不存在 → 按当前配置进行转写
+- [ ] **转写元数据记录**：转写完成后，将四元组 `(audio_sha256, transcriber_name, model_version, params_version)` 写入 `manifest.json` 的 `transcription` 字段，用于溯源和 CLI 筛选
 - [ ] OSS 端去重：同一 object key 重复下载只会覆盖本地 `audio.mp3`，不会产生新目录
-- [ ] **单条强制重转 CLI（OQ-3 决议）**：提供 `python -m soniscope_worker retranscribe <fragment_id> [--all-from <YYYY-MM-DD>] [--force]` 子命令（顶层 `make retranscribe FRAGMENT_ID=<id>` 别名）：
-  - 不带 `--force` 时：若该 Fragment 四元组与当前配置一致且 `.done` 存在 → 提示"已是最新，使用 --force 强制重转"
-  - 带 `--force` 时：忽略四元组判断，直接进入转写流程，覆盖 `transcript.json`、更新 manifest、刷新 `.done`
-  - 支持 `--all-from <YYYY-MM-DD>` 批量强制重转某日期起的全部 Fragment（按目录批扫描，逐条转写，遇到失败继续下一条并最后汇总）
+- [ ] **显式重转 CLI（OQ-3 决议）**：提供 `python -m soniscope_worker retranscribe <fragment_id> [--all-from <YYYY-MM-DD>] [--upgrade] [--force]` 子命令（顶层 `make retranscribe FRAGMENT_ID=<id>` 别名）：
+  - 不带 `--force` / `--upgrade` 时：若该 Fragment `.done` 存在 → 提示"已完成转写，使用 --force 强制重转或 --upgrade 升级旧模型"
+  - `--upgrade`：比对 manifest 中的 `model` / `params_version` 与当前配置，仅对"用旧版本转写的 Fragment"执行重转
+  - `--force`：忽略一切判断，直接重转
+  - 支持 `--all-from <YYYY-MM-DD>` 批量重转某日期起的全部 Fragment（按目录批扫描，逐条转写，遇到失败继续下一条并最后汇总）
   - 命令运行期间 Worker 主轮询线程可继续工作（不互斥），但同一 fragment_id 不会被同时转两遍（用 file lock 防并发）
 - [ ] 显式重转过程中老的 `transcript.json` 不会"半覆盖"（始终通过 `.tmp` + rename 保证原子性）
 
 **(B) 自动验证（`make` 命令一键跑完，无需人工操作）**
 - [ ] Typecheck / lint 通过
-- [ ] 单元测试覆盖：`retranscribe` 幂等性、`--force` 行为、file lock 并发保护
+- [ ] 单元测试覆盖：`retranscribe` 幂等性、`--force` 行为、`--upgrade` 筛选逻辑、file lock 并发保护
 - [ ] **重复扫描验证（F-08）**：`make test-idempotent-skip` → 脚本完成一条 Fragment 的转写后，重启或等待下一轮扫描 → 该 Fragment 不会再次进入 transcriber.transcribe()（通过日志或调用计数验证）
-- [ ] **显式全量重转验证（F-10）**：`make test-bulk-retranscribe` → 修改 `config.yaml` 中 `transcriber.params_version` 从 `v1` → `v2` → 下次扫描时，**所有存量 Fragment** 都被重新转写，`transcript.json` 内容被覆盖，manifest 的 `params_version` 字段更新为 `v2`，`.done` 重新刷新
-- [ ] **CLI 验证**：`make retranscribe FRAGMENT_ID=<id> ARGS=--force` → 日志显示重转 + 新 `transcript.json` 覆盖；manifest 的 `transcription.completed_at` 时间戳更新
+- [ ] **配置变更不触发自动重转验证（F-10）**：`make test-no-auto-retranscribe` → 修改 `config.yaml` 中 `transcriber.model` 或 `params_version` → 重启脚本 → 已有 `.done` 的存量 Fragment **不会**被重新转写（通过日志或调用计数验证，确认 transcriber.transcribe() 调用次数为 0）
+- [ ] **CLI 显式重转验证（F-11）**：`make test-cli-retranscribe` → 执行 `retranscribe <id> --force` → 日志显示重转 + 新 `transcript.json` 覆盖；manifest 的 `transcription.completed_at` 时间戳和 `model` 字段更新
+- [ ] **CLI --upgrade 验证**：`make test-cli-upgrade` → 修改 `config.yaml` 模型版本 → 执行 `retranscribe --all-from <date> --upgrade` → 仅旧模型转写的 Fragment 被重转，已用新模型转写的 Fragment 被跳过
 
 **(C) 手动验证清单**
 
@@ -759,7 +762,7 @@
 
 #### US-019: `manifest.json` 单向写入 + `transcript.json` + `.done` 完成标记
 
-**描述：** 作为系统所有者，我需要每个 Fragment 目录最终包含完整的 `manifest.json`（权威状态来源）、`transcript.json`（结构化转写）、`transcript.txt`（从 transcript.json 派生的纯文本）和 `.done`（完成标记），且字段格式与 requirements_v4 第 7.5 节完全一致。
+**描述：** 作为系统所有者，我需要每个 Fragment 目录最终包含完整的 `manifest.json`（权威状态来源）、`transcript.json`（结构化转写）、`transcript.txt`（从 transcript.json 派生的纯文本）和 `.done`（完成标记），且字段格式与 requirements_v5 第 7.5 节完全一致。
 
 **Acceptance Criteria：**
 
@@ -851,9 +854,9 @@
 - **FR-12**：本地文件操作**必须**走"先临时 → 原子 rename → 写 `.done`"三段式协议（US-016）。
 - **FR-13**：脚本启动时**必须**扫描 `~/SoniScope/fragments/`，对每个目录按状态机决定是跳过 / 重转 / 重下 / 新办（US-016）。
 - **FR-14**：转写**必须**通过 `Transcriber` 抽象接口调用；本期默认实现 `CloudSpeechTranscriber`（调用云端语音转文字 API），且预留 `WhisperLocalTranscriber` 占位骨架；**本期不部署本地推理模型**（US-017）。
-- **FR-15**：转写幂等性**必须**基于 `(audio_sha256, transcriber, model, params_version)` 四元组判断（US-018）。
+- **FR-15**：转写幂等性**必须**基于 `.done` 标记文件判断——`.done` 存在即跳过，不因模型 / 参数版本变更自动重转；四元组 `(audio_sha256, transcriber, model, params_version)` 仅记录于 manifest 供溯源和 CLI 筛选（US-018）。
 - **FR-16**：每个 Fragment 目录最终**必须**同时存在 `audio.mp3` / `manifest.json` / `transcript.json` / `transcript.txt` / `.done` 五个文件（US-019）。
-- **FR-17**：`manifest.json` 字段格式**必须**与 requirements_v4 第 7.5 节完全一致（US-019）。
+- **FR-17**：`manifest.json` 字段格式**必须**与 requirements_v5 第 7.5 节完全一致（US-019）。
 
 ---
 
@@ -861,7 +864,7 @@
 
 明确划出边界，避免范围蔓延：
 
-- **NG-1**：不做 LLM 润色与每日文字稿生成（详见 requirements_v4 第八章，下一期【计划 C】）。
+- **NG-1**：不做 LLM 润色与每日文字稿生成（详见 requirements_v5 第八章，下一期【计划 C】）。
 - **NG-2**：不做日稿呈现界面（Web / 邮件 / 移动 App），手机端**不需要**查看历史 Fragment 列表或日稿。
 - **NG-3**：不做搜索 / 标签 / 聚合 / 统计；本期不引入 SQLite 索引（下一期【计划 E】）。
 - **NG-4**：不做完整用户登录系统；只用 `openid` allowlist 单用户（下一期【计划 B】）。
@@ -908,7 +911,7 @@
 
 ## 8. Success Metrics / 成功指标
 
-以下指标必须全部通过才算 MVP 验收完成。每条都对应 requirements_v4 第十章的某条验收。
+以下指标必须全部通过才算 MVP 验收完成。每条都对应 requirements_v5 第十章的某条验收。
 
 | 指标 | 目标 | 对应原始验收编号 |
 |---|---|---|
