@@ -71,7 +71,7 @@ description: "为新功能生成 Product Requirements Document (PRD)。在规划
 - **描述：** "作为 [用户]，我想要 [功能]，以便 [收益]"
 - **Acceptance Criteria：** 可验证的"完成"标准清单
 
-每个 story 应该足够小，可以在一次专注的会话中实现。
+每个 story 应该符合 INVEST 原则：足够小，尽量独立，且可以在一次专注的会话中实现和验证。
 
 ### Acceptance Criteria 编写规则
 
