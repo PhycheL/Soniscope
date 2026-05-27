@@ -124,7 +124,7 @@
 
 - [ ] FC 已开通（首次开通自动创建服务关联角色）
 - [ ] 已创建服务 `soniscope-svc`，地域与 OSS 一致（如 `cn-hangzhou`）
-- [ ] 已在服务下创建两个函数 `issue-credential` 和 `verify-upload`，运行时 Python 3.11，**函数体可暂时是空的 hello world**（实际代码由 AI 在 US-003/004/005 提供，US-006 一键部署进来）
+- [ ] 已在服务下创建两个函数 `issue-credential` 和 `verify-upload`，运行时 Python 3.11，**函数体可暂时是空的 hello world**（实际代码与部署由 AI 在 US-003 和 US-005 各自完整交付：US-003 负责 `issue-credential` 的代码 + 部署，US-005 负责 `verify-upload` 的代码 + 扩展部署）
 - [ ] 两个函数都配置了 HTTP 触发器（认证方式 = anonymous，不是 function；后续业务层鉴权由 US-003 的 openid allowlist 兜底）
 - **检查方法**：
   - 终端：`curl -i https://<account>.<region>.fcapp.run/2016-08-15/proxy/soniscope-svc/issue-credential/` 应返回 200 + hello world，**不是** 404 / 502 / 网络错误
@@ -321,88 +321,115 @@
 
 ### 阶段 2：后端 FC（阿里云函数计算）
 
-#### US-003: FC `/issue-credential` — 微信 openid 校验与 allowlist 鉴权
+#### US-003: FC `/issue-credential` 完整交付（openid 校验 + STS 签发 + 部署 + 云端 verify）
 
-**描述：** 作为系统所有者，我需要 FC 在签发任何临时凭证前先用 `wx.login` 的 `code` 换 `openid`，并校验 openid 是否在 allowlist 中，以防止匿名滥用。
+> **AI 编程任务**：写 `/issue-credential` 的 handler 代码 + FC 部署能力首版（`make deploy-fc`）+ 在云端真实联调全部 AC。
+>
+> **前置假设（来自 US-001）**：FC 服务 `soniscope-svc` 已开通、两个函数槽位已建好（hello world 状态）、HTTP 触发器已配置、微信合法域名白名单已配置、FC 环境变量已注入。本 story 不要求用户回控制台做任何配置。
+>
+> **本 story 完整闭环**：写完即部署到云端真实 FC、云端 AC 全部 verify 通过，故事独立可交付。
+
+**描述：** 作为系统所有者，我需要 FC `/issue-credential` 接口在云端真实可用，能 (1) 用 wx.login code 换 openid 校验是否在 allowlist，(2) 给合法用户签发精确到单 object key、≤15 分钟、≤50MB 的 STS 临时凭证，(3) 拒绝越权 / 过期 / 超限请求。
 
 **Acceptance Criteria：**
+
+**(A) handler 代码 — openid 校验 + allowlist**
 - [ ] FC 函数 `/issue-credential` 接收 `{ code, fragment_id, sha256, size }`，**必填字段缺失返回 400**，含明确错误码
 - [ ] FC 调用 `jscode2session` 成功换得 openid；微信侧返回错误时 FC 返回 401 并透传错误码（如 `INVALID_CODE`）
 - [ ] FC 环境变量 `OPENID_ALLOWLIST` 中硬编码 1 个 openid（本期单用户）
 - [ ] openid **不在** allowlist → FC 返回 403 `{ "error": "OPENID_NOT_ALLOWED" }`，不再签发任何凭证
-- [ ] openid **在** allowlist → 继续进入 US-004 的凭证签发流程
-- [ ] 从任意可访问公网的终端用 `curl` 直接调用 FC 公网 URL（不带 code 或带伪造 code）**必须**被拒（400/401/403），不会拿到任何凭证
-- [ ] FC 日志记录每次调用的 openid（哈希后）、fragment_id、判定结果；用户可通过 `make fc-logs FUNCTION=issue-credential` 命令拉取最近日志，**无需打开 FC 控制台**
-- [ ] Typecheck / lint 通过
+- [ ] openid **在** allowlist → 继续进入 (B) 的凭证签发流程
+- [ ] FC 日志记录每次调用的 openid（哈希后）、fragment_id、判定结果
 
-#### US-004: FC `/issue-credential` — STS 签发单 object key 级别临时凭证
-
-**描述：** 作为系统所有者，我需要 FC 在 openid 通过校验后，调用阿里云 STS 签发**只能 PutObject 到本次 fragment 对应 object key** 的临时凭证，过期时间 ≤ 15 分钟。
-
-**Acceptance Criteria：**
+**(B) handler 代码 — STS 签发 + 大小校验**
 - [ ] FC 根据请求中的 `fragment_id` + 当前日期，组装目标 object key：`recordings/<YYYY-MM-DD>/<fragment_id>.mp3`
 - [ ] FC 调用 STS AssumeRole 时，传入的 policy 文档 `Resource` 字段**精确等于** `acs:oss:*:*:<bucket>/<object_key>`（单条，不带通配符）
 - [ ] 凭证有效期设置为 ≤ 900 秒（15 分钟）
-- [ ] **上传大小上限校验（OQ-5 决议）**：FC 检查请求中的 `size` 字段，**必须 ≤ 50 MB（52428800 字节）**；超过则**直接返回 400 `{ "error": "SIZE_EXCEEDED", "limit_bytes": 52428800, "actual_bytes": <size> }`**，不签发任何凭证。理由：单条录音目标 ≤ 10 分钟，MP3 约 10MB；50MB 已留足余量，超此阈值视为可疑请求（防止 Worker 被洪水下载攻击）。上限值通过 FC 环境变量 `MAX_UPLOAD_BYTES` 可调（默认 52428800）。
+- [ ] **上传大小上限校验（OQ-5 决议）**：FC 检查请求中的 `size` 字段，**必须 ≤ 50 MB（52428800 字节）**；超过则**直接返回 400 `{ "error": "SIZE_EXCEEDED", "limit_bytes": 52428800, "actual_bytes": <size> }`**，不签发任何凭证。理由：单条录音目标 ≤ 10 分钟，MP3 约 10MB；50MB 已留足余量，超此阈值视为可疑请求（防止 Worker 被洪水下载攻击）。上限值通过 FC 环境变量 `MAX_UPLOAD_BYTES` 可调（默认 52428800）
 - [ ] 返回体包含 `access_key_id`、`access_key_secret`、`security_token`、`expiration`、`bucket`、`endpoint`、`object_key`
-- [ ] **安全反例验证**：拿到的凭证尝试上传到 `recordings/<其他日期>/<其他 id>.mp3` → OSS 返回 `AccessDenied`
+
+**(C) FC 部署能力首版（含工程化基线）**
+- [ ] FC 函数源码位于 `apps/fc/issue_credential/handler.py`；同步把 `apps/fc/` 加入根 `pyproject.toml` 的 `[tool.uv.workspace] members`
+- [ ] 仓库新增 `scripts/deploy_fc.py` 和顶层 `make deploy-fc` target
+- [ ] `make deploy-fc` 自动完成：
+  1. 接收 `FUNCTION=<name>` 参数（如 `make deploy-fc FUNCTION=issue_credential`），不传时默认部署所有 `apps/fc/*/` 下的函数（本 story 阶段只有一个）
+  2. 在 `build/fc/<function_name>/` 下打包源码（从 `apps/fc/<function_name>/` 拷贝）+ `apps/fc/<function_name>/requirements.txt` 中声明的 vendored 依赖
+  3. 用 aliyun fc SDK（`alibabacloud-fc20230330` 或同等）把 zip 上传到 `soniscope-svc` 服务下对应函数（覆盖代码，**不动**环境变量 / 触发器 / 运行时配置——这些都是 US-001 已经配置好的，AI 不要动）
+  4. 部署完成后，自动 `curl` 该函数 URL 做存活验证
+- [ ] 部署脚本读取 FC 部署所需的 AK 来源（环境变量 `ALIYUN_DEPLOY_AK_ID` / `ALIYUN_DEPLOY_AK_SECRET`），**不写死到代码里**；本地 `.env`（已 gitignore）或 CI secret 都可注入
+- [ ] **工程化基线（必须在首次部署就具备，US-005 直接复用，不允许后续追加）**：
+  - 部署脚本每次推送前从 FC 读取当前代码 zip 并备份到 `build/fc/backup/<timestamp>/<function_name>.zip`，便于一键回滚
+  - 部署日志写入 `build/fc/logs/deploy-<timestamp>.log`，包含：函数名、zip sha256、上传耗时、curl 验证结果
+  - `build/` 目录已加入 `.gitignore`（构建产物不进仓库）
+
+**(D) 云端联调（必须在云端真实 FC 上 verify）**
+- [ ] 跑 `make deploy-fc FUNCTION=issue_credential` 把 (A)(B) 代码推到云端，部署日志显示 200 + curl 存活验证通过
+- [ ] **公网 curl 拒绝匿名验证**：从任意可访问公网的终端用 `curl` 直接调用 FC 公网 URL（不带 code 或带伪造 code）**必须**被拒（400/401/403），不会拿到任何凭证
+- [ ] **wx-login 失败验证**：跑 `make test-fc-live` → 用 `tests/fixtures/wx-login-fixture.json` 中的伪造 code 调 `/issue-credential` → 验证返回 401 `INVALID_CODE`（证明 (A) 代码生效）
+- [ ] **allowlist 拒绝验证**：用真实 wx.login code（通过 `scripts/get_wx_code.py` 由用户在 DevTools 中临时获取并传入）调 `/issue-credential` → 验证 openid 不在 allowlist 时返回 403 `OPENID_NOT_ALLOWED`（**不需要用户回控制台**，只需 DevTools 跑 `wx.login` 一次）
+- [ ] **STS 签发成功验证**：用 allowlist 内 openid 的 code 调 `/issue-credential` 返回有效 STS 凭证（含 (B) 要求的 7 个字段）
+- [ ] **安全反例验证（拿到 STS 后越权）**：拿到的凭证尝试上传到 `recordings/<其他日期>/<其他 id>.mp3` → OSS 返回 `AccessDenied`
 - [ ] **安全反例验证**：拿到的凭证尝试 `GetObject` / `ListObjects` / `DeleteObject` → 全部返回 `AccessDenied`
 - [ ] **安全反例验证**：等待 16 分钟后用同一凭证再 PutObject → 返回 `ExpiredToken` 或等价错误
 - [ ] **大小反例验证**：用 `size=60000000` 调 `/issue-credential` → 返回 400 `SIZE_EXCEEDED`；用 `size=10000000` → 返回正常 STS 凭证
-- [ ] Typecheck / lint 通过
+- [ ] **日志拉取验证**：跑 `make fc-logs FUNCTION=issue-credential` 能拉到上述请求的日志（含 openid 哈希、fragment_id、判定结果），**用户无需打开 FC 控制台**
 
-#### US-005: FC `/verify-upload` — OSS HeadObject 上传完整性校验
+**(E) 质量门 + 本地测试**
+- [ ] Typecheck（mypy strict）通过；扫 `apps/fc/issue_credential/src/`、`scripts/deploy_fc.py`
+- [ ] Lint（ruff）通过
+- [ ] 单元测试覆盖：handler 字段校验、`jscode2session` mock、allowlist 判定、STS policy 字符串拼接、大小上限边界、deploy 脚本打包逻辑 / SDK 调用 mock / 错误重试
 
-**描述：** 作为系统所有者，我需要 FC 提供一个 `/verify-upload` 接口，用于在小程序上传完成后做 OSS 端 HeadObject 校验，给出"上传是否真的完整存在"的最终签收回执。
+**(F) 用户操作清单（用户只需跑命令，不回控制台）**
+- [ ] 用户跑 `make deploy-fc FUNCTION=issue_credential` 一次 → 部署成功 + curl 验证通过
+- [ ] 用户跑 `make test-fc-live` → (D) 中所有云端反例 + 正例自动跑完并汇总 pass/fail
+- [ ] 用户跑 `make fc-logs FUNCTION=issue-credential` → 能看到上面请求的日志
+- [ ] 后续 `issue-credential` 代码改动只需重跑 `make deploy-fc FUNCTION=issue_credential`，**不需要打开 FC 控制台**
+
+> ❌ 本 story **不**做的事（已在 US-001 完成）：开通 FC 服务 / 创建函数槽位 / 配置 HTTP 触发器 / 微信合法域名白名单 / 注入 FC 环境变量。这些都是 US-001 C/D/H 块的一次性人工准备，AI 不要试图自动化。
+
+#### US-005: FC `/verify-upload` 完整交付（HeadObject + 扩展部署 + 云端 verify）
+
+> **AI 编程任务**：写 `/verify-upload` 的 handler 代码 + 扩展 US-003 已建的 `make deploy-fc` 支持第二个函数 + 在云端真实联调全部 AC。
+>
+> **前置假设（来自 US-003）**：`make deploy-fc` 已存在且支持 `FUNCTION=<name>` 参数化；FC 部署 SDK / RAM 凭证 / 备份 / 回滚 / 日志机制已就绪。本 story 只需新增一个函数的部署配置。
+>
+> **本 story 完整闭环**：写完即部署到云端真实 FC、云端 AC 全部 verify 通过，故事独立可交付。
+
+**描述：** 作为系统所有者，我需要 FC `/verify-upload` 接口在云端真实可用，能用 HeadObject 校验 OSS 对象存在性 + 大小一致性，给小程序提供"上传是否真的完整"的最终签收回执，P95 ≤ 1 秒。
 
 **Acceptance Criteria：**
-- [ ] FC 函数 `/verify-upload` 接收 `{ code, fragment_id, expected_sha256, expected_size }`；同样走 US-003 的 openid + allowlist 校验
+
+**(A) handler 代码**
+- [ ] FC 函数 `/verify-upload` 接收 `{ code, fragment_id, expected_sha256, expected_size }`；同样走 US-003 (A) 的 openid + allowlist 校验（代码层面**可复用** US-003 已有的鉴权 helper；如已抽公共模块更佳，未抽则各自实现一遍亦可，本期不强求 DRY）
 - [ ] FC 对目标 object key 执行 HeadObject；对象不存在 → 返回 `{ verified: false, reason: "OBJECT_NOT_FOUND" }`
 - [ ] 对象存在但 `Content-Length` 与 `expected_size` 不一致 → 返回 `{ verified: false, reason: "SIZE_MISMATCH", actual_size: ... }`
 - [ ] 对象存在且大小一致 → 返回 `{ verified: true, etag, size, last_modified }`
-- [ ] **真实闭环验证（脚本化）**：AI 提供 `make test-verify-upload` 脚本自动完成「ossutil 上传测试对象 → 调用 `/verify-upload` 期望 `verified: true` → ossutil 删除对象 → 再次调用期望 `verified: false, reason: OBJECT_NOT_FOUND`」全流程，**用户无需手工操作 OSS 控制台**
-- [ ] FC 日志记录每次 verify 的 fragment_id、结果、耗时；AI 同时提供 `make fc-logs FUNCTION=verify-upload` 命令拉取最近日志，**用户无需打开 FC 控制台**
+- [ ] FC 日志记录每次 verify 的 fragment_id、结果、耗时
 - [ ] P95 响应时间 ≤ 1 秒（原需求 P-03）
-- [ ] Typecheck / lint 通过
 
-#### US-006: FC 函数代码部署脚本（一键 deploy 到 US-001 C 块创建的函数槽位）
+**(B) 扩展 `make deploy-fc` 支持第二个函数**
+- [ ] FC 函数源码位于 `apps/fc/verify_upload/handler.py`（US-003 已建 `apps/fc/` workspace 配置，此处仅新增子目录 + `pyproject.toml` member 配置）
+- [ ] 跑 `make deploy-fc FUNCTION=verify_upload` 能复用 US-003 已建的部署能力（备份 / 回滚 / 日志 / 工程化基线全部复用，**不应**新写一份）
+- [ ] 跑不带参的 `make deploy-fc` 能自动扫描 `apps/fc/*/` 并部署所有函数（此时应同时部署 `issue_credential` + `verify_upload`）；日志显示两个函数各自的 zip sha256 + curl 存活验证结果
 
-> **AI 编程任务**：写 `make deploy-fc` 部署脚本，把 US-003 / US-004 / US-005 的 FC 函数代码打包推送到 US-001 C 块创建好的函数槽位上。
->
-> **前置假设（来自 US-001）**：FC 服务 `soniscope-svc` 已开通、两个函数槽位已建好、HTTP 触发器已配置、微信合法域名白名单已配置、FC 环境变量已注入。本 story 不要求用户回控制台做任何配置，只跑 `make deploy-fc`。
+**(C) 云端联调（必须在云端真实 FC 上 verify）**
+- [ ] 跑 `make deploy-fc FUNCTION=verify_upload` 把 (A) 代码推到云端，部署日志显示 200 + curl 存活验证通过
+- [ ] **真实闭环验证（脚本化）**：AI 提供 `make test-verify-upload` 脚本自动完成「ossutil 上传测试对象 → 调用 `/verify-upload` 期望 `verified: true` → ossutil 删除对象 → 再次调用期望 `verified: false, reason: OBJECT_NOT_FOUND`」全流程，**用户无需手工操作 OSS 控制台**
+- [ ] **大小不一致验证**：上传一个 100 字节对象 → 用 `expected_size=200` 调 `/verify-upload` → 返回 `verified: false, reason: SIZE_MISMATCH, actual_size: 100`
+- [ ] **鉴权拒绝验证**：不带 code / 伪造 code → 同 US-003 (D)，返回 400/401
+- [ ] **日志拉取验证**：跑 `make fc-logs FUNCTION=verify-upload` 能拉到上述请求的日志（含 fragment_id / 结果 / 耗时），**用户无需打开 FC 控制台**
+- [ ] **性能验证**：跑 `make test-verify-upload` 时输出 P95 响应时间，必须 ≤ 1 秒
 
-**描述：** 作为开发者，我需要 AI 提供一键部署脚本，把 FC 函数代码（US-003/004/005 完成的 Python 代码）打包成 zip 推送到阿里云 FC，覆盖到 US-001 C 块创建的两个函数槽位上；部署完成后通过 curl 验证两个 URL 真实可用。
-
-**Acceptance Criteria：**
-
-**(A) 部署脚本**
-- [ ] 仓库新增 `scripts/deploy_fc.py` 和顶层 `make deploy-fc` target
-- [ ] FC 函数源码位于 `apps/fc/{issue_credential,verify_upload}/handler.py`（本 story 同步把 `apps/fc/` 加入根 `pyproject.toml` 的 uv workspace members；如 US-003/004/005 已加则跳过）
-- [ ] `make deploy-fc` 自动完成：
-  1. 在 `build/fc/issue_credential/` 和 `build/fc/verify_upload/` 下打包源码（从 `apps/fc/<func>/` 拷贝）+ `apps/fc/<func>/requirements.txt` 中声明的 vendored 依赖
-  2. 用 aliyun fc SDK（`alibabacloud-fc20230330` 或同等）把两个 zip 上传到 `soniscope-svc` 服务下对应的函数（覆盖代码即可，**不动**环境变量 / 触发器 / 运行时配置——这些都是 US-001 已经配置好的，AI 不要动）
-  3. 部署完成后，自动 `curl` 两个函数 URL 做存活验证
-- [ ] 部署脚本读取 FC 部署所需的 AK 来源（环境变量 `ALIYUN_DEPLOY_AK_ID` / `ALIYUN_DEPLOY_AK_SECRET`），**不写死到代码里**；本地 `.env`（已 gitignore）或 CI secret 都可注入
-
-**(B) 部署验证**
-- [ ] 部署成功后跑 `make test-fc-live` → 用 `tests/fixtures/wx-login-fixture.json` 中的伪造 code 调 `/issue-credential` → 验证返回 401 `INVALID_CODE`（证明函数代码生效）
-- [ ] 用真实 wx.login code（通过 `scripts/get_wx_code.py` 由用户在 DevTools 中临时获取并传入）调 `/issue-credential` → 验证 openid 不在 allowlist 时返回 403（**不需要用户回控制台**，只需 DevTools 跑 `wx.login` 一次）
-- [ ] 用 allowlist 内 openid 的 code 调 `/issue-credential` 返回有效 STS 凭证；调 `/verify-upload` 对不存在 object 返回 `OBJECT_NOT_FOUND`
-
-**(C) 失败回滚 + 部署可追溯**
-- [ ] 部署脚本每次推送前从 FC 读取当前代码 zip 并备份到 `build/fc/backup/<timestamp>/`（包含 `issue_credential.zip` + `verify_upload.zip`），便于一键回滚
-- [ ] 部署日志写入 `build/fc/logs/deploy-<timestamp>.log`，包含：函数名、zip sha256、上传耗时、curl 验证结果
-- [ ] `build/` 目录已加入 `.gitignore`（构建产物不进仓库）
-
-**(D) 质量门**
-- [ ] Typecheck / lint 通过
-- [ ] 单元测试覆盖：打包逻辑 / SDK 调用 mock / 错误重试逻辑
+**(D) 质量门 + 本地测试**
+- [ ] Typecheck（mypy strict）通过；扫 `apps/fc/verify_upload/src/`
+- [ ] Lint（ruff）通过
+- [ ] 单元测试覆盖：handler 字段校验、HeadObject mock 三种返回路径、`jscode2session` mock、allowlist 判定
 
 **(E) 用户操作清单（用户只需跑命令，不回控制台）**
-- [ ] 用户跑 `make deploy-fc` 一次 → 部署成功 + curl 验证通过
-- [ ] 后续任何 FC 代码改动后，重新 `make deploy-fc` 即可，**不需要打开 FC 控制台**
-
-> ❌ 本 story **不**做的事（已在 US-001 完成）：开通 FC 服务 / 创建函数槽位 / 配置 HTTP 触发器 / 微信合法域名白名单 / 注入 FC 环境变量。这些都是 US-001 C/D/H 块的一次性人工准备，AI 不要试图自动化（FC 服务和触发器的初次创建涉及账号级别的策略，自动化反而风险大；后续日常的代码迭代靠 deploy 脚本即可）。
+- [ ] 用户跑 `make deploy-fc FUNCTION=verify_upload` 一次 → 部署成功 + curl 验证通过
+- [ ] 用户跑 `make test-verify-upload` → (C) 中闭环验证自动跑完
+- [ ] 用户跑 `make fc-logs FUNCTION=verify-upload` → 能看到日志
+- [ ] 后续 `verify-upload` 代码改动只需重跑 `make deploy-fc FUNCTION=verify_upload`，**不需要打开 FC 控制台**
 
 ---
 
@@ -494,7 +521,7 @@
 - [ ] OSS 返回非 2xx → 进入指数退避自动重试（最多 3 次，间隔 5s / 15s / 45s）
 - [ ] 上传时 UI 显示进度条（百分比），上传完成后状态切换为"待 verify"
 - [ ] **真实闭环验证（关键）**：从 DevTools 录一条 5 秒音频 → 保存并上传 → 用户跑 `make show-oss-object FRAGMENT_ID=<前端打印的 id>` 能 stat 到该对象 + 大小与前端记录的 `audio.size_bytes` 一致；**用户无需打开 OSS 控制台**
-- [ ] **安全反例验证（脚本化）**：AI 提供 `make test-sts-escape` 脚本——脚本自动模拟"小程序拿到 STS 凭证后试图写另一个 object key"的场景（用 oss2 SDK 直接调用，跳过小程序 UI），期望返回 `AccessDenied`（验证 US-004 的单 key 级别 policy 生效）
+- [ ] **安全反例验证（脚本化）**：AI 提供 `make test-sts-escape` 脚本——脚本自动模拟"小程序拿到 STS 凭证后试图写另一个 object key"的场景（用 oss2 SDK 直接调用，跳过小程序 UI），期望返回 `AccessDenied`（验证 US-003 (B) 的单 key 级别 policy 生效）
 - [ ] vConsole / 控制台无未捕获异常
 - [ ] Typecheck / lint 通过
 
@@ -698,7 +725,7 @@
 - **FR-3**：停止录音后**必须**先生成草稿，由用户显式点击"保存并上传"才晋升为 Fragment（US-009）。
 - **FR-4**：当单次录音 ≥ 10 分钟时，前端**必须**自动按 600 秒分片，多片共享 `session_id`、独立 `chunk_seq`（US-010）。
 - **FR-5**：每条 Fragment 在前端生成时**必须**得到全局唯一的 `fragment_id = <YYYYMMDDTHHMMSS>_<deviceShortId>_<ulid>`（US-011）。
-- **FR-6**：FC `/issue-credential` **必须**先用 `wx.login` 的 code 换 `openid` → 检查 allowlist → 通过后才用 STS 签发**精确到单个 object key** 的临时凭证，凭证有效期 ≤ 15 分钟（US-003 + US-004）。
+- **FR-6**：FC `/issue-credential` **必须**先用 `wx.login` 的 code 换 `openid` → 检查 allowlist → 通过后才用 STS 签发**精确到单个 object key** 的临时凭证，凭证有效期 ≤ 15 分钟（US-003）。
 - **FR-7**：FC `/verify-upload` **必须**用 HeadObject 校验 OSS 对象存在 + 大小一致；失败时返回明确原因码（US-005）。
 - **FR-8**：小程序**必须**在收到 OSS 200 后立即调用 `/verify-upload`，并**至少保留本地缓存 48 小时**才允许清理（US-013）。
 - **FR-9**：上传连续失败 3 次后**必须**切换为"待人工重传"红色提示状态（US-014）。
@@ -798,7 +825,7 @@
 | OQ-2 | 前端是否算 sha256 | **保持现状：前端算 sha256**（卡顿如严重再退化为 size-only verify） | 无需改 PRD，已是默认行为（US-011） |
 | OQ-3 | 是否提供单条 Fragment 强制重转 CLI | **要做，本期内提供** `python -m soniscope_worker retranscribe <id> --force`（顶层 `make retranscribe` 别名） | US-018 |
 | OQ-4 | 长录音多 chunk 在上传列表如何展示 | **折叠卡片 + 每个 chunk 独立可重传**（不整段强制一起重传） | US-014 |
-| OQ-5 | FC 是否对 expected_size 做上限校验 | **要加，上限 50 MB**（环境变量 `MAX_UPLOAD_BYTES` 可调） | US-004 |
+| OQ-5 | FC 是否对 expected_size 做上限校验 | **要加，上限 50 MB**（环境变量 `MAX_UPLOAD_BYTES` 可调） | US-003 (B) |
 | OQ-6 | 选哪家云端语音转文字 API | **暂定阿里云智能语音交互 NLS 录音文件极速版**；执行 US-001 (E) 实测时若有调整需同步更新 PRD + runbook | US-001 (E) / Technical Considerations / US-017 |
 | OQ-7 | NLS 拉 OSS URL vs Worker 直传 | **方案 A：传 OSS 签名 URL 让 NLS 自己拉**（更省流量）；不支持的 provider 降级到方案 B | US-017 |
 
@@ -811,7 +838,7 @@
 按本 PRD user stories 编号自然实施即可，但建议关键里程碑：
 
 1. **里程碑 M0（人工，唯一一次）**：US-001 完成 → 阿里云资源 + 微信小程序 + 云端 ASR + 测试素材 + Worker 环境 + 凭证全部就绪 → `make verify-prep` 全绿
-2. **里程碑 M1（AI 编程）**：US-002 ~ US-006 完成 → 项目骨架 + FC 函数代码 + 部署脚本就绪；跑 `make deploy-fc` + `make test-fc-live` 通过
+2. **里程碑 M1（AI 编程）**：US-002 + US-003 + US-005 完成 → 项目骨架就绪 + 两个 FC 函数代码已部署到云端且联调通过；跑 `make typecheck` / `make lint` / `make test` / `make deploy-fc` / `make test-fc-live` 全绿
 3. **里程碑 M2（AI 编程）**：US-007 ~ US-014 完成 → 小程序端完整完成"录音 → 上传 → verify"；故障注入开关可用
 4. **里程碑 M3（AI 编程）**：US-015 ~ US-019 完成 → Worker 端完整完成"轮询 → 下载 → 调用云端 API 转写 → 落盘"（本期不部署本地模型）
 5. **里程碑 M4（AI 编程 + 用户跑）**：US-020 + US-021 完成 → MVP 整体闭环验收通过；100 条真机录音 + 6 类异常路径全跑通
@@ -826,7 +853,7 @@
 实施过程中可对照下面清单逐项打勾：
 
 - [ ] **M0（人工，必须先完成）**：US-001 全部 A~I 9 块的检查方法通过；`make verify-prep` 全绿；`docs/runbook/cloud-setup.md` 已登记
-- [ ] **M1（AI）**：US-002 ~ US-006 完成；`make typecheck` / `make lint` / `make test` / `make deploy-fc` / `make test-fc-live` 全绿
+- [ ] **M1（AI）**：US-002 + US-003 + US-005 完成；`make typecheck` / `make lint` / `make test` / `make deploy-fc` / `make test-fc-live` 全绿
 - [ ] **M2（AI + 真机）**：US-007 ~ US-014 完成；DevTools 模拟器 + 真机预览两侧均 verified；上传列表 5 种状态可通过故障注入开关构造出来
 - [ ] **M3（AI + Worker 主机）**：US-015 ~ US-019 完成；`make test` 通过；`make simulate-worker-crash` 三种恢复场景均成功补齐
 - [ ] **M4（AI + 真机 + Worker）**：US-020 跑 100 条成功率 100% + US-021 6 类异常路径全部跑通
@@ -881,7 +908,7 @@
 - **背景**：FC 接口暴露在公网，恶意调用可能要求签发大对象凭证，导致 Worker 后续被洪水下载。
 - **决策**：**加 50 MB 上限**，环境变量 `MAX_UPLOAD_BYTES` 可调。
 - **理由**：单条目标 ≤ 10 分钟约 10 MB；50 MB 留 5x 余量；超此阈值视为可疑。
-- **影响**：US-004。
+- **影响**：US-003 (B)。
 
 ### OQ-6：云端语音转文字 API 选型
 
