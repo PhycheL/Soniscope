@@ -33,7 +33,7 @@
 
 ## 3. User Stories
 
-> 拆分顺序：**基础设施 → 后端 FC → 前端小程序 → Worker → 闭环集成验证**。前置 story 完成后下游 story 才能真实联调；每个 story 的 acceptance criteria 都写成可观测、可验证的结果，而不是实现描述。
+> 拆分顺序：**基础设施 → 后端 FC → 前端小程序 → Worker → Feature 最终验收 AC（见 §4）**。前置 story 完成后下游 story 才能真实联调；每个 story 的 acceptance criteria 都写成可观测、可验证的结果，而不是实现描述。
 
 ### 3.0 人 vs AI 分工说明
 
@@ -42,7 +42,8 @@
 | 分工类型 | 范围 | 谁来做 |
 |---|---|---|
 | **US-001（唯一的人工准备 story）** | 所有需要人工在控制台 / 浏览器 / 真机操作的一次性准备工作：阿里云账号 / OSS / RAM / FC 服务槽位 / 微信小程序账号 / 域名白名单 / 云端 ASR 注册 / 测试音频素材准备 / Worker 运行环境就绪 / 凭证注入 / runbook 登记。 | **人工**：用户在控制台/浏览器/终端按 checklist 完成，每项给出"检查方法"。 |
-| **US-002 ~ US-021（全部由 AI 编程完成）** | 所有需要写代码、写脚本、写配置的工作：项目骨架 / FC 函数代码 / 部署脚本 / 小程序代码 / Worker 代码 / 集成测试脚本 / 文档。 | **AI 编程**：基于 US-001 已准备好的资源和凭证，写代码 + 写一键运行的脚本；用户只需 `git pull` → 跑脚本 → 看结果，无需再回控制台手工操作。 |
+| **US-002 ~ US-019（全部由 AI 编程完成）** | 所有需要写代码、写脚本、写配置的工作：项目骨架 / FC 函数代码 / 部署脚本 / 小程序代码 / Worker 代码 / 集成测试脚本 / 文档。 | **AI 编程**：基于 US-001 已准备好的资源和凭证，写代码 + 写一键运行的脚本；用户只需 `git pull` → 跑脚本 → 看结果，无需再回控制台手工操作。 |
+| **§4 Feature 最终验收 AC（由 AI 提供脚本 + 用户在真机执行）** | E2E 验收的自动验证脚本（`make verify-e2e-*`、`make test-e2e-*` 等）由 AI 实现；真机录音、中断、长录音、故障注入这些只能人工执行的环节由用户跑。 | **AI**：提供所有 `make` 验收脚本；**用户**：按 §4.2 真机 checklist 操作。 |
 
 **关键约定**：
 - 从 US-002 开始的所有 stories **不再要求用户回控制台做任何手工配置**。所有可自动化的事情（部署 FC、推送代码、初始化目录、跑测试），AI 必须提供脚本/命令；用户只跑命令、不点控制台。
@@ -81,7 +82,7 @@
 
 #### US-001: 人工准备：账号 / 资源 / 凭证 / 测试素材 / 运行环境 一站式 checklist
 
-> **本 story 是整个 MVP 唯一的人工准备 story**，全部在控制台 / 浏览器 / 终端手工完成，不写业务代码。完成后所有后续 stories（US-002 ~ US-021）才能由 AI 编程接手。
+> **本 story 是整个 MVP 唯一的人工准备 story**，全部在控制台 / 浏览器 / 终端手工完成，不写业务代码。完成后所有后续 stories（US-002 ~ US-019）才能由 AI 编程接手，进而进入 §4 最终验收 AC 阶段。
 >
 > **完成判据**：以下 A~I 九个块的所有检查项都打勾，且 `docs/runbook/cloud-setup.md` 已包含全部非敏感信息。
 
@@ -169,10 +170,10 @@
 
 **(F) 测试基线音频素材**
 
-- [ ] 已准备 4 段标准测试音频，**全部放在 `tests/fixtures/audio/` 目录下**（这是项目仓库内的相对路径，AI 在 US-015 / US-017 / US-020 / US-021 中会直接引用）：
+- [ ] 已准备 4 段标准测试音频，**全部放在 `tests/fixtures/audio/` 目录下**（这是项目仓库内的相对路径，AI 在 US-015 / US-017 以及 §4 最终验收 AC 中会直接引用）：
   - `tests/fixtures/audio/sample-10s.mp3`：约 10 秒 MP3，清晰人声，无背景音（US-001 E 联调 + US-017 真实闭环验证用）
   - `tests/fixtures/audio/sample-1min.mp3`：约 60 秒 MP3，含 5~10 句话（P-01 性能基线 + US-017 性能验证用）
-  - `tests/fixtures/audio/sample-25min.mp3`：约 25 分钟 MP3（US-010 长录音分片 + US-020 闭环用）
+  - `tests/fixtures/audio/sample-25min.mp3`：约 25 分钟 MP3（US-010 长录音分片 + §4.2 手动验收闭环用）
   - `tests/fixtures/audio/sample-aac.aac`：约 10 秒 AAC 格式（OQ-1 决议中**AAC 转码验证**用，US-015 强依赖）；可以用 `ffmpeg -i sample-10s.mp3 -c:a aac sample-aac.aac` 从 MP3 转出来
 - [ ] 每个文件的 sha256 已记录到 runbook，便于后续校验文件未被改动
 - **检查方法**：
@@ -791,52 +792,79 @@
 
 ---
 
-### 阶段 5：闭环集成验证（E2E）
+## 4. Feature 最终验收 AC（E2E）
 
-> **说明**：前面的 stories 单独都能通过单元 / 组件级验证，但用户感知上"录音 → 上传 → 转写 → 落盘"是**一个完整流程**。所以本阶段两个集成 story 必须真实跑通端到端链路，覆盖正常路径与所有关键异常路径。这两个 story 不允许用 mock，必须用真实小程序 + 真实 FC + 真实 OSS + 真实Worker。
+> **本章节性质**：**不是 user story，而是整个 MVP feature 的最终交付验收清单**。前面 §3 章节中的 US-001 ~ US-019 全部完成后才能进入本章 AC。
+>
+> **验收前提**：必须用真实小程序 + 真实 FC + 真实 OSS + 真实 Worker 跑完整条链路，**不允许使用任何 mock**。
+>
+> **与其他章节的关系**：
+> - 本章 §4 是"可执行的验收动作"——明确告诉用户跑哪条 `make` 命令、在真机上做哪些操作；
+> - §9 Success Metrics 是"量化的目标指标表"——承诺（如端到端成功率 100%）；
+> - 本章 §4.1 + §4.2 全部打勾即视为本 feature 验收完成。
+>
+> **范围覆盖**：正常路径（100 条录音端到端落盘）+ 关键异常路径（脚本崩溃恢复 / 显式重转 / 安全反例）+ 真机交互异常（中断保护 / 长录音分片 / 失败重试）+ 长期保留（OSS 永不删除）。
 
-#### US-020: 正常路径端到端闭环（成功率 100%）
+### 4.1 自动验证 AC（`make` 命令一键跑完，无需人工操作）
 
-**描述：** 作为系统所有者，我需要在真实环境下连续跑 100 条录音，验证整条链路（小程序录音 → 草稿确认 → 上传 OSS → FC verify → Worker下载 → **云端 API 转写** → `.done`）成功率达到 100%，无一条丢失或残留中间态。
+> 本节所有命令的实现脚本均由 AI 在前置 stories（US-002 ~ US-019）中提供；用户在完成 §4.2 真机录入后，按顺序跑下面命令并核对输出即可。
 
-**Acceptance Criteria：**
+**[正常路径 · 100 条录音落盘完整性]**
 
-**(A) 自动验证（`make` 命令一键跑完，无需人工操作）**
-
-> 以下脚本在用户完成手动录音操作后运行，自动校验后端全链路结果。
-
-- [ ] `make list-oss-objects DATE=<YYYY-MM-DD>` 能列出**完整的 100 个 `.mp3` 对象**（脚本化输出 + 计数 = 100），文件名与前端 `fragment_id` 一一对应；**用户无需打开 OSS 控制台**
-- [ ] `make verify-e2e-integrity` → 本地 `~/SoniScope/fragments/` 下能看到**完整的 100 个 Fragment 目录**，每个目录都包含 `audio.mp3` / `manifest.json` / `transcript.json` / `transcript.txt` / `.done`
-- [ ] `make verify-e2e-sha256` → 每条 Fragment 的本地 `audio.mp3` sha256 与 OSS `ETag` 与小程序前端 `manifest.audio.sha256` **三者一致**
+- [ ] `make list-oss-objects DATE=<YYYY-MM-DD>` → 列出**完整的 100 个 `.mp3` 对象**（脚本化输出 + 计数 = 100），文件名与前端 `fragment_id` 一一对应；用户**无需打开 OSS 控制台**
+- [ ] `make verify-e2e-integrity` → 本地 `~/SoniScope/fragments/` 下出现**完整的 100 个 Fragment 目录**，每个目录都同时包含 `audio.mp3` / `manifest.json` / `transcript.json` / `transcript.txt` / `.done` 五个文件
+- [ ] `make verify-e2e-sha256` → 每条 Fragment 的本地 `audio.mp3` sha256 与 OSS 对象 ETag 与小程序前端 `manifest.audio.sha256` **三者一致**
 - [ ] `make verify-e2e-fields` → 每条 Fragment 的 `manifest.upload.verified_at` 非空、`manifest.transcription.completed_at` 非空
-- [ ] **跑 1 周后再次确认**（R-07）：`make verify-oss-retention` → OSS 上对象数 ≥ 本地 fragments 目录数；Worker日志中无任何 `DeleteObject` 调用记录
 
-**(B) 手动验证清单（用户在真机上操作）**
-- [ ] **真机操作**：在真机上连续录制 100 条 30~90 秒的录音，依次点击"保存并上传"
+**[异常路径 · 脚本崩溃恢复]**
+
+- [ ] `make test-e2e-crash-recovery` → Worker 运行中，对一条正在转写的 Fragment 执行 `kill -9` → 该目录残留 `audio.mp3` 但无 `.done` → 重启脚本 → 自动重新转写并补回 `.done` + 完整的 `transcript.json`
+
+**[异常路径 · 显式重转]**
+
+- [ ] `make test-e2e-retranscribe` → 修改 `config.yaml` 的 `transcriber.params_version` v1 → v2 → 下次扫描时**所有存量 Fragment** 被重新转写，新的 `transcript.json` 覆盖旧的，`manifest.transcription.params_version` 全部变为 v2
+
+**[安全反例 · 鉴权与越权]**
+
+- [ ] `make test-e2e-security` → 用未在 allowlist 中的另一个微信号调用 FC → 收到 403；用合法 STS 凭证尝试 PutObject 到其他 key → OSS 返回 AccessDenied
+
+**[完整性扫描 · 无半成品残留]**
+
+- [ ] `make verify-no-stale` → 所有异常路径跑完后：OSS 上对象数 ≥ 本地 Fragment 目录数；未出现任何"半成品"目录（即不存在"有 `.part` 又有 `audio.mp3`"或"有 `transcript.json.tmp` 残留"的目录）
+
+**[长期保留 · OSS 永不删除]**
+
+- [ ] **跑完后 1 周再次确认**：`make verify-oss-retention` → OSS 上对象数 ≥ 本地 fragments 目录数；Worker 日志中无任何 `DeleteObject` 调用记录
+
+### 4.2 手动验证 AC（真机操作 checklist，必须人工执行）
+
+> 本节所有项必须在**真实微信 + 真实手机 + 真实 OSS / FC / Worker** 环境下执行，AI 无法代跑；每完成一项请在原文打勾。
+
+**[100 条真机录音 · 正常路径]**
+
+- [ ] 在真机上连续录制 **100 条 30~90 秒**的录音，依次点击"保存并上传"
 - [ ] 所有 100 条 Fragment 在小程序上传列表中状态最终都是"上传成功（verified）"
 - [ ] 没有任何"待人工重传"或"待 verify"状态残留
-- [ ] 跑完后再等 48 小时 + 1 小时 → 真机本地的 100 条音频缓存自动清理；OSS 上的 100 个对象**仍然存在**
 
-#### US-021: 异常路径端到端闭环（中断 / 重试 / 崩溃 / 重转）
+**[本地缓存自动清理 · verify+48h 策略]**
 
-**描述：** 作为系统所有者，我需要在真实环境下覆盖所有关键异常路径——录音中断、上传失败重试、脚本崩溃恢复、显式重转——验证系统在每种异常下都能正确恢复，无数据丢失、无重复转写。
+- [ ] 上述 100 条跑完后再等 **48 小时 + 1 小时** → 真机本地的 100 条音频缓存自动清理；OSS 上的 100 个对象**仍然存在**
 
-**Acceptance Criteria：**
+**[中断保护闭环]**
 
-**(A) 自动验证（`make` 命令一键跑完，无需人工操作）**
-- [ ] **脚本崩溃恢复闭环**（F-09 + R-04）：`make test-e2e-crash-recovery` → Worker运行中，对一条正在转写的 Fragment 执行 `kill -9` → 该目录残留 `audio.mp3` 但无 `.done` → 重启脚本 → 自动重新转写并补回 `.done` + 完整的 `transcript.json`
-- [ ] **显式重转闭环**（F-10）：`make test-e2e-retranscribe` → 修改 `config.yaml` 的 `transcriber.params_version` v1 → v2 → 下次扫描时**所有存量 Fragment** 被重新转写，新的 `transcript.json` 覆盖旧的，`manifest.transcription.params_version` 全部变为 v2
-- [ ] **安全反例闭环**（S-03 + S-05）：`make test-e2e-security` → 用未在 allowlist 中的另一个微信号调用 FC → 收到 403；用合法 STS 凭证尝试 PutObject 到其他 key → OSS 返回 AccessDenied
-- [ ] **完整性扫描**：`make verify-no-stale` → 所有异常路径跑完后：OSS 上对象数 ≥ 本地 Fragment 目录数，未出现任何"半成品"目录（即不存在"有 `.part` 又有 `audio.mp3`"或"有 `transcript.json.tmp` 残留"的目录）
+- [ ] 真机开飞行模式 → 录音 60 秒 → 中途按电源键锁屏 → 解锁 → 弹出中断恢复提示 → 选择"保留" → 草稿存在且时长 ≈ 锁屏前的时长 → 关闭飞行模式 → 上传成功
 
-**(B) 手动验证清单（用户在真机上操作）**
-- [ ] **中断保护闭环**（F-04 + R-06）：真机开飞行模式 → 录音 60 秒 → 中途按电源键锁屏 → 解锁 → 弹出中断恢复提示 → 选择"保留" → 草稿存在且时长 ≈ 锁屏前的时长 → 关闭飞行模式 → 上传成功
-- [ ] **长录音分片闭环**（F-05）：真机连续录制 25 分钟 → 自动切片为 3 条 Fragment（chunk_total = 3）→ 全部上传成功 + 本地全部转写完成 + 3 条 `manifest.session_id` 一致
-- [ ] **失败重试闭环**（R-05）：在小程序中打开「开发者菜单 → 故障注入」开关（AI 在 US-014 提供）→ 选「FC URL 失效」→ 录音上传 → 自动重试 3 次失败 → 上传列表红色提示 + "点击手动重传"按钮 → 关闭故障注入 → 手动重传 → 上传成功 + Worker落盘完成；**用户无需修改源码**
+**[长录音分片闭环]**
+
+- [ ] 真机连续录制 **25 分钟** → 自动切片为 3 条 Fragment（`chunk_total = 3`）→ 全部上传成功 + 本地全部转写完成 + 3 条 `manifest.session_id` 一致
+
+**[失败重试 + 手动重传闭环]**
+
+- [ ] 在小程序中打开「开发者菜单 → 故障注入」开关（AI 在 US-014 提供）→ 选「FC URL 失效」→ 录音上传 → 自动重试 3 次失败 → 上传列表红色提示 + "点击手动重传"按钮 → 关闭故障注入 → 手动重传 → 上传成功 + Worker 落盘完成；**用户无需修改源码**
 
 ---
 
-## 4. Functional Requirements / 功能性需求
+## 5. Functional Requirements / 功能性需求
 
 > 编号化的"系统必须做到 X"清单。每条都对应上面某个 US 的核心行为，便于实施时按条逐项 check。
 
@@ -850,7 +878,7 @@
 - **FR-8**：小程序**必须**在收到 OSS 200 后立即调用 `/verify-upload`；本地缓存**仅在 verify 通过且超过 48 小时后**才允许自动清理，verify 未通过的文件永不自动删除；用户可手动删除任何状态的本地文件（US-013）。
 - **FR-9**：上传连续失败 3 次后**必须**切换为"待人工重传"红色提示状态（US-014）。
 - **FR-10**：Worker**必须**按 `config.yaml` 中可配置的 `poll.interval_seconds`（默认 60）周期轮询 OSS（US-015）。
-- **FR-11**：Worker**绝不**调用 OSS `DeleteObject`，OSS 文件永久保留（US-015 + US-020）。
+- **FR-11**：Worker**绝不**调用 OSS `DeleteObject`，OSS 文件永久保留（US-015 + §4 最终验收 AC）。
 - **FR-12**：本地文件操作**必须**走"先临时 → 原子 rename → 写 `.done`"三段式协议（US-016）。
 - **FR-13**：脚本启动时**必须**扫描 `~/SoniScope/fragments/`，对每个目录按状态机决定是跳过 / 重转 / 重下 / 新办（US-016）。
 - **FR-14**：转写**必须**通过 `Transcriber` 抽象接口调用；本期默认实现 `CloudSpeechTranscriber`（调用云端语音转文字 API），且预留 `WhisperLocalTranscriber` 占位骨架；**本期不部署本地推理模型**（US-017）。
@@ -860,7 +888,7 @@
 
 ---
 
-## 5. Non-Goals / 本期不做
+## 6. Non-Goals / 本期不做
 
 明确划出边界，避免范围蔓延：
 
@@ -876,23 +904,23 @@
 
 ---
 
-## 6. Design Considerations / 设计说明
+## 7. Design Considerations / 设计说明
 
-### 6.1 极薄前端 + 重后端原则
+### 7.1 极薄前端 + 重后端原则
 - 小程序只做采集、上传、状态展示；任何"业务规则"（鉴权、签发、校验、转写、幂等）都不能放在小程序里。
 - 小程序代码里**绝对不能**出现长期 AccessKey、任何业务密钥。
 
-### 6.2 UI 极简
+### 7.2 UI 极简
 - 首页只有一个圆形录音按钮（开始 / 停止），二级页面是草稿确认态 + 上传列表。
 - 默认状态 = 准备录音；任何"异常状态"（离线积压、上传失败堆积）用红色横条置顶提示。
 
-### 6.3 状态机为权威
+### 7.3 状态机为权威
 - 本地以 `manifest.json` + 文件 `.part` / `.tmp` / `.done` 为权威；不引入数据库（本期）。
 - 任何时候出现冲突，都以"硬盘上实际有什么文件"为准，代码不能假设"我记得我做过 X"。
 
 ---
 
-## 7. Technical Considerations / 技术约束与依赖
+## 8. Technical Considerations / 技术约束与依赖
 
 - **微信小程序限制**：单条录音目标 ≤ 10 分钟（与微信后台限制对齐）；`wx.uploadFile` 单文件大小有限制，超长录音必须前端分片（见 US-010）。
 - **OSS 直传**：必须使用 STS 临时凭证 + V4 签名直传，不允许走 FC 中转上传（FC 内存 + 网络成本太高）。
@@ -909,7 +937,7 @@
 
 ---
 
-## 8. Success Metrics / 成功指标
+## 9. Success Metrics / 成功指标
 
 以下指标必须全部通过才算 MVP 验收完成。每条都对应 requirements_v5 第十章的某条验收。
 
@@ -935,7 +963,7 @@
 
 ---
 
-## 9. Open Questions / 待澄清的问题
+## 10. Open Questions / 待澄清的问题
 
 > **状态**：本期 PRD v1 起 7 个 OQ **全部已决议**（2026-05-26）。具体决策落到了对应 user stories 的 acceptance criteria 中；本节保留为决策索引，便于追溯。完整决策语境记录在附录 C。
 
@@ -961,7 +989,7 @@
 2. **里程碑 M1（AI 编程）**：US-002 + US-003 + US-005 完成 → 项目骨架就绪 + 两个 FC 函数代码已部署到云端且联调通过；跑 `make typecheck` / `make lint` / `make test` / `make deploy-fc` / `make test-fc-live` 全绿
 3. **里程碑 M2（AI 编程）**：US-007 ~ US-014 完成 → 小程序端完整完成"录音 → 上传 → verify"；故障注入开关可用
 4. **里程碑 M3（AI 编程）**：US-015 ~ US-019 完成 → Worker 端完整完成"轮询 → 下载 → 调用云端 API 转写 → 落盘"（本期不部署本地模型）
-5. **里程碑 M4（AI 编程 + 用户跑）**：US-020 + US-021 完成 → MVP 整体闭环验收通过；100 条真机录音 + 6 类异常路径全跑通
+5. **里程碑 M4（AI 编程 + 用户跑）**：§4 Feature 最终验收 AC 全部通过 → MVP 整体闭环验收完成；§4.1 自动验证脚本全绿 + §4.2 真机 checklist 全部打勾（100 条录音 + 中断 / 长录音 / 失败重试 / 安全反例 / 长期保留）
 6. **下一阶段（不在本 PRD 内）**：用 `WhisperLocalTranscriber` 替换 `CloudSpeechTranscriber`，验证本地推理可行性 + 成本下降
 
 > **关键约定**：从 M1 开始，**用户不再回阿里云 / 微信任何控制台**。所有验证步骤都通过 AI 提供的 `make` 命令完成；如果某个 AC 用户被要求"打开控制台"，那是 PRD 没对齐，请反馈。
@@ -976,7 +1004,7 @@
 - [ ] **M1（AI）**：US-002 + US-003 + US-005 完成；`make typecheck` / `make lint` / `make test` / `make deploy-fc` / `make test-fc-live` 全绿
 - [ ] **M2（AI + 真机）**：US-007 ~ US-014 完成；DevTools 模拟器 + 真机预览两侧均 verified；上传列表 5 种状态可通过故障注入开关构造出来
 - [ ] **M3（AI + Worker 主机）**：US-015 ~ US-019 完成；`make test` 通过；`make simulate-worker-crash` 三种恢复场景均成功补齐
-- [ ] **M4（AI + 真机 + Worker）**：US-020 跑 100 条成功率 100% + US-021 6 类异常路径全部跑通
+- [ ] **M4（AI + 真机 + Worker）**：§4 最终验收 AC 全部通过——§4.1 自动验证 `make` 脚本全绿（正常路径 / 崩溃恢复 / 显式重转 / 安全反例 / 无残留 / OSS 长期保留）+ §4.2 真机 checklist 全部打勾（100 条录音成功率 100% + 中断 / 长录音 / 失败重试）
 - [ ] Success Metrics 表中 15 条全部达标
 - [ ] Non-Goals 列出的 9 条本期都没有"偷偷"做进来（避免范围蔓延）
 - [ ] Open Questions 7 条均已决议并落到对应 US 的 AC（决策详情见附录 C）
