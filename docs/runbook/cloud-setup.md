@@ -95,11 +95,8 @@
 > 这些 URL 是公网可访问的，**不属于敏感信息**，可入 git。需要登记到小程序「服务器域名」白名单。  
 > FC 3.0 每个函数有独立的 `<url-id>` 子域名，**两个函数 hostname 不同**，小程序白名单需各加一条。
 
--  `issue-credential` 公网 URL：`<待填写>`  
-  （形如 `https://issue-credential-xxxxxxxx.cn-beijing.fcapp.run/`，`xxxxxxxx` 由 FC 3.0 自动分配，无法自定义）
--  `verify-upload` 公网 URL：`<待填写>`  
-  （形如 `https://verify-upload-yyyyyyyy.cn-beijing.fcapp.run/`）
--  curl 两个 URL 均返回 HTTP 200 + hello world：☐ 已验证
+-  `issue-credential` 公网 URL：https://issue-cedential-ottfirocds.cn-beijing.fcapp.run
+-  `verify-upload` 公网 URL：https://verify-upload-nnjpaoamhw.cn-beijing.fcapp.run
 
 ### 3.3 FC 环境变量清单（**仅列 key 名，不列 value**）
 
@@ -126,33 +123,29 @@
 
 ## 4. 微信小程序
 
-> 对应 US-001 (D)。详细步骤见手册 §D。
-
 ### 4.1 账号 / AppID
 
--  小程序名称：`<待填写>`（如 `日观声记` 或 `SoniScope`）
--  AppID：`<待填写>`（形如 `wx1234567890abcdef`，**可入 git，非敏感**）
--  AppSecret 保存位置：`<待填写>`（如 `1Password vault: soniscope · item: mp-wechat-app-secret`）
--  主体类型：`<待填写>`（个人 / 企业）
+-  小程序名称：` 日观声记`
+-  AppID：`wx3f973c7297728b0c`
+-  AppSecret 保存位置：`1Password` 中 `日观声记 小程序 AppSecret`
+-  主体类型：`个人`
 
 ### 4.2 体验者 + 真机 openid
 
--  体验成员列表（仅记录微信昵称或代号，不记录手机号）：
-  - `<待填写：成员 1>`
-  - `<待填写：成员 2>`
--  **本人真机 openid**（用作 FC `OPENID_ALLOWLIST`）：`<待填写>`（形如 `o6zAJs________________`，约 28 字符）
+-  体验成员列表：
+  - `老庄道人` openid：`o68Nm3RodhXQKA6_Z5VGiWC8LEVI`
+  - `Bemied` openid：`o68Nm3Z5tK1Dr8QchPT7Ikqjre8Q`
 
 ### 4.3 服务器域名白名单
 
 -  `request` 合法域名（**两条**，FC 3.0 每函数子域名独立，小程序白名单不支持通配符）：
-   - `<待填写>`（issue-credential 的 host，形如 `https://issue-credential-xxxxxxxx.cn-beijing.fcapp.run`）
-   - `<待填写>`（verify-upload 的 host，形如 `https://verify-upload-yyyyyyyy.cn-beijing.fcapp.run`）
--  `uploadFile` 合法域名：`<待填写>`（应为 OSS Bucket 域名，如 `https://soniscope-audio.oss-cn-beijing.aliyuncs.com`）
+   - `https://issue-cedential-ottfirocds.cn-beijing.fcapp.run`
+   - `https://verify-upload-nnjpaoamhw.cn-beijing.fcapp.run`
+-  `uploadFile` 合法域名：` https://soniscope-audio.oss-cn-beijing.aliyuncs.com`
 
 ### 4.4 开发工具
 
--  微信开发者工具版本：`<待填写>`（如 `Stable Build 1.06.xxxx`）
--  DevTools → 详情 → 本地设置：「不校验合法域名」已**取消**勾选
+-  微信开发者工具版本：`Stable 2.01.2510290`
 
 ---
 
