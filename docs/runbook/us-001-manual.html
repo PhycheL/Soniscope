@@ -1,0 +1,1205 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SoniScope · US-001 人工准备操作 + 验收手册</title>
+<style>
+  :root {
+    --bg: #f7f8fa;
+    --panel: #ffffff;
+    --border: #e4e7eb;
+    --text: #1f2328;
+    --muted: #57606a;
+    --brand: #2563eb;
+    --brand-weak: #dbeafe;
+    --ok: #16a34a;
+    --ok-weak: #dcfce7;
+    --warn: #d97706;
+    --warn-weak: #fef3c7;
+    --danger: #dc2626;
+    --danger-weak: #fee2e2;
+    --code-bg: #0f172a;
+    --code-fg: #e2e8f0;
+    --code-comment: #94a3b8;
+    --shadow: 0 1px 2px rgba(0,0,0,.04), 0 4px 12px rgba(0,0,0,.04);
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue",
+      "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+    font-size: 15px;
+    line-height: 1.65;
+  }
+  a { color: var(--brand); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    min-height: 100vh;
+    transition: grid-template-columns .25s ease;
+  }
+  body.sidebar-collapsed .layout {
+    grid-template-columns: 0 1fr;
+  }
+
+  /* ===== 左侧导航 ===== */
+  aside.sidebar {
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    padding: 20px 16px;
+    transition: padding .25s ease, opacity .2s ease, visibility .25s;
+  }
+  body.sidebar-collapsed aside.sidebar {
+    padding-left: 0;
+    padding-right: 0;
+    border-right: none;
+    opacity: 0;
+    visibility: hidden;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  /* 侧边栏内的折叠按钮（在 brand 区域右上角） */
+  .brand {
+    font-weight: 700;
+    font-size: 16px;
+    margin-bottom: 4px;
+    padding-right: 36px;
+    position: relative;
+  }
+  .brand small { display: block; font-weight: 400; color: var(--muted); font-size: 12px; }
+  .collapse-btn {
+    position: absolute;
+    top: -2px;
+    right: 0;
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--border);
+    background: white;
+    border-radius: 6px;
+    color: var(--muted);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    line-height: 1;
+    padding: 0;
+    transition: color .15s, border-color .15s;
+  }
+  .collapse-btn:hover { color: var(--brand); border-color: var(--brand); }
+
+  /* 折叠状态下的浮动展开按钮（fixed 在视口左上角） */
+  .expand-btn {
+    position: fixed;
+    top: 14px;
+    left: 14px;
+    width: 38px;
+    height: 38px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    border-radius: 8px;
+    color: var(--muted);
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    line-height: 1;
+    box-shadow: var(--shadow);
+    z-index: 100;
+    padding: 0;
+    transition: color .15s, transform .15s;
+  }
+  .expand-btn:hover { color: var(--brand); transform: translateX(2px); }
+  body.sidebar-collapsed .expand-btn { display: inline-flex; }
+  .nav { margin-top: 16px; }
+  .nav a {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 10px;
+    margin-bottom: 2px;
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 14px;
+  }
+  .nav a:hover { background: var(--brand-weak); text-decoration: none; }
+  .nav a.active { background: var(--brand-weak); color: var(--brand); font-weight: 600; }
+  .nav .badge {
+    font-size: 11px;
+    color: var(--muted);
+    background: #f1f3f5;
+    padding: 1px 6px;
+    border-radius: 999px;
+    font-variant-numeric: tabular-nums;
+  }
+  .nav .badge.done { background: var(--ok-weak); color: var(--ok); }
+  .nav-title {
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 14px 10px 6px;
+  }
+
+  /* ===== 主区 ===== */
+  main {
+    padding: 32px 48px 80px;
+    max-width: 1080px;
+  }
+  header.page-head {
+    margin-bottom: 28px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  header.page-head h1 {
+    margin: 0 0 6px;
+    font-size: 24px;
+  }
+  header.page-head .sub { color: var(--muted); font-size: 14px; }
+
+  .progress {
+    display: flex; align-items: center; gap: 12px;
+    margin-top: 14px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 16px;
+    box-shadow: var(--shadow);
+  }
+  .progress .bar {
+    flex: 1;
+    height: 8px;
+    background: #eef0f3;
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .progress .bar > i {
+    display: block;
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--brand), var(--ok));
+    transition: width .25s ease;
+  }
+  .progress .label {
+    font-variant-numeric: tabular-nums;
+    color: var(--muted);
+    font-size: 13px;
+    min-width: 96px;
+    text-align: right;
+  }
+  .progress .reset {
+    border: 1px solid var(--border);
+    background: white;
+    color: var(--muted);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .progress .reset:hover { color: var(--danger); border-color: var(--danger); }
+
+  section.block {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px 28px;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow);
+    scroll-margin-top: 16px;
+  }
+  section.block h2 {
+    margin: 0 0 6px;
+    font-size: 20px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  section.block h2 .chip {
+    background: var(--brand);
+    color: white;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 2px 10px;
+    border-radius: 999px;
+  }
+  section.block h2 .state {
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 400;
+    margin-left: auto;
+  }
+  section.block .lead {
+    color: var(--muted);
+    margin: 0 0 16px;
+    font-size: 14px;
+  }
+
+  h3.step-title {
+    font-size: 16px;
+    margin: 22px 0 8px;
+    padding-left: 10px;
+    border-left: 3px solid var(--brand);
+  }
+  h4.sub-title {
+    font-size: 14px;
+    margin: 16px 0 6px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }
+
+  ol.steps { padding-left: 22px; margin: 0 0 8px; }
+  ol.steps > li { margin-bottom: 6px; }
+  ul.bullets { padding-left: 22px; margin: 0 0 8px; }
+  ul.bullets > li { margin-bottom: 4px; }
+
+  /* ===== 验收 checklist ===== */
+  .checklist {
+    list-style: none;
+    padding: 0;
+    margin: 8px 0 4px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .checklist li {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    background: #fafbfc;
+  }
+  .checklist li:last-child { border-bottom: none; }
+  .checklist input[type="checkbox"] {
+    margin-top: 4px;
+    width: 16px; height: 16px;
+    accent-color: var(--ok);
+    flex-shrink: 0;
+  }
+  .checklist li label { flex: 1; cursor: pointer; font-size: 14px; }
+  .checklist li.checked { background: var(--ok-weak); }
+  .checklist li.checked label { color: var(--muted); text-decoration: line-through; }
+
+  /* ===== 提示框 ===== */
+  .callout {
+    border-left: 4px solid;
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin: 12px 0;
+    background: #f8fafc;
+    font-size: 14px;
+  }
+  .callout.info { border-color: var(--brand); background: var(--brand-weak); }
+  .callout.warn { border-color: var(--warn); background: var(--warn-weak); }
+  .callout.danger { border-color: var(--danger); background: var(--danger-weak); }
+  .callout.ok { border-color: var(--ok); background: var(--ok-weak); }
+  .callout .title {
+    font-weight: 700;
+    margin-bottom: 4px;
+    display: block;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }
+  .callout.info .title { color: var(--brand); }
+  .callout.warn .title { color: var(--warn); }
+  .callout.danger .title { color: var(--danger); }
+  .callout.ok .title { color: var(--ok); }
+
+  /* ===== 反例区 ===== */
+  .counter-tests {
+    border: 1px solid var(--danger);
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 14px 0;
+  }
+  .counter-tests .ct-head {
+    background: var(--danger-weak);
+    color: var(--danger);
+    font-weight: 700;
+    padding: 10px 14px;
+    font-size: 13px;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--danger);
+  }
+  .counter-tests table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .counter-tests th, .counter-tests td {
+    border-bottom: 1px solid var(--border);
+    padding: 10px 14px;
+    text-align: left;
+    font-size: 13.5px;
+    vertical-align: top;
+  }
+  .counter-tests tr:last-child th, .counter-tests tr:last-child td { border-bottom: none; }
+  .counter-tests th {
+    background: #fff7f7;
+    width: 100px;
+    color: var(--danger);
+    font-weight: 600;
+  }
+
+  /* ===== 代码块 ===== */
+  pre, code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  pre {
+    background: var(--code-bg);
+    color: var(--code-fg);
+    padding: 14px 16px;
+    border-radius: 8px;
+    overflow-x: auto;
+    font-size: 13px;
+    line-height: 1.55;
+    margin: 8px 0 12px;
+    position: relative;
+  }
+  pre .cmt { color: var(--code-comment); }
+  code.inline {
+    background: #eef2f7;
+    color: #1d4ed8;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 13px;
+  }
+
+  /* ===== 表格 ===== */
+  table.kv {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 8px 0;
+    font-size: 14px;
+  }
+  table.kv th, table.kv td {
+    border: 1px solid var(--border);
+    padding: 8px 12px;
+    text-align: left;
+    vertical-align: top;
+  }
+  table.kv th {
+    background: #f6f8fa;
+    width: 220px;
+    font-weight: 600;
+  }
+  table.kv code { font-size: 12.5px; }
+
+  /* ===== 红线区 ===== */
+  .redlines {
+    background: linear-gradient(180deg, #fff7f7, #ffffff);
+    border: 1px solid var(--danger);
+    border-radius: 12px;
+    padding: 18px 22px;
+    margin-bottom: 24px;
+  }
+  .redlines h2 {
+    color: var(--danger);
+    margin: 0 0 8px;
+    font-size: 18px;
+  }
+  .redlines ol { padding-left: 20px; margin: 0; }
+  .redlines li { margin-bottom: 4px; font-size: 14px; }
+
+  hr.sep { border: none; border-top: 1px dashed var(--border); margin: 18px 0; }
+
+  /* ===== 打印 ===== */
+  @media print {
+    .layout { display: block; }
+    aside.sidebar { display: none; }
+    main { padding: 0; max-width: none; }
+    .progress, .progress .reset { display: none; }
+    .collapse-btn, .expand-btn { display: none !important; }
+    section.block { break-inside: avoid; page-break-inside: avoid; box-shadow: none; }
+    pre { white-space: pre-wrap; word-break: break-all; }
+  }
+
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+    aside.sidebar { position: relative; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
+    body.sidebar-collapsed aside.sidebar { display: none; }
+    main { padding: 24px 16px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- 折叠状态时显示的浮动展开按钮 -->
+<button class="expand-btn" id="expandBtn" type="button" title="展开侧边栏 (Ctrl+B / Cmd+B)" aria-label="展开侧边栏">≡</button>
+
+<div class="layout">
+  <!-- ============== Sidebar ============== -->
+  <aside class="sidebar">
+    <div class="brand">
+      SoniScope · US-001
+      <small>人工准备操作 + 验收手册</small>
+      <button class="collapse-btn" id="collapseBtn" type="button" title="折叠侧边栏 (Ctrl+B / Cmd+B)" aria-label="折叠侧边栏">‹</button>
+    </div>
+    <div class="nav-title">章节</div>
+    <nav class="nav" id="nav">
+      <a href="#overview"><span>总览 & 红线</span></a>
+      <a href="#block-a"><span>A · 阿里云账号 & OSS Bucket</span><span class="badge" data-badge="block-a"></span></a>
+      <a href="#block-b"><span>B · RAM 子账号 & 角色</span><span class="badge" data-badge="block-b"></span></a>
+      <a href="#block-c"><span>C · 函数计算 FC</span><span class="badge" data-badge="block-c"></span></a>
+      <a href="#block-d"><span>D · 微信小程序</span><span class="badge" data-badge="block-d"></span></a>
+      <a href="#block-e"><span>E · 云端 ASR 服务</span><span class="badge" data-badge="block-e"></span></a>
+      <a href="#block-f"><span>F · 测试基线音频</span><span class="badge" data-badge="block-f"></span></a>
+      <a href="#block-g"><span>G · Worker 运行环境</span><span class="badge" data-badge="block-g"></span></a>
+      <a href="#block-h"><span>H · 凭证注入</span><span class="badge" data-badge="block-h"></span></a>
+      <a href="#block-i"><span>I · runbook 文档登记</span><span class="badge" data-badge="block-i"></span></a>
+      <a href="#final"><span>最终验收 & 收尾</span></a>
+    </nav>
+    <div class="nav-title">操作建议</div>
+    <div style="font-size: 12.5px; color: var(--muted); padding: 0 10px;">
+      建议按 A → I 顺序执行；每项打勾后浏览器会自动保存进度（localStorage），重新打开本页可继续。
+    </div>
+  </aside>
+
+  <!-- ============== Main ============== -->
+  <main>
+    <header class="page-head">
+      <h1>US-001 · 人工准备一站式操作 + 验收手册</h1>
+      <div class="sub">来源：<code class="inline">docs/PRD_v1.md</code> §3 US-001（行 83–270）。本手册扩展为可执行 + 可验收的标准动作清单，是整个 MVP <b>唯一的人工准备 story</b>。完成后所有后续 US-002 ~ US-019 由 AI 编程接手。</div>
+
+      <div class="progress">
+        <span class="label" id="progressLabel">0 / 0</span>
+        <span class="bar"><i id="progressBar"></i></span>
+        <button class="reset" id="resetBtn" title="清空所有勾选状态">重置进度</button>
+      </div>
+    </header>
+
+    <!-- ============== 总览 ============== -->
+    <section class="block" id="overview">
+      <h2><span class="chip">总览</span>完成判据 & 红线</h2>
+      <p class="lead">下方 A~I 九个块的所有检查项打勾 + <code class="inline">docs/runbook/cloud-setup.md</code> 含全部非敏感信息 = US-001 完成。</p>
+
+      <h4 class="sub-title">六类外部依赖</h4>
+      <table class="kv">
+        <tr><th>① 阿里云资源</th><td>账号、OSS 私有 Bucket、RAM 两个子账号 + 一个角色、FC 服务 + 两个函数槽位</td></tr>
+        <tr><th>② 微信小程序</th><td>AppID、AppSecret、服务器域名白名单、体验者真机 openid</td></tr>
+        <tr><th>③ 云端语音转文字 API</th><td>默认阿里云 NLS 录音文件极速版；AppKey + 调用凭证</td></tr>
+        <tr><th>④ 测试音频素材</th><td>4 段标准音频，存放 <code class="inline">tests/fixtures/audio/</code>，记录 sha256</td></tr>
+        <tr><th>⑤ Worker 运行环境</th><td>任意可跑 Python 3.11+ 的主机；<code class="inline">$SONISCOPE_HOME</code> 工作目录（默认 <code class="inline">~/SoniScope/</code>）</td></tr>
+        <tr><th>⑥ 凭证注入</th><td>FC 环境变量（9 项）+ Worker <code class="inline">~/SoniScope/config.yaml</code>（chmod 600）</td></tr>
+      </table>
+
+      <div class="redlines" style="margin-top: 18px;">
+        <h2>红线（违反即否决，无例外）</h2>
+        <ol>
+          <li>小程序代码内 <b>绝不</b> 包含任何长期 AccessKey 或业务密钥。</li>
+          <li>Worker 任何路径 <b>绝不</b> 调用 OSS <code class="inline">DeleteObject</code>。</li>
+          <li>STS 凭证必须 <b>精确到单个 object key</b>，不带通配符；有效期 ≤ 15 分钟。</li>
+          <li>FC 接口必须有 <b>openid allowlist</b> 校验，不接受匿名调用。</li>
+          <li>明文 AK / Secret 不进 git；FC 走环境变量，Worker 走 <code class="inline">~/SoniScope/config.yaml</code>（chmod 600）。</li>
+        </ol>
+      </div>
+
+      <div class="callout warn">
+        <span class="title">⚠ 操作顺序</span>
+        必须按 A → B → C → D → E → F → G → H → I 顺序，因为 B 块创建的角色 ARN 要填进 H 块 FC 环境变量；E 块拿到的 AppKey 要填进 H 块 Worker config.yaml。
+      </div>
+    </section>
+
+    <!-- ============== A ============== -->
+    <section class="block" id="block-a">
+      <h2><span class="chip">A</span>阿里云账号 + OSS 私有 Bucket<span class="state" id="state-block-a"></span></h2>
+      <p class="lead">目标：拿到一个能存音频的私有 Bucket，未鉴权访问必须被拒。</p>
+
+      <h3 class="step-title">操作步骤</h3>
+      <ol class="steps">
+        <li>访问 <a href="https://www.aliyun.com" target="_blank">aliyun.com</a>，注册账号 → 账号中心 → <b>实名认证</b>（个人主体，提交身份证 + 人脸识别）。</li>
+        <li>账号中心 → <b>充值 ≥ ¥100</b> 作为押金（防欠费导致服务暂停）。</li>
+        <li>开通 <b>对象存储 OSS</b> 服务（首次进入控制台会引导开通）。</li>
+        <li>OSS 控制台 → Bucket 列表 → 创建 Bucket，填写如下参数：
+          <table class="kv" style="margin-top: 8px;">
+            <tr><th>Bucket 名称</th><td><code class="inline">soniscope-audio</code>（全球唯一，若已被占用可加后缀如 <code class="inline">soniscope-audio-yyy</code>，并同步更新本手册全部引用）</td></tr>
+            <tr><th>地域</th><td><b>华东1（杭州）</b> = <code class="inline">cn-hangzhou</code>（必须与后续 FC / NLS 同 region，避免跨区流量费）</td></tr>
+            <tr><th>存储类型</th><td>标准存储 Standard</td></tr>
+            <tr><th>读写权限 ACL</th><td><b>私有 private</b>（绝对不能选 public-read）</td></tr>
+            <tr><th>同城冗余 / 版本控制</th><td>本期 MVP 全部关闭</td></tr>
+            <tr><th>服务端加密</th><td>本期不开（后续阶段评估）</td></tr>
+          </table>
+        </li>
+        <li>（可选）本地安装 <code class="inline">ossutil</code> 命令行工具：<a href="https://help.aliyun.com/document_detail/120075.html" target="_blank">官方安装文档</a>。用临时 AK 配置好 profile，便于后续验收。</li>
+      </ol>
+
+      <h3 class="step-title">验收清单</h3>
+      <ul class="checklist" data-block="block-a">
+        <li><input type="checkbox" id="a1"><label for="a1">阿里云账号已完成 <b>个人实名认证</b>。</label></li>
+        <li><input type="checkbox" id="a2"><label for="a2">账号余额 ≥ ¥100。</label></li>
+        <li><input type="checkbox" id="a3"><label for="a3">已创建 Bucket <code class="inline">soniscope-audio</code>（或同等命名），地域 <code class="inline">cn-hangzhou</code>。</label></li>
+        <li><input type="checkbox" id="a4"><label for="a4">OSS 控制台 → Bucket 概览页「读写权限」显示 <b>私有</b> ✅。</label></li>
+        <li><input type="checkbox" id="a5"><label for="a5">终端跑 <code class="inline">ossutil ls oss://soniscope-audio/</code> 能成功列出（即使为空也算通过）。</label></li>
+        <li><input type="checkbox" id="a6"><label for="a6"><b>反例</b>：未登录浏览器访问 <code class="inline">https://soniscope-audio.oss-cn-hangzhou.aliyuncs.com/anything.txt</code> 返回 <code class="inline">AccessDenied</code>（不是 404）。</label></li>
+      </ul>
+
+      <div class="callout warn">
+        <span class="title">⚠ 验收要点</span>
+        反例验证（A6）必须返回的是 <code class="inline">&lt;Code&gt;AccessDenied&lt;/Code&gt;</code> 这种 XML 错误。如果返回 404 或 NoSuchBucket，说明 ACL 配错；如果能直接看到内容，立即把 ACL 改回 private。
+      </div>
+    </section>
+
+    <!-- ============== B ============== -->
+    <section class="block" id="block-b">
+      <h2><span class="chip">B</span>RAM：两个子账号 + 一个角色 + STS 反例验证<span class="state" id="state-block-b"></span></h2>
+      <p class="lead">目标：FC 拿一个临时凭证 → 临时凭证只能写指定 object key，不能列、不能读、不能越界，且 15 分钟后自动失效。</p>
+
+      <h3 class="step-title">B-1 创建子账号 <code class="inline">soniscope-fc</code>（供 FC AssumeRole）</h3>
+      <ol class="steps">
+        <li>RAM 控制台 → 身份管理 → 用户 → 创建用户。</li>
+        <li>登录名 <code class="inline">soniscope-fc</code>，访问方式 <b>只勾选「OpenAPI 调用访问」</b>（不勾控制台登录）。</li>
+        <li>创建成功后会显示 AccessKey ID + AccessKey Secret，<b>立即复制保存到密码管理器（1Password / Bitwarden）</b>。Secret 关掉后无法再次查看。</li>
+        <li>添加权限 → <b>系统策略</b> → 搜索并勾选 <code class="inline">AliyunSTSAssumeRoleAccess</code>（只这一条，不要给 OSS 任何权限）。</li>
+      </ol>
+
+      <h3 class="step-title">B-2 创建子账号 <code class="inline">soniscope-local-reader</code>（供 Worker 拉音频）</h3>
+      <ol class="steps">
+        <li>RAM → 用户 → 创建用户，登录名 <code class="inline">soniscope-local-reader</code>，访问方式同样只勾 OpenAPI。保存 AK / Secret。</li>
+        <li>RAM → 权限管理 → 权限策略 → 创建权限策略，名称 <code class="inline">soniscope-bucket-readonly</code>，脚本编辑模式贴入：
+<pre>{
+  "Version": "1",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "oss:GetObject",
+        "oss:HeadObject",
+        "oss:ListObjects"
+      ],
+      "Resource": [
+        "acs:oss:*:*:soniscope-audio",
+        "acs:oss:*:*:soniscope-audio/*"
+      ]
+    }
+  ]
+}</pre>
+        </li>
+        <li>给 <code class="inline">soniscope-local-reader</code> 添加权限 → 自定义策略 → 勾选 <code class="inline">soniscope-bucket-readonly</code>。</li>
+      </ol>
+
+      <div class="callout danger">
+        <span class="title">✗ 红线提醒</span>
+        FC 用的 <code class="inline">soniscope-fc</code> 子账号 <b>绝不</b> 直接绑 OSS 写权限。FC 写 OSS 必须走 STS AssumeRole 流程，临时凭证精确到单 object key。
+      </div>
+
+      <h3 class="step-title">B-3 创建角色 <code class="inline">soniscope-uploader-role</code>（FC 扮演它来签发 STS）</h3>
+      <ol class="steps">
+        <li>RAM → 身份管理 → 角色 → 创建角色 → 选择 <b>「阿里云账号」</b>。</li>
+        <li>角色名 <code class="inline">soniscope-uploader-role</code>，选择信任的云账号 = 当前账号。</li>
+        <li>创建后 → 信任策略管理 → 修改信任策略为「精确到 <code class="inline">soniscope-fc</code>」：
+<pre>{
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "sts:AssumeRole",
+      "Principal": {
+        "RAM": [
+          "acs:ram::&lt;主账号 UID&gt;:user/soniscope-fc"
+        ]
+      }
+    }
+  ],
+  "Version": "1"
+}</pre>
+          <span style="font-size: 13px; color: var(--muted);">主账号 UID 在右上角头像 → 账号管理 → 安全设置 中可看，纯数字。</span>
+        </li>
+        <li>创建自定义权限策略 <code class="inline">soniscope-upload-template</code>（作为模板上限）：
+<pre>{
+  "Version": "1",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "oss:PutObject"
+      ],
+      "Resource": [
+        "acs:oss:*:*:soniscope-audio/recordings/*"
+      ]
+    }
+  ]
+}</pre>
+        </li>
+        <li>把该策略授给角色 <code class="inline">soniscope-uploader-role</code>。</li>
+        <li>记录角色 ARN：形如 <code class="inline">acs:ram::123456789:role/soniscope-uploader-role</code>，后面 H 块要填进 FC 环境变量。</li>
+      </ol>
+
+      <h3 class="step-title">B-4 4 个反例验证（用 aliyun CLI）</h3>
+      <p style="font-size: 13.5px; color: var(--muted);">先用 <code class="inline">soniscope-fc</code> 的 AK 调一次 AssumeRole 拿临时凭证，再分别尝试 4 种越界 / 失效操作。</p>
+
+<pre><span class="cmt"># 1) 配置 aliyun CLI（用 soniscope-fc 的 AK）</span>
+aliyun configure --profile soniscope-fc
+
+<span class="cmt"># 2) AssumeRole 拿临时凭证（policy 收紧到单 object key）</span>
+aliyun sts AssumeRole \
+  --profile soniscope-fc \
+  --RoleArn acs:ram::&lt;UID&gt;:role/soniscope-uploader-role \
+  --RoleSessionName test \
+  --Policy '{"Version":"1","Statement":[{"Effect":"Allow","Action":["oss:PutObject"],"Resource":["acs:oss:*:*:soniscope-audio/recordings/test.mp3"]}]}'
+
+<span class="cmt"># 拿到 AccessKeyId / AccessKeySecret / SecurityToken，导出到环境变量</span>
+export OSS_AK_ID=&lt;tmp ak id&gt;
+export OSS_AK_SECRET=&lt;tmp secret&gt;
+export OSS_TOKEN=&lt;tmp security token&gt;</pre>
+
+      <div class="counter-tests">
+        <div class="ct-head">必须全部按预期"失败"的反例</div>
+        <table>
+          <tr><th>反例 1</th><td>用上述临时凭证 <b>PutObject 到 <code class="inline">recordings/evil.mp3</code></b>（不在 Policy 内）→ 必须返回 <code class="inline">AccessDenied</code>。</td></tr>
+          <tr><th>反例 2</th><td>用同一临时凭证 <b>ListObjects</b> → 必须返回 <code class="inline">AccessDenied</code>。</td></tr>
+          <tr><th>反例 3</th><td>用同一临时凭证 <b>GetObject <code class="inline">recordings/test.mp3</code></b> → 必须返回 <code class="inline">AccessDenied</code>（凭证只有 PutObject 权限）。</td></tr>
+          <tr><th>反例 4</th><td><b>等待 16 分钟</b>后用同一临时凭证再 PutObject → 必须返回 <code class="inline">ExpiredToken</code>（凭证默认有效期 15 分钟）。</td></tr>
+        </table>
+      </div>
+
+      <h3 class="step-title">验收清单</h3>
+      <ul class="checklist" data-block="block-b">
+        <li><input type="checkbox" id="b1"><label for="b1">子账号 <code class="inline">soniscope-fc</code> 已创建，AK 已保存到密码管理器，仅有 <code class="inline">AliyunSTSAssumeRoleAccess</code> 系统策略。</label></li>
+        <li><input type="checkbox" id="b2"><label for="b2">子账号 <code class="inline">soniscope-local-reader</code> 已创建，AK 已保存，仅绑自定义 <code class="inline">soniscope-bucket-readonly</code>。</label></li>
+        <li><input type="checkbox" id="b3"><label for="b3">角色 <code class="inline">soniscope-uploader-role</code> 已创建，信任策略 Principal 精确到 <code class="inline">acs:ram::&lt;UID&gt;:user/soniscope-fc</code>。</label></li>
+        <li><input type="checkbox" id="b4"><label for="b4">角色绑定的权限策略 <code class="inline">soniscope-upload-template</code> Resource 限定 <code class="inline">soniscope-audio/recordings/*</code>。</label></li>
+        <li><input type="checkbox" id="b5"><label for="b5"><b>正例</b>：用临时凭证 PutObject 到 <code class="inline">recordings/test.mp3</code> 成功。</label></li>
+        <li><input type="checkbox" id="b6"><label for="b6"><b>反例 1</b>：PutObject <code class="inline">recordings/evil.mp3</code> → AccessDenied。</label></li>
+        <li><input type="checkbox" id="b7"><label for="b7"><b>反例 2</b>：ListObjects → AccessDenied。</label></li>
+        <li><input type="checkbox" id="b8"><label for="b8"><b>反例 3</b>：GetObject → AccessDenied。</label></li>
+        <li><input type="checkbox" id="b9"><label for="b9"><b>反例 4</b>：16 分钟后 PutObject → ExpiredToken。</label></li>
+        <li><input type="checkbox" id="b10"><label for="b10">角色 ARN 已记录到 runbook（值不含敏感信息，可进 git）。</label></li>
+      </ul>
+    </section>
+
+    <!-- ============== C ============== -->
+    <section class="block" id="block-c">
+      <h2><span class="chip">C</span>函数计算 FC：服务 + 两个函数槽位 + HTTP 触发器<span class="state" id="state-block-c"></span></h2>
+      <p class="lead">目标：留好两个 hello-world 函数 URL。<b>真实业务代码 + 部署由 US-003（issue-credential）和 US-005（verify-upload）AI 实现</b>，本块仅准备槽位。</p>
+
+      <h3 class="step-title">操作步骤</h3>
+      <ol class="steps">
+        <li>访问 <a href="https://fcnext.console.aliyun.com/" target="_blank">函数计算 FC 控制台</a>，首次进入会自动创建服务关联角色 <code class="inline">AliyunFCDefaultRole</code>。</li>
+        <li>选择地域 <b>华东1（杭州）cn-hangzhou</b>（必须与 OSS 同 region）。</li>
+        <li>服务及函数 → 创建服务 → 名称 <code class="inline">soniscope-svc</code>。描述可填"日观声记 MVP 后端"。</li>
+        <li>在 <code class="inline">soniscope-svc</code> 下创建第 1 个函数：
+          <table class="kv" style="margin-top: 8px;">
+            <tr><th>函数名</th><td><code class="inline">issue-credential</code>（kebab-case，作为 HTTP URL 路径）</td></tr>
+            <tr><th>运行时</th><td>Python 3.11</td></tr>
+            <tr><th>处理程序</th><td><code class="inline">index.handler</code>（默认）</td></tr>
+            <tr><th>代码</th><td>保留默认 hello world（业务代码由 US-003 提交）</td></tr>
+            <tr><th>函数实例类型</th><td>弹性实例（默认）</td></tr>
+            <tr><th>触发器</th><td>HTTP 触发器，认证方式 = <b>anonymous</b>（业务层 openid allowlist 兜底）；请求方式勾选 GET + POST</td></tr>
+          </table>
+        </li>
+        <li>记录该函数的 HTTP 触发器 URL（形如 <code class="inline">https://&lt;account&gt;.&lt;region&gt;.fcapp.run/2016-08-15/proxy/soniscope-svc/issue-credential/</code>）。</li>
+        <li>重复步骤 4-5，创建第 2 个函数 <code class="inline">verify-upload</code>，配置完全相同。</li>
+      </ol>
+
+      <div class="callout info">
+        <span class="title">命名约定</span>
+        函数<b>目录</b>用 snake_case（<code class="inline">apps/fc/issue_credential/</code>），函数<b>名 / URL</b>用 kebab-case（<code class="inline">issue-credential</code>）。本步在 FC 控制台填的是 kebab-case 名字，AGENTS.md 已明示。
+      </div>
+
+      <h3 class="step-title">验收清单</h3>
+      <ul class="checklist" data-block="block-c">
+        <li><input type="checkbox" id="c1"><label for="c1">服务 <code class="inline">soniscope-svc</code> 已创建于 <code class="inline">cn-hangzhou</code>。</label></li>
+        <li><input type="checkbox" id="c2"><label for="c2">函数 <code class="inline">issue-credential</code> 状态正常（Python 3.11，hello world）。</label></li>
+        <li><input type="checkbox" id="c3"><label for="c3">函数 <code class="inline">verify-upload</code> 状态正常（Python 3.11，hello world）。</label></li>
+        <li><input type="checkbox" id="c4"><label for="c4"><code class="inline">curl -i &lt;issue-credential URL&gt;</code> 返回 HTTP/2 200 + hello world 文本，<b>不是</b> 404 / 502 / 网络错误。</label></li>
+        <li><input type="checkbox" id="c5"><label for="c5"><code class="inline">curl -i &lt;verify-upload URL&gt;</code> 返回 HTTP/2 200 + hello world 文本。</label></li>
+        <li><input type="checkbox" id="c6"><label for="c6">两个 URL 已记录到 <code class="inline">docs/runbook/cloud-setup.md</code>。</label></li>
+      </ul>
+
+<pre><span class="cmt"># 验收示例</span>
+curl -i https://&lt;account&gt;.&lt;region&gt;.fcapp.run/2016-08-15/proxy/soniscope-svc/issue-credential/
+curl -i https://&lt;account&gt;.&lt;region&gt;.fcapp.run/2016-08-15/proxy/soniscope-svc/verify-upload/
+
+<span class="cmt"># 期望：HTTP/2 200 + hello world</span></pre>
+    </section>
+
+    <!-- ============== D ============== -->
+    <section class="block" id="block-d">
+      <h2><span class="chip">D</span>微信小程序：账号 + AppID + 域名白名单 + 工具 + 真机 openid<span class="state" id="state-block-d"></span></h2>
+      <p class="lead">目标：拿到 AppID / AppSecret / 真机 openid 三件套，且 FC + OSS 域名已加入小程序合法域名白名单。</p>
+
+      <h3 class="step-title">D-1 注册小程序账号</h3>
+      <ol class="steps">
+        <li>访问 <a href="https://mp.weixin.qq.com" target="_blank">mp.weixin.qq.com</a> → 注册 → <b>小程序</b>（个人主体即可）。</li>
+        <li>填写邮箱 / 设密码 / 邮件激活 → 选择主体类型「个人」→ 微信扫码绑定管理员。</li>
+        <li>登录小程序后台，记录 AppID（形如 <code class="inline">wx1234567890abcdef</code>）。</li>
+        <li>开发管理 → 开发设置 → 重置 AppSecret（首次需管理员扫码），<b>立即保存到密码管理器</b>。</li>
+      </ol>
+
+      <h3 class="step-title">D-2 配置服务器域名白名单</h3>
+      <ol class="steps">
+        <li>小程序后台 → 开发管理 → 开发设置 → 服务器域名 → 修改。</li>
+        <li>在 <b>request 合法域名</b> 添加 FC 公网域名（去掉路径，只填域名部分）：<br>
+          <code class="inline">https://&lt;account&gt;.&lt;region&gt;.fcapp.run</code>
+        </li>
+        <li>在 <b>uploadFile 合法域名</b> 添加 OSS Bucket 域名：<br>
+          <code class="inline">https://soniscope-audio.oss-cn-hangzhou.aliyuncs.com</code>
+        </li>
+        <li>保存（每月最多修改 50 次，无需担心配额）。</li>
+      </ol>
+
+      <div class="callout warn">
+        <span class="title">⚠ 注意</span>
+        微信要求域名必须是 <b>https</b>，且不能包含端口、路径。FC 默认给的 <code class="inline">.fcapp.run</code> 域名是 https，可直接用。如未来切自定义域名，需重新配置白名单。
+      </div>
+
+      <h3 class="step-title">D-3 安装微信开发者工具 + 创建项目</h3>
+      <ol class="steps">
+        <li>下载 <a href="https://developers.weixin.qq.com/miniprogram/dev/devtools/download.html" target="_blank">微信开发者工具（稳定版 Stable Build）</a>。</li>
+        <li>安装并扫码登录。</li>
+        <li>新建项目 → 小程序 → 填入 AppID（D-1 记录的）→ 项目名随意 → 选择本地空目录（用于测试，不必与 repo 关联）→ 不使用云开发 → 创建。</li>
+      </ol>
+
+      <h3 class="step-title">D-4 加入体验者 + 拿真机 openid</h3>
+      <ol class="steps">
+        <li>小程序后台 → 管理 → 成员管理 → 体验成员 → 添加体验者 → 用<b>本人微信</b>扫码确认。</li>
+        <li>在开发者工具中，把下面这段代码贴到 <code class="inline">app.js</code> 的 <code class="inline">onLaunch</code> 里临时跑一次：
+<pre>wx.login({
+  success: (res) => {
+    console.log('JS code:', res.code);
+    <span class="cmt">// 用这个 code 去服务端调 jscode2session 拿 openid</span>
+  }
+});</pre>
+        </li>
+        <li>在终端用 curl 调用微信接口换 openid：
+<pre>curl "https://api.weixin.qq.com/sns/jscode2session?appid=&lt;AppID&gt;&secret=&lt;AppSecret&gt;&js_code=&lt;上一步的 code&gt;&grant_type=authorization_code"
+
+<span class="cmt"># 返回示例：</span>
+<span class="cmt"># {"session_key":"...","openid":"o6zAJs...."}</span></pre>
+        </li>
+        <li>把 openid（形如 <code class="inline">o6zAJs...</code>，28 字符左右）记录到 runbook，用作 FC 环境变量 <code class="inline">OPENID_ALLOWLIST</code> 的值。</li>
+      </ol>
+
+      <h3 class="step-title">验收清单</h3>
+      <ul class="checklist" data-block="block-d">
+        <li><input type="checkbox" id="d1"><label for="d1">小程序后台 → 设置 → 基本设置：能看到 AppID。</label></li>
+        <li><input type="checkbox" id="d2"><label for="d2">AppSecret 已保存到密码管理器。</label></li>
+        <li><input type="checkbox" id="d3"><label for="d3">服务器域名页：FC 域名在 <b>request</b> 列、OSS 域名在 <b>uploadFile</b> 列。</label></li>
+        <li><input type="checkbox" id="d4"><label for="d4">微信开发者工具能成功打开 AppID 项目（无报错弹窗）。</label></li>
+        <li><input type="checkbox" id="d5"><label for="d5">开发者工具 → 详情 → 本地设置：<b>取消勾选</b>「不校验合法域名」，跑 <code class="inline">wx.request({ url: 'https://&lt;FC URL&gt;' })</code> 不报「不在合法域名列表中」。</label></li>
+        <li><input type="checkbox" id="d6"><label for="d6">本人微信已加入体验成员名单。</label></li>
+        <li><input type="checkbox" id="d7"><label for="d7">通过 jscode2session 拿到自己的 openid，已记录到 runbook。</label></li>
+      </ul>
+    </section>
+
+    <!-- ============== E ============== -->
+    <section class="block" id="block-e">
+      <h2><span class="chip">E</span>云端语音转文字 API（默认阿里云 NLS 录音文件极速版）<span class="state" id="state-block-e"></span></h2>
+      <p class="lead">目标：开通 ASR 服务，拿 AppKey，并完成一次官方 demo 联调验证转写质量。</p>
+
+      <div class="callout info">
+        <span class="title">为什么默认 NLS</span>
+        ① 与现有阿里云账号同一身份体系；② 与 OSS 同 region 流量便宜；③ 录音文件极速版<b>支持直接传 OSS 公网/签名 URL 让 API 自己拉</b>，Worker 不需要把音频重传给 ASR。备选：通义听悟 / OpenAI Whisper API（如选备选需在 runbook 中记录变更原因 + 影响哪些 stories）。
+      </div>
+
+      <h3 class="step-title">操作步骤</h3>
+      <ol class="steps">
+        <li>访问 <a href="https://nls-portal.console.aliyun.com/" target="_blank">智能语音交互控制台</a>，立即开通服务（同账号同 region）。</li>
+        <li>左侧菜单 → 全部项目 → 创建项目，名称 <code class="inline">soniscope-mvp</code>，业务场景选「录音文件转写」。</li>
+        <li>项目创建后，复制 <b>AppKey</b>（项目级标识，约 16 字符）保存到 runbook。注意：AppKey 不是 AccessKey，可入 runbook。</li>
+        <li>调用 API 的 AccessKey 复用 A 块账号下的另一个 RAM 子账号（如已用 <code class="inline">soniscope-fc</code> 不要复用，建议新建一个 <code class="inline">soniscope-asr</code> 子账号并授予 <code class="inline">AliyunNLSFullAccess</code>），AK / Secret 保存到密码管理器。</li>
+        <li>查看免费额度：智能语音交互 → 资源中心 → 资源包，确认录音文件转写免费时长（通常每月若干小时）。</li>
+        <li><b>真实联调基线</b>：用官方 demo 或 curl 调用录音文件极速版，提交 F 块准备的 <code class="inline">sample-10s.mp3</code> 的 OSS 公网 URL，等待返回结构化结果。<a href="https://help.aliyun.com/document_detail/90727.html" target="_blank">官方文档</a>。</li>
+        <li>把返回 JSON 的关键字段（含完整文字 + segments + 时间戳）粘贴到 runbook 作为基线参考，方便后续比对。</li>
+      </ol>
+
+      <h4 class="sub-title">成本估算（参考）</h4>
+      <table class="kv">
+        <tr><th>场景</th><td>日均 30 分钟录音 × 30 天 = 15 小时/月</td></tr>
+        <tr><th>NLS 录音文件极速版</th><td>按小时计费，免费额度通常足够个人使用；超出部分约 ¥1.4/小时</td></tr>
+        <tr><th>OSS 存储</th><td>15 小时 ≈ 360 MB MP3/月，几乎可忽略</td></tr>
+      </table>
+
+      <h3 class="step-title">验收清单</h3>
+      <ul class="checklist" data-block="block-e">
+        <li><input type="checkbox" id="e1"><label for="e1">已选定 ASR 服务商（默认 NLS 录音文件极速版；如选备选已在 runbook 记录原因）。</label></li>
+        <li><input type="checkbox" id="e2"><label for="e2">已开通服务，控制台能看到项目 <code class="inline">soniscope-mvp</code> 和 AppKey。</label></li>
+        <li><input type="checkbox" id="e3"><label for="e3">已领取并确认免费额度数量，已在 runbook 估算月度成本。</label></li>
+        <li><input type="checkbox" id="e4"><label for="e4">用 <code class="inline">sample-10s.mp3</code> 跑过一次官方 demo 联调，拿到结构化转写结果。</label></li>
+        <li><input type="checkbox" id="e5"><label for="e5">转写文本与原始口述内容主干一致（允许标点 / 同音字差异）。</label></li>
+        <li><input type="checkbox" id="e6"><label for="e6">联调 JSON 输出关键字段已贴入 runbook 作为基线。</label></li>
+        <li><input type="checkbox" id="e7"><label for="e7">AppKey + API endpoint 已记录到 runbook；调用 AK / Secret 已保存到密码管理器。</label></li>
+      </ul>
+    </section>
+
+    <!-- ============== F ============== -->
+    <section class="block" id="block-f">
+      <h2><span class="chip">F</span>测试基线音频素材<span class="state" id="state-block-f"></span></h2>
+      <p class="lead">目标：在 <code class="inline">tests/fixtures/audio/</code> 准备 4 段标准音频，提供 sha256，供 US-015 / US-017 + §4 最终验收复用。</p>
+
+      <h3 class="step-title">需要准备的 4 个文件</h3>
+      <table class="kv">
+        <tr><th>文件</th><th>用途 / 时长 / 格式</th></tr>
+        <tr><td><code class="inline">sample-10s.mp3</code></td><td>约 10 秒 MP3，清晰人声，无背景音。US-001 E 联调 + US-017 真实闭环用。</td></tr>
+        <tr><td><code class="inline">sample-1min.mp3</code></td><td>约 60 秒 MP3，含 5~10 句话。P-01 性能基线 + US-017 性能验证用。</td></tr>
+        <tr><td><code class="inline">sample-25min.mp3</code></td><td>约 25 分钟 MP3。US-010 长录音分片 + §4.2 手动验收闭环用。</td></tr>
+        <tr><td><code class="inline">sample-aac.aac</code></td><td>约 10 秒 AAC 格式。验证 AAC 转码（OQ-1 / US-015 强依赖）。</td></tr>
+      </table>
+
+      <h3 class="step-title">操作步骤</h3>
+      <ol class="steps">
+        <li>用手机录音 App（如「微信语音转文字」「讯飞语记」「QuickTime」）录制 3 段 MP3，时长分别约 10s / 60s / 25min。可念新闻、读书摘录或自由讲话。</li>
+        <li>用 <code class="inline">ffmpeg</code> 把 <code class="inline">sample-10s.mp3</code> 转出 AAC 版：
+<pre>ffmpeg -i tests/fixtures/audio/sample-10s.mp3 \
+  -c:a aac -b:a 128k \
+  tests/fixtures/audio/sample-aac.aac</pre>
+        </li>
+        <li>把 4 个文件放到 <code class="inline">tests/fixtures/audio/</code>（仓库相对路径）。</li>
+        <li>计算并记录 sha256：
+<pre>shasum -a 256 tests/fixtures/audio/*.{mp3,aac}
+
+<span class="cmt"># 把每个文件的 sha256 抄到 docs/runbook/cloud-setup.md</span></pre>
+        </li>
+        <li>用 ffprobe 检查 codec / duration：
+<pre>ffprobe -v error -show_entries stream=codec_name,duration \
+  -of default=noprint_wrappers=1 tests/fixtures/audio/sample-1min.mp3
+<span class="cmt"># 期望：codec_name=mp3, duration ≈ 60</span>
+
+ffprobe -v error -show_entries stream=codec_name \
+  -of default=noprint_wrappers=1 tests/fixtures/audio/sample-aac.aac
+<span class="cmt"># 期望：codec_name=aac（不能是 mp3，否则后续 AAC 转码验证假阳）</span></pre>
+        </li>
+      </ol>
+
+      <div class="callout warn">
+        <span class="title">⚠ 文件大小约束</span>
+        4 个 fixture 总大小通常 &lt; 50 MB，可直接进 git。如担心仓库膨胀，可考虑用 git-lfs 管理，但本期 MVP 暂不要求。
+      </div>
+
+      <h3 class="step-title">验收清单</h3>
+      <ul class="checklist" data-block="block-f">
+        <li><input type="checkbox" id="f1"><label for="f1"><code class="inline">ls -la tests/fixtures/audio/</code> 能看到 4 个文件。</label></li>
+        <li><input type="checkbox" id="f2"><label for="f2"><code class="inline">shasum -a 256 tests/fixtures/audio/*</code> 输出与 runbook 中记录的一致（每行长度 64 字符 hex）。</label></li>
+        <li><input type="checkbox" id="f3"><label for="f3">每个文件用播放器试听，能听到清晰人声、无明显杂音。</label></li>
+        <li><input type="checkbox" id="f4"><label for="f4"><code class="inline">ffprobe sample-1min.mp3</code> 显示 duration ≈ 60s + codec=mp3。</label></li>
+        <li><input type="checkbox" id="f5"><label for="f5"><code class="inline">ffprobe sample-25min.mp3</code> 显示 duration ≈ 1500s（25 分钟）。</label></li>
+        <li><input type="checkbox" id="f6"><label for="f6"><code class="inline">ffprobe sample-aac.aac</code> 显示 codec=aac（不是 mp3 假冒）。</label></li>
+        <li><input type="checkbox" id="f7"><label for="f7">sha256 + duration + codec 三项信息已写入 runbook。</label></li>
+      </ul>
+    </section>
+
+    <!-- ============== G ============== -->
+    <section class="block" id="block-g">
+      <h2><span class="chip">G</span>Worker 运行环境（与 macOS 解耦）<span class="state" id="state-block-g"></span></h2>
+      <p class="lead">目标：一台能跑 Python 3.11+ 的主机，工作目录 <code class="inline">$SONISCOPE_HOME</code>（默认 <code class="inline">~/SoniScope/</code>）有 ≥ 50GB 空间。</p>
+
+      <h3 class="step-title">操作步骤</h3>
+      <ol class="steps">
+        <li>选定 Worker 部署位置（Linux 服务器 / Docker / 本机 Mac / NAS / 树莓派 / 云主机 任意），记录主机标识（hostname + IP）到 runbook。</li>
+        <li>SSH 到该主机，确认 Python 版本 ≥ 3.11：
+<pre>python3 --version
+<span class="cmt"># 若 &lt; 3.11，用 pyenv / uv / 系统包管理器升级到 3.11.x 或 3.12.x</span></pre>
+        </li>
+        <li>检查必要工具：
+<pre>which git make curl ffmpeg ffprobe
+
+<span class="cmt"># 若缺：</span>
+<span class="cmt">#   macOS: brew install git make curl ffmpeg</span>
+<span class="cmt">#   Ubuntu: sudo apt install -y git make curl ffmpeg</span></pre>
+        </li>
+        <li>检查工作目录磁盘空间：
+<pre>df -h ~
+<span class="cmt"># 期望：Avail ≥ 50GB</span>
+
+mkdir -p ~/SoniScope
+ls -la ~/SoniScope
+<span class="cmt"># 期望：目录创建成功，可写</span></pre>
+        </li>
+        <li>克隆代码仓库（如还没在该主机上）：
+<pre>cd ~
+git clone &lt;repo URL&gt; my_soniscope
+cd my_soniscope</pre>
+        </li>
+      </ol>
+
+      <div class="callout info">
+        <span class="title">关于 $SONISCOPE_HOME</span>
+        AGENTS.md 明确：<b>运行时数据目录与代码仓库严格分离</b>。代码在 <code class="inline">my_soniscope/</code>，运行时数据（config.yaml / inbox / fragments / tmp）在 <code class="inline">$SONISCOPE_HOME</code>。可通过环境变量切换。默认值 <code class="inline">~/SoniScope/</code>。运行时数据<b>绝不</b> 进 git。
+      </div>
+
+      <h3 class="step-title">验收清单</h3>
+      <ul class="checklist" data-block="block-g">
+        <li><input type="checkbox" id="g1"><label for="g1">已记录 Worker 主机标识（hostname / IP / OS 版本）到 runbook。</label></li>
+        <li><input type="checkbox" id="g2"><label for="g2"><code class="inline">python3 --version</code> 输出 3.11+。</label></li>
+        <li><input type="checkbox" id="g3"><label for="g3"><code class="inline">which git make curl ffmpeg ffprobe</code> 五条都能找到。</label></li>
+        <li><input type="checkbox" id="g4"><label for="g4"><code class="inline">df -h ~</code> 显示 ≥ 50GB 可用空间。</label></li>
+        <li><input type="checkbox" id="g5"><label for="g5"><code class="inline">mkdir -p ~/SoniScope</code> 不报错。</label></li>
+        <li><input type="checkbox" id="g6"><label for="g6">能 <code class="inline">git clone</code> 本项目到该主机。</label></li>
+      </ul>
+    </section>
+
+    <!-- ============== H ============== -->
+    <section class="block" id="block-h">
+      <h2><span class="chip">H</span>凭证注入：FC 环境变量 + Worker config.yaml<span class="state" id="state-block-h"></span></h2>
+      <p class="lead">目标：把 A~E 块拿到的所有凭证 / ID / endpoint 注入两个目标位置。<b>明文 AK 一律不进 git</b>。</p>
+
+      <h3 class="step-title">H-1 FC 环境变量（共 9 项）</h3>
+      <p style="font-size: 13.5px;">FC 控制台 → 服务 <code class="inline">soniscope-svc</code> → 函数 <code class="inline">issue-credential</code> → 配置 → 环境变量。逐项填入；同样的环境变量也要在 <code class="inline">verify-upload</code> 函数下配一份（或用服务级变量共享，根据 FC 实际能力选）。</p>
+      <table class="kv">
+        <tr><th>Key</th><th>说明 / 取值</th></tr>
+        <tr><td><code class="inline">OSS_BUCKET</code></td><td>来自 A 块，固定值 <code class="inline">soniscope-audio</code></td></tr>
+        <tr><td><code class="inline">OSS_REGION</code></td><td><code class="inline">cn-hangzhou</code></td></tr>
+        <tr><td><code class="inline">OSS_ENDPOINT</code></td><td><code class="inline">oss-cn-hangzhou.aliyuncs.com</code></td></tr>
+        <tr><td><code class="inline">RAM_ROLE_ARN</code></td><td>B-3 创建的 <code class="inline">soniscope-uploader-role</code> 的 ARN</td></tr>
+        <tr><td><code class="inline">ALIYUN_AK_ID</code></td><td>B-1 创建的 <code class="inline">soniscope-fc</code> 子账号的 AK ID</td></tr>
+        <tr><td><code class="inline">ALIYUN_AK_SECRET</code></td><td>同上 AK Secret（FC 控制台脱敏显示，可放心填）</td></tr>
+        <tr><td><code class="inline">WX_APPID</code></td><td>D-1 拿到的小程序 AppID</td></tr>
+        <tr><td><code class="inline">WX_APP_SECRET</code></td><td>D-1 拿到的 AppSecret</td></tr>
+        <tr><td><code class="inline">OPENID_ALLOWLIST</code></td><td>D-4 拿到的真机 openid（单值或逗号分隔多值）</td></tr>
+      </table>
+
+      <h3 class="step-title">H-2 Worker <code class="inline">~/SoniScope/config.yaml</code></h3>
+      <p style="font-size: 13.5px;">在 G 块选定的 Worker 主机上创建配置文件，注入 OSS 读凭证 + ASR 凭证：</p>
+<pre>oss:
+  endpoint: oss-cn-hangzhou.aliyuncs.com
+  bucket: soniscope-audio
+  access_key_id: <span class="cmt">&lt;B-2 soniscope-local-reader 的 AK ID&gt;</span>
+  access_key_secret: <span class="cmt">&lt;B-2 soniscope-local-reader 的 AK Secret&gt;</span>
+
+poll:
+  interval_seconds: 60
+
+transcriber:
+  name: cloud-speech
+  provider: aliyun-nls
+  model: paraformer-v2
+  params_version: v1
+  api_endpoint: <span class="cmt">&lt;E 块 NLS API endpoint，如 nls-meta.cn-shanghai.aliyuncs.com&gt;</span>
+  appkey: <span class="cmt">&lt;E 块 NLS AppKey&gt;</span>
+  access_key_id: <span class="cmt">&lt;调用 NLS 的 RAM 子账号 AK ID&gt;</span>
+  access_key_secret: <span class="cmt">&lt;调用 NLS 的 RAM 子账号 AK Secret&gt;</span>
+  local:
+    enabled: false   <span class="cmt"># 本期不部署本地 Whisper</span></pre>
+
+      <p style="font-size: 13.5px;">保存后立即调整权限并验证：</p>
+<pre><span class="cmt"># 仅自己可读，防止其他用户偷看明文 AK</span>
+chmod 600 ~/SoniScope/config.yaml
+
+<span class="cmt"># 验证</span>
+ls -la ~/SoniScope/config.yaml
+<span class="cmt"># 期望：-rw------- 1 you staff ... config.yaml</span>
+
+grep -c '^[a-z]' ~/SoniScope/config.yaml
+<span class="cmt"># 期望：≥ 8（粗略统计已填字段数）</span></pre>
+
+      <div class="callout danger">
+        <span class="title">✗ 红线提醒</span>
+        ① <code class="inline">~/SoniScope/config.yaml</code> 必须在 <code class="inline">.gitignore</code> 覆盖范围内（运行时目录默认与代码仓库分离，且 <code class="inline">SONISCOPE_HOME</code> 默认值在 <code class="inline">~/SoniScope/</code>，不在 repo 里）。<br>
+        ② FC 环境变量值在控制台是脱敏显示，但 FC 函数代码访问 <code class="inline">os.environ['ALIYUN_AK_SECRET']</code> 可拿到明文，<b>禁止</b> 在日志中打印完整 Secret，必须遵守"前后 4 位"约定。
+      </div>
+
+      <h3 class="step-title">验收清单</h3>
+      <ul class="checklist" data-block="block-h">
+        <li><input type="checkbox" id="h1"><label for="h1">FC 控制台 → <code class="inline">issue-credential</code> → 配置 → 环境变量：能看到 9 个键都已填值（脱敏显示）。</label></li>
+        <li><input type="checkbox" id="h2"><label for="h2"><code class="inline">verify-upload</code> 函数也有同样 9 个环境变量（或服务级共享变量已生效）。</label></li>
+        <li><input type="checkbox" id="h3"><label for="h3">Worker 主机：<code class="inline">~/SoniScope/config.yaml</code> 存在，且 <code class="inline">grep -c '^[a-z]' </code> ≥ 8。</label></li>
+        <li><input type="checkbox" id="h4"><label for="h4"><code class="inline">ls -la ~/SoniScope/config.yaml</code> 权限为 <code class="inline">-rw-------</code>（chmod 600）。</label></li>
+        <li><input type="checkbox" id="h5"><label for="h5"><b>回头确认（US-002 完成后）</b>：跑 <code class="inline">make check-config</code> 输出"所有必填字段已就绪"。</label></li>
+      </ul>
+    </section>
+
+    <!-- ============== I ============== -->
+    <section class="block" id="block-i">
+      <h2><span class="chip">I</span><code class="inline">docs/runbook/cloud-setup.md</code> 文档登记<span class="state" id="state-block-i"></span></h2>
+      <p class="lead">目标：把所有<b>非敏感</b>信息沉淀到 runbook，方便后续 AI / 团队成员复用。明文 AK / Secret / Token <b>禁止</b> 出现。</p>
+
+      <h3 class="step-title">runbook 应包含的 8 个章节</h3>
+      <ol class="steps">
+        <li><b>## 阿里云 OSS</b>：Bucket 名 / region / Endpoint / 创建日期</li>
+        <li><b>## 阿里云 RAM</b>：两个子账号名 / 角色名 / 角色 ARN / AK 保存位置（如「1Password vault: soniscope」）</li>
+        <li><b>## 阿里云 FC</b>：服务名 / 两个函数名 / 两个 HTTP URL / 9 个环境变量名（<b>只列名字不列值</b>）</li>
+        <li><b>## 微信小程序</b>：AppID / AppSecret 保存位置 / 体验者列表 / 自己的 openid</li>
+        <li><b>## 云端 ASR 服务</b>：服务商名 / 项目名 / AppKey / API endpoint / 免费额度信息 / 月度成本估算 / 联调基线 JSON 片段</li>
+        <li><b>## 测试音频素材</b>：4 个 fixture 文件的相对路径 + sha256 + duration</li>
+        <li><b>## Worker 运行环境</b>：主机标识 / Python 版本 / 工作目录路径 / 可用磁盘空间</li>
+        <li><b>## 凭证管理约定</b>：明文 AK 一律不进仓库；FC 端在环境变量、Worker 端在 <code class="inline">~/SoniScope/config.yaml</code>（chmod 600，已被 .gitignore 覆盖）</li>
+      </ol>
+
+      <h3 class="step-title">敏感信息检查</h3>
+<pre><span class="cmt"># 检查是否有明文 AK 泄漏（必须无任何匹配）</span>
+grep -E 'LTAI|sk-|aliyun_ak' docs/runbook/cloud-setup.md
+<span class="cmt"># 期望：no match</span>
+
+<span class="cmt"># 确认 runbook 已被 git 跟踪</span>
+git status docs/runbook/cloud-setup.md</pre>
+
+      <h3 class="step-title">验收清单</h3>
+      <ul class="checklist" data-block="block-i">
+        <li><input type="checkbox" id="i1"><label for="i1"><code class="inline">docs/runbook/cloud-setup.md</code> 文件已创建。</label></li>
+        <li><input type="checkbox" id="i2"><label for="i2">8 个章节齐全（OSS / RAM / FC / 小程序 / ASR / 测试音频 / Worker 环境 / 凭证约定）。</label></li>
+        <li><input type="checkbox" id="i3"><label for="i3"><code class="inline">grep -E 'LTAI|sk-|aliyun_ak' docs/runbook/cloud-setup.md</code> <b>无匹配</b>（无明文 AK 泄漏）。</label></li>
+        <li><input type="checkbox" id="i4"><label for="i4"><code class="inline">git status</code> 显示 runbook 已被跟踪。</label></li>
+        <li><input type="checkbox" id="i5"><label for="i5">FC 9 个环境变量章节中<b>只列 key 名，不列 value</b>。</label></li>
+        <li><input type="checkbox" id="i6"><label for="i6">ASR 联调基线 JSON 片段已贴入。</label></li>
+        <li><input type="checkbox" id="i7"><label for="i7">4 个 fixture 文件的 sha256 已记录。</label></li>
+      </ul>
+    </section>
+
+    <!-- ============== Final ============== -->
+    <section class="block" id="final">
+      <h2><span class="chip">✓</span>最终验收 & 收尾</h2>
+      <p class="lead">完成 A~I 全部勾选后，按下面流程做一次端到端"自检"，再把 US-001 标记为 done。</p>
+
+      <h3 class="step-title">完成判据（必须 100% 满足）</h3>
+      <ol class="steps">
+        <li>本页面顶部进度条 = 100%（所有 checkbox 已勾选）。</li>
+        <li><code class="inline">docs/runbook/cloud-setup.md</code> 已包含 8 个章节，无明文 AK。</li>
+        <li>4 个 STS 反例验证已亲手跑过（B-4），结果与预期完全一致。</li>
+        <li>两个 FC 函数 URL 用 <code class="inline">curl</code> 都能返回 200。</li>
+        <li>用 <code class="inline">sample-10s.mp3</code> 跑通了一次 ASR 联调，转写结果与原音内容主干一致。</li>
+      </ol>
+
+      <h3 class="step-title">未来 <code class="inline">make verify-prep</code>（US-002 提供）会跑以下检查</h3>
+<pre><span class="cmt"># 注意：本脚本由 AI 在 US-002 中提供；US-001 完成时只需手工跑过反例 + 把信息记入 runbook。</span>
+
+make verify-prep
+<span class="cmt"># 等价于：</span>
+<span class="cmt">#   aliyun oss stat oss://soniscope-audio    # 验证 Bucket 私有</span>
+<span class="cmt">#   4 条 STS 反例（PutObject 越界 / ListBucket / GetObject / Expired）</span>
+<span class="cmt">#   curl 两个 FC URL 返回 200</span>
+<span class="cmt">#   ls tests/fixtures/audio/*.mp3 三个文件存在 + sha256 匹配</span>
+<span class="cmt">#   make check-config 读取 ~/SoniScope/config.yaml 通过</span>
+
+<span class="cmt"># 输出：pass/fail 汇总报告</span></pre>
+
+      <h3 class="step-title">下一步</h3>
+      <ul class="bullets">
+        <li>把本页面保存为 PDF（浏览器 Cmd+P → 另存为 PDF）归档。</li>
+        <li>把 <code class="inline">docs/runbook/cloud-setup.md</code> 提交到 git。</li>
+        <li>切到 US-002，把 AI 拉进来：仓库骨架 + uv workspace + check-config CLI。</li>
+        <li>从 US-002 开始，<b>不再需要回阿里云 / 小程序控制台手工操作</b>。</li>
+      </ul>
+
+      <div class="callout ok">
+        <span class="title">✓ US-001 完成</span>
+        到此为止整个 MVP 的人工准备工作全部完成。剩下 US-002 ~ US-019 + §4 最终验收 AC，全部交给 AI 编程 + 真机测试，闭环。
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+  // ============== Checkbox 持久化 + 进度统计 ==============
+  const STORAGE_KEY = 'soniscope-us001-checks-v1';
+
+  function loadState() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); }
+    catch (e) { return {}; }
+  }
+  function saveState(state) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+
+  const state = loadState();
+  const allCheckboxes = document.querySelectorAll('.checklist input[type="checkbox"]');
+
+  // 恢复勾选状态
+  allCheckboxes.forEach(cb => {
+    if (state[cb.id]) {
+      cb.checked = true;
+      cb.closest('li').classList.add('checked');
+    }
+    cb.addEventListener('change', () => {
+      state[cb.id] = cb.checked;
+      saveState(state);
+      cb.closest('li').classList.toggle('checked', cb.checked);
+      updateProgress();
+    });
+  });
+
+  function updateProgress() {
+    const total = allCheckboxes.length;
+    let done = 0;
+    allCheckboxes.forEach(cb => { if (cb.checked) done++; });
+    const pct = total === 0 ? 0 : Math.round((done / total) * 100);
+    document.getElementById('progressBar').style.width = pct + '%';
+    document.getElementById('progressLabel').textContent = `${done} / ${total}  ·  ${pct}%`;
+
+    // 每块的进度
+    document.querySelectorAll('.checklist').forEach(ul => {
+      const blockId = ul.dataset.block;
+      const cbs = ul.querySelectorAll('input[type="checkbox"]');
+      let d = 0;
+      cbs.forEach(c => { if (c.checked) d++; });
+      const badge = document.querySelector(`[data-badge="${blockId}"]`);
+      if (badge) {
+        badge.textContent = `${d}/${cbs.length}`;
+        badge.classList.toggle('done', d === cbs.length && cbs.length > 0);
+      }
+      const state = document.getElementById('state-' + blockId);
+      if (state) {
+        if (d === cbs.length) state.textContent = '✓ 已完成';
+        else if (d === 0) state.textContent = '○ 未开始';
+        else state.textContent = `… ${d}/${cbs.length}`;
+      }
+    });
+  }
+
+  updateProgress();
+
+  // 重置按钮
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    if (!confirm('确定要清空所有勾选状态吗？此操作不可撤销。')) return;
+    localStorage.removeItem(STORAGE_KEY);
+    allCheckboxes.forEach(cb => {
+      cb.checked = false;
+      cb.closest('li').classList.remove('checked');
+    });
+    updateProgress();
+  });
+
+  // ============== 侧边栏展开 / 折叠 ==============
+  const SIDEBAR_KEY = 'soniscope-us001-sidebar-collapsed-v1';
+  const collapseBtn = document.getElementById('collapseBtn');
+  const expandBtn = document.getElementById('expandBtn');
+
+  function applySidebarState(collapsed) {
+    document.body.classList.toggle('sidebar-collapsed', collapsed);
+    if (collapseBtn) collapseBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    if (expandBtn) expandBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+  }
+
+  // 恢复上次状态
+  applySidebarState(localStorage.getItem(SIDEBAR_KEY) === '1');
+
+  function setSidebar(collapsed) {
+    applySidebarState(collapsed);
+    localStorage.setItem(SIDEBAR_KEY, collapsed ? '1' : '0');
+  }
+
+  if (collapseBtn) collapseBtn.addEventListener('click', () => setSidebar(true));
+  if (expandBtn) expandBtn.addEventListener('click', () => setSidebar(false));
+
+  // 快捷键：Ctrl/Cmd + B 切换
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'b' || e.key === 'B')) {
+      e.preventDefault();
+      setSidebar(!document.body.classList.contains('sidebar-collapsed'));
+    }
+  });
+
+  // ============== 滚动锚点高亮 ==============
+  const navLinks = document.querySelectorAll('.nav a');
+  const sections = Array.from(document.querySelectorAll('main section, main header'));
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const id = entry.target.id;
+        navLinks.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + id));
+      }
+    });
+  }, { rootMargin: '-30% 0px -60% 0px' });
+  sections.forEach(s => observer.observe(s));
+</script>
+
+</body>
+</html>
