@@ -71,30 +71,41 @@
 
 ---
 
-## 3. 阿里云 函数计算 FC
+## 3. 阿里云 函数计算 FC 3.0
 
-### 3.1 服务 + 函数槽位
+> ⚠ **FC 3.0 重要变更**：阿里云函数计算已升级到 FC 3.0，**取消了"服务"层级**，函数变成顶级实体。  
+> 因此本节不再有"服务名"字段，**不需要也不应创建 `soniscope-svc` 服务**。  
+> URL 格式从 FC 2.0 的 `/2016-08-15/proxy/<svc>/<fn>/` 变为 FC 3.0 的 `https://<url-id>.<region>.fcapp.run/`。
 
--  服务名：`soniscope-svc`
+### 3.1 函数槽位
+
+-  函数计算版本：**FC 3.0**（控制台顶部 banner 应显示「函数计算 FC 3.0」）
 -  地域：`cn-beijing`（必须与 OSS 同 region，本项目实际选用 `cn-beijing`）
--  函数 1 名（kebab-case，作为 HTTP URL 路径）：`issue-credential`
+-  函数 1 名（kebab-case，会成为 HTTP URL 子域名前缀）：`issue-credential`
 -  函数 2 名：`verify-upload`
--  运行时：Python 3.12
--  HTTP 触发器认证方式：`anonymous`（业务层 openid allowlist 兜底）
+-  函数类型：**Web 函数**（自动配置 HTTP 触发器；非「事件函数」）
+-  运行时：Python 3.12（或 3.10 / 3.11，按当前 FC 3.0 支持列表）
+-  规格：0.35 vCPU / 512 MB
+-  HTTP 触发器认证方式：`无身份认证（anonymous）`（业务层 openid allowlist 兜底，禁止用 sig 签名认证）
+-  公网访问 URL：已开启
+-  请求方式：GET + POST
 
-### 3.2 函数 HTTP 触发器 URL
+### 3.2 函数 HTTP 触发器 URL（FC 3.0 格式）
 
-> 这些 URL 是公网可访问的，**不属于敏感信息**，可入 git。但需要登记到小程序「服务器域名」白名单。
+> 这些 URL 是公网可访问的，**不属于敏感信息**，可入 git。需要登记到小程序「服务器域名」白名单。  
+> FC 3.0 每个函数有独立的 `<url-id>` 子域名，**两个函数 hostname 不同**，小程序白名单需各加一条。
 
--  `issue-credential` URL：`<待填写>`  
-  （形如 `https://<account>.<region>.fcapp.run/2016-08-15/proxy/soniscope-svc/issue-credential/`）
--  `verify-upload` URL：`<待填写>`
+-  `issue-credential` 公网 URL：`<待填写>`  
+  （形如 `https://issue-credential-xxxxxxxx.cn-beijing.fcapp.run/`，`xxxxxxxx` 由 FC 3.0 自动分配，无法自定义）
+-  `verify-upload` 公网 URL：`<待填写>`  
+  （形如 `https://verify-upload-yyyyyyyy.cn-beijing.fcapp.run/`）
 -  curl 两个 URL 均返回 HTTP 200 + hello world：☐ 已验证
 
 ### 3.3 FC 环境变量清单（**仅列 key 名，不列 value**）
 
-> 实际值在 FC 控制台 → 服务 `soniscope-svc` → 函数配置 → 环境变量中填入并脱敏显示。  
-> **此处禁止写明文值。**
+> 实际值在 FC 3.0 控制台 → 函数列表 → 函数详情 → **配置 → 环境变量** 中填入并脱敏显示。  
+> **此处禁止写明文值。**  
+> ⚠ FC 3.0 **无"服务级共享变量"**，下表 9 项必须在 `issue-credential` 和 `verify-upload` 两个函数下**各自配置一份**。后续 US-003 / US-005 部署脚本会用阿里云 SDK 自动同步，避免手工漏键。
 
 | Key | 来源 | 是否敏感 |
 |---|---|---|
@@ -108,8 +119,8 @@
 | `WX_APP_SECRET` | §4.1 小程序 AppSecret | **是** |
 | `OPENID_ALLOWLIST` | §4.2 真机 openid（逗号分隔多值） | 否（轻敏感） |
 
--  9 个环境变量在 FC 控制台均已填入并脱敏显示
--  `verify-upload` 函数也有同样 9 个环境变量（或服务级共享变量已生效）
+-  `issue-credential` 函数下 9 个环境变量已填入并脱敏显示
+-  `verify-upload` 函数下 9 个环境变量已 **独立** 填入（FC 3.0 无服务级共享，两份必须各自填全）
 
 ---
 
@@ -133,7 +144,9 @@
 
 ### 4.3 服务器域名白名单
 
--  `request` 合法域名：`<待填写>`（应为 FC 域名，如 `https://<account>.<region>.fcapp.run`）
+-  `request` 合法域名（**两条**，FC 3.0 每函数子域名独立，小程序白名单不支持通配符）：
+   - `<待填写>`（issue-credential 的 host，形如 `https://issue-credential-xxxxxxxx.cn-beijing.fcapp.run`）
+   - `<待填写>`（verify-upload 的 host，形如 `https://verify-upload-yyyyyyyy.cn-beijing.fcapp.run`）
 -  `uploadFile` 合法域名：`<待填写>`（应为 OSS Bucket 域名，如 `https://soniscope-audio.oss-cn-beijing.aliyuncs.com`）
 
 ### 4.4 开发工具

@@ -489,7 +489,7 @@
 
       <h4 class="sub-title">六类外部依赖</h4>
       <table class="kv">
-        <tr><th>① 阿里云资源</th><td>账号、OSS 私有 Bucket、RAM 两个子账号 + 一个角色、FC 服务 + 两个函数槽位（region: <code class="inline">cn-beijing</code>）</td></tr>
+        <tr><th>① 阿里云资源</th><td>账号、OSS 私有 Bucket、RAM 两个子账号 + 一个角色、<b>FC 3.0 两个 Web 函数槽位</b>（region: <code class="inline">cn-beijing</code>；FC 3.0 已无"服务"层级）</td></tr>
         <tr><th>② 微信小程序</th><td>AppID、AppSecret、服务器域名白名单、体验者真机 openid</td></tr>
         <tr><th>③ 云端语音转文字 API</th><td>默认阿里云 NLS 录音文件极速版；AppKey + 调用凭证</td></tr>
         <tr><th>④ 测试音频素材</th><td>4 段标准音频，存放 <code class="inline">tests/fixtures/audio/</code>，记录 sha256</td></tr>
@@ -683,48 +683,66 @@ export OSS_TOKEN=&lt;tmp security token&gt;</pre>
 
     <!-- ============== C ============== -->
     <section class="block" id="block-c">
-      <h2><span class="chip">C</span>函数计算 FC：服务 + 两个函数槽位 + HTTP 触发器<span class="state" id="state-block-c"></span></h2>
+      <h2><span class="chip">C</span>函数计算 FC 3.0：两个 Web 函数 + HTTP 触发器<span class="state" id="state-block-c"></span></h2>
       <p class="lead">目标：留好两个 hello-world 函数 URL。<b>真实业务代码 + 部署由 US-003（issue-credential）和 US-005（verify-upload）AI 实现</b>，本块仅准备槽位。</p>
+
+      <div class="callout warn">
+        <span class="title">⚠ FC 3.0 与 PRD 原文差异</span>
+        阿里云函数计算已升级到 <b>FC 3.0</b>，<b>取消了"服务"层级</b>，函数变成顶级实体。PRD 原文写的"服务 <code class="inline">soniscope-svc</code> + 两个函数"在 FC 3.0 控制台不存在"创建服务"这一步，直接创建函数即可。URL 格式也从 FC 2.0 的 <code class="inline">/2016-08-15/proxy/&lt;svc&gt;/&lt;fn&gt;/</code> 变为 FC 3.0 的 <code class="inline">https://&lt;url-id&gt;.&lt;region&gt;.fcapp.run/</code>。本手册和 <code class="inline">cloud-setup.md</code> 均已按 FC 3.0 调整；后续 AI 在 US-003 / US-005 部署时也以函数为单元（无服务概念）。
+      </div>
 
       <h3 class="step-title">操作步骤</h3>
       <ol class="steps">
-        <li>访问 <a href="https://fcnext.console.aliyun.com/" target="_blank">函数计算 FC 控制台</a>，首次进入会自动创建服务关联角色 <code class="inline">AliyunFCDefaultRole</code>。</li>
-        <li>选择地域 <b>华北2（北京）cn-beijing</b>（必须与 OSS 同 region）。</li>
-        <li>服务及函数 → 创建服务 → 名称 <code class="inline">soniscope-svc</code>。描述可填"日观声记 MVP 后端"。</li>
-        <li>在 <code class="inline">soniscope-svc</code> 下创建第 1 个函数：
+        <li>访问 <a href="https://fcnext.console.aliyun.com/" target="_blank">函数计算 FC 3.0 控制台</a>，确认顶部 banner 显示 <b>「函数计算 FC 3.0」</b>。首次进入会自动创建服务关联角色 <code class="inline">AliyunFCDefaultRole</code>。</li>
+        <li>右上角切换到地域 <b>华北2（北京）cn-beijing</b>（必须与 OSS 同 region）。</li>
+        <li>左侧菜单 → 函数管理 → <b>函数列表</b> → 蓝色「创建函数」按钮。</li>
+        <li>创建第 1 个函数 <code class="inline">issue-credential</code>，按下表填写（其余字段保持默认）：
           <table class="kv" style="margin-top: 8px;">
-            <tr><th>函数名</th><td><code class="inline">issue-credential</code>（kebab-case，作为 HTTP URL 路径）</td></tr>
-            <tr><th>运行时</th><td>Python 3.11</td></tr>
-            <tr><th>处理程序</th><td><code class="inline">index.handler</code>（默认）</td></tr>
-            <tr><th>代码</th><td>保留默认 hello world（业务代码由 US-003 提交）</td></tr>
-            <tr><th>函数实例类型</th><td>弹性实例（默认）</td></tr>
-            <tr><th>触发器</th><td>HTTP 触发器，认证方式 = <b>anonymous</b>（业务层 openid allowlist 兜底）；请求方式勾选 GET + POST</td></tr>
+            <tr><th>创建方式</th><td>选择 <b>「Web 函数」</b>（FC 3.0 推荐方式，会自动配置 HTTP 触发器；选「事件函数」也行但要再手动加触发器）</td></tr>
+            <tr><th>函数名</th><td><code class="inline">issue-credential</code>（kebab-case，会出现在 HTTP URL 子域名前缀里）</td></tr>
+            <tr><th>运行时</th><td>Python 3.11（或 3.10 / 3.12，按当前 FC 3.0 支持列表）</td></tr>
+            <tr><th>代码上传方式</th><td>使用示例代码（hello world）—— 业务代码由 US-003 用 SDK / s.yaml 部署覆盖</td></tr>
+            <tr><th>启动命令 / 监听端口</th><td>保持默认（Python Web 函数默认 <code class="inline">9000</code> 端口）</td></tr>
+            <tr><th>请求处理程序类型</th><td>处理 HTTP 请求</td></tr>
+            <tr><th>规格</th><td>0.35 vCPU / 512 MB（最小配置即可，hello world 占用极小）</td></tr>
+            <tr><th>触发器（自动创建）</th><td>认证方式 = <b>无身份认证（anonymous）</b>，请求方式 = GET + POST，<b>公网访问 URL = 开启</b>（FC 3.0 默认会同时给一个内网 URL，本期只需公网）</td></tr>
           </table>
         </li>
-        <li>记录该函数的 HTTP 触发器 URL（形如 <code class="inline">https://&lt;account&gt;.&lt;region&gt;.fcapp.run/2016-08-15/proxy/soniscope-svc/issue-credential/</code>）。</li>
-        <li>重复步骤 4-5，创建第 2 个函数 <code class="inline">verify-upload</code>，配置完全相同。</li>
+        <li>函数创建完成后会自动跳转到「函数详情」。进入 <b>配置 → 触发器</b> 页签，复制 HTTP 触发器的<b>公网访问地址</b>（FC 3.0 格式：<code class="inline">https://&lt;url-id&gt;.cn-beijing.fcapp.run/</code>；<code class="inline">&lt;url-id&gt;</code> 通常形如 <code class="inline">issue-credential-xxxxxxxx</code>，由系统分配，不可自定义）。</li>
+        <li>返回函数列表，重复步骤 3-5，创建第 2 个函数 <code class="inline">verify-upload</code>，配置完全相同。复制其公网访问 URL。</li>
+        <li>把两条 <code class="inline">.fcapp.run</code> URL 记录到 <code class="inline">docs/runbook/cloud-setup.md §3.2</code>。</li>
       </ol>
 
       <div class="callout info">
         <span class="title">命名约定</span>
-        函数<b>目录</b>用 snake_case（<code class="inline">apps/fc/issue_credential/</code>），函数<b>名 / URL</b>用 kebab-case（<code class="inline">issue-credential</code>）。本步在 FC 控制台填的是 kebab-case 名字，AGENTS.md 已明示。
+        函数<b>目录</b>用 snake_case（<code class="inline">apps/fc/issue_credential/</code>），FC 控制台函数<b>名</b>用 kebab-case（<code class="inline">issue-credential</code>）。FC 3.0 的 URL 子域名包含函数名前缀，所以 kebab-case 命名是强制约定。AGENTS.md 已明示。
+      </div>
+
+      <div class="callout danger">
+        <span class="title">✗ 触发器认证方式必看</span>
+        FC 3.0「认证方式」选项中：<br>
+        ① <b>无身份认证（anonymous）</b> —— 本期选这个，业务层走 US-003 实现的 openid allowlist；<br>
+        ② <b>函数计算签名认证（sig）</b> —— 客户端必须用 FC AK 对请求签名，小程序无法做到。<br>
+        如果第一次创建时选错了 sig，去「触发器」页签 → 编辑触发器 → 改回「无身份认证」，无需重建函数。
       </div>
 
       <h3 class="step-title">验收清单</h3>
       <ul class="checklist" data-block="block-c">
-        <li><input type="checkbox" id="c1"><label for="c1">服务 <code class="inline">soniscope-svc</code> 已创建于 <code class="inline">cn-beijing</code>。</label></li>
-        <li><input type="checkbox" id="c2"><label for="c2">函数 <code class="inline">issue-credential</code> 状态正常（Python 3.11，hello world）。</label></li>
-        <li><input type="checkbox" id="c3"><label for="c3">函数 <code class="inline">verify-upload</code> 状态正常（Python 3.11，hello world）。</label></li>
-        <li><input type="checkbox" id="c4"><label for="c4"><code class="inline">curl -i &lt;issue-credential URL&gt;</code> 返回 HTTP/2 200 + hello world 文本，<b>不是</b> 404 / 502 / 网络错误。</label></li>
-        <li><input type="checkbox" id="c5"><label for="c5"><code class="inline">curl -i &lt;verify-upload URL&gt;</code> 返回 HTTP/2 200 + hello world 文本。</label></li>
-        <li><input type="checkbox" id="c6"><label for="c6">两个 URL 已记录到 <code class="inline">docs/runbook/cloud-setup.md</code>。</label></li>
+        <li><input type="checkbox" id="c1"><label for="c1">FC 控制台顶部 banner 显示「函数计算 FC 3.0」，地域 = <code class="inline">cn-beijing</code>。</label></li>
+        <li><input type="checkbox" id="c2"><label for="c2">函数 <code class="inline">issue-credential</code> 状态 = 已发布 / 正常，类型 = Web 函数，运行时 = Python 3.11。</label></li>
+        <li><input type="checkbox" id="c3"><label for="c3">函数 <code class="inline">verify-upload</code> 同上配置正常。</label></li>
+        <li><input type="checkbox" id="c4"><label for="c4">两个函数的 HTTP 触发器 <b>认证方式 = 无身份认证（anonymous）</b>，公网访问 URL 已开启。</label></li>
+        <li><input type="checkbox" id="c5"><label for="c5"><code class="inline">curl -i &lt;issue-credential URL&gt;</code> 返回 HTTP/2 200 + hello world 文本，<b>不是</b> 404 / 403 / 502 / 网络错误。</label></li>
+        <li><input type="checkbox" id="c6"><label for="c6"><code class="inline">curl -i &lt;verify-upload URL&gt;</code> 返回 HTTP/2 200 + hello world 文本。</label></li>
+        <li><input type="checkbox" id="c7"><label for="c7">两个 <code class="inline">.fcapp.run</code> 公网 URL 已记录到 <code class="inline">docs/runbook/cloud-setup.md §3.2</code>。</label></li>
       </ul>
 
-<pre><span class="cmt"># 验收示例</span>
-curl -i https://&lt;account&gt;.&lt;region&gt;.fcapp.run/2016-08-15/proxy/soniscope-svc/issue-credential/
-curl -i https://&lt;account&gt;.&lt;region&gt;.fcapp.run/2016-08-15/proxy/soniscope-svc/verify-upload/
+<pre><span class="cmt"># 验收示例（FC 3.0 URL 格式，url-id 由控制台分配）</span>
+curl -i https://issue-credential-xxxxxxxx.cn-beijing.fcapp.run/
+curl -i https://verify-upload-yyyyyyyy.cn-beijing.fcapp.run/
 
-<span class="cmt"># 期望：HTTP/2 200 + hello world</span></pre>
+<span class="cmt"># 期望：HTTP/2 200 + hello world 内容（FC Web 函数默认返回 "Hello, World!"）</span>
+<span class="cmt"># 注意：path 留空或写 / 都可，FC 3.0 Web 函数会把所有请求转发到函数 9000 端口</span></pre>
     </section>
 
     <!-- ============== D ============== -->
@@ -743,8 +761,10 @@ curl -i https://&lt;account&gt;.&lt;region&gt;.fcapp.run/2016-08-15/proxy/sonisc
       <h3 class="step-title">D-2 配置服务器域名白名单</h3>
       <ol class="steps">
         <li>小程序后台 → 开发管理 → 开发设置 → 服务器域名 → 修改。</li>
-        <li>在 <b>request 合法域名</b> 添加 FC 公网域名（去掉路径，只填域名部分）：<br>
-          <code class="inline">https://&lt;account&gt;.&lt;region&gt;.fcapp.run</code>
+        <li>在 <b>request 合法域名</b> 添加 <b>两个 FC 3.0 函数</b>的完整公网 host（去掉路径，只填 https + host）。注意：FC 3.0 每个函数的子域名都不同，<b>需要分别添加两条</b>，微信不支持通配符：<br>
+          <code class="inline">https://issue-credential-xxxxxxxx.cn-beijing.fcapp.run</code><br>
+          <code class="inline">https://verify-upload-yyyyyyyy.cn-beijing.fcapp.run</code><br>
+          <span style="font-size: 13px; color: var(--muted);">实际的 <code class="inline">xxxxxxxx</code> / <code class="inline">yyyyyyyy</code> 部分从 C 块复制下来的 URL 中提取；上限：request 域名最多 20 个，足够本期使用。</span>
         </li>
         <li>在 <b>uploadFile 合法域名</b> 添加 OSS Bucket 域名：<br>
           <code class="inline">https://soniscope-audio.oss-cn-beijing.aliyuncs.com</code>
@@ -948,7 +968,8 @@ cd my_soniscope</pre>
       <p class="lead">目标：把 A~E 块拿到的所有凭证 / ID / endpoint 注入两个目标位置。<b>明文 AK 一律不进 git</b>。</p>
 
       <h3 class="step-title">H-1 FC 环境变量（共 9 项）</h3>
-      <p style="font-size: 13.5px;">FC 控制台 → 服务 <code class="inline">soniscope-svc</code> → 函数 <code class="inline">issue-credential</code> → 配置 → 环境变量。逐项填入；同样的环境变量也要在 <code class="inline">verify-upload</code> 函数下配一份（或用服务级变量共享，根据 FC 实际能力选）。</p>
+      <p style="font-size: 13.5px;">FC 3.0 控制台 → 函数列表 → 函数 <code class="inline">issue-credential</code> → <b>配置 → 环境变量</b>。逐项填入。<br>
+      <b>注意</b>：FC 3.0 取消了"服务"层级，<b>没有"服务级共享环境变量"概念</b>，必须在 <code class="inline">verify-upload</code> 函数下<b>再配一份完全相同的 9 项</b>。建议用 <code class="inline">jq</code> 或 s.yaml 模板批量同步，避免手抖漏键。后续 US-003 / US-005 部署脚本会用阿里云 SDK 一次性写入两个函数，无需手工维护。</p>
       <table class="kv">
         <tr><th>Key</th><th>说明 / 取值</th></tr>
         <tr><td><code class="inline">OSS_BUCKET</code></td><td>来自 A 块，固定值 <code class="inline">soniscope-audio</code></td></tr>
@@ -1005,7 +1026,7 @@ grep -c '^[a-z]' ~/SoniScope/config.yaml
       <h3 class="step-title">验收清单</h3>
       <ul class="checklist" data-block="block-h">
         <li><input type="checkbox" id="h1"><label for="h1">FC 控制台 → <code class="inline">issue-credential</code> → 配置 → 环境变量：能看到 9 个键都已填值（脱敏显示）。</label></li>
-        <li><input type="checkbox" id="h2"><label for="h2"><code class="inline">verify-upload</code> 函数也有同样 9 个环境变量（或服务级共享变量已生效）。</label></li>
+        <li><input type="checkbox" id="h2"><label for="h2"><code class="inline">verify-upload</code> 函数 <b>独立</b>配置了同样 9 个环境变量（FC 3.0 无服务级共享，两份必须各自填全）。</label></li>
         <li><input type="checkbox" id="h3"><label for="h3">Worker 主机：<code class="inline">~/SoniScope/config.yaml</code> 存在，且 <code class="inline">grep -c '^[a-z]' </code> ≥ 8。</label></li>
         <li><input type="checkbox" id="h4"><label for="h4"><code class="inline">ls -la ~/SoniScope/config.yaml</code> 权限为 <code class="inline">-rw-------</code>（chmod 600）。</label></li>
         <li><input type="checkbox" id="h5"><label for="h5"><b>回头确认（US-002 完成后）</b>：跑 <code class="inline">make check-config</code> 输出"所有必填字段已就绪"。</label></li>
