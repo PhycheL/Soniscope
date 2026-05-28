@@ -17,10 +17,11 @@
 
 ## 元信息
 
-- **填写人**：`<待填写>`（GitHub 用户名 / 内部 ID）
+- **填写人**：`<待填写>`(GitHub 用户名 / 内部 ID)
 - **首次完成时间**：`<待填写>`（如 `2026-05-28`）
 - **最近修订时间**：`<待填写>`
 - **本期 MVP 范围**：录音 → OSS 备份 → Worker 拉取 → 云端 ASR 转写 → 本地落盘
+- **实际使用 region**：`cn-beijing`（华北2 北京）—— PRD 默认建议 `cn-hangzhou`，本项目已统一调整为 `cn-beijing`。所有 endpoint / 环境变量 / 域名白名单都以北京为准。
 
 ---
 
@@ -29,8 +30,8 @@
 > 对应 US-001 (A)。详细步骤见手册 §A。
 
 - [ ] Bucket 名：`<待填写>`（PRD 默认 `soniscope-audio`，被占用可加后缀）
-- [ ] 地域 (region)：`<待填写>`（PRD 默认 `cn-hangzhou`）
-- [ ] Endpoint：`<待填写>`（PRD 默认 `oss-cn-hangzhou.aliyuncs.com`）
+- [ ] 地域 (region)：`cn-beijing`（华北2 北京；本项目实际选用，PRD 默认建议 `cn-hangzhou`，已调整）
+- [ ] Endpoint：`oss-cn-beijing.aliyuncs.com`（公网；同 region 内网为 `oss-cn-beijing-internal.aliyuncs.com`）
 - [ ] 读写权限 ACL：`私有 private`
 - [ ] 创建日期：`<待填写>`（如 `2026-05-28`）
 - [ ] 阿里云主账号 UID：`<待填写>`（纯数字，右上角头像 → 安全设置可看；后面 RAM 角色 ARN 要用）
@@ -94,7 +95,7 @@
 ### 3.1 服务 + 函数槽位
 
 - [ ] 服务名：`soniscope-svc`
-- [ ] 地域：`<待填写>`（必须与 OSS 同 region，默认 `cn-hangzhou`）
+- [ ] 地域：`cn-beijing`（必须与 OSS 同 region，本项目实际选用 `cn-beijing`）
 - [ ] 函数 1 名（kebab-case，作为 HTTP URL 路径）：`issue-credential`
 - [ ] 函数 2 名：`verify-upload`
 - [ ] 运行时：Python 3.11
@@ -152,7 +153,7 @@
 ### 4.3 服务器域名白名单
 
 - [ ] `request` 合法域名：`<待填写>`（应为 FC 域名，如 `https://<account>.<region>.fcapp.run`）
-- [ ] `uploadFile` 合法域名：`<待填写>`（应为 OSS Bucket 域名，如 `https://soniscope-audio.oss-cn-hangzhou.aliyuncs.com`）
+- [ ] `uploadFile` 合法域名：`<待填写>`（应为 OSS Bucket 域名，如 `https://soniscope-audio.oss-cn-beijing.aliyuncs.com`）
 
 ### 4.4 开发工具
 
@@ -178,7 +179,7 @@
 
 - [ ] 项目名：`<待填写>`（默认 `soniscope-mvp`）
 - [ ] AppKey：`<待填写>`（NLS 项目级标识，约 16 字符，**非 AccessKey，可入 git**）
-- [ ] API endpoint：`<待填写>`（如 `nls-meta.cn-shanghai.aliyuncs.com` 或 region 对应值）
+- [ ] API endpoint：`<待填写>`（录音文件转写极速版北京 endpoint：`filetrans.cn-beijing.aliyuncs.com`；如实际控制台返回不同值以控制台为准）
 - [ ] 模型名 / 版本：`<待填写>`（如 `paraformer-v2`）
 - [ ] 调用凭证保存位置：`<待填写>`（如 `1Password vault: soniscope · item: ram-soniscope-asr`）
 

@@ -482,9 +482,14 @@
       <h2><span class="chip">总览</span>完成判据 & 红线</h2>
       <p class="lead">下方 A~I 九个块的所有检查项打勾 + <code class="inline">docs/runbook/cloud-setup.md</code> 含全部非敏感信息 = US-001 完成。</p>
 
+      <div class="callout info">
+        <span class="title">本项目实际选用 region</span>
+        <b>OSS / FC / NLS 全部使用 <code class="inline">cn-beijing</code>（华北2 北京）</b>。PRD 文本默认建议 <code class="inline">cn-hangzhou</code>，已在本手册和 <code class="inline">cloud-setup.md</code> 中统一调整为北京。后续所有 endpoint、域名白名单、环境变量都以 <code class="inline">cn-beijing</code> / <code class="inline">oss-cn-beijing.aliyuncs.com</code> 为准。
+      </div>
+
       <h4 class="sub-title">六类外部依赖</h4>
       <table class="kv">
-        <tr><th>① 阿里云资源</th><td>账号、OSS 私有 Bucket、RAM 两个子账号 + 一个角色、FC 服务 + 两个函数槽位</td></tr>
+        <tr><th>① 阿里云资源</th><td>账号、OSS 私有 Bucket、RAM 两个子账号 + 一个角色、FC 服务 + 两个函数槽位（region: <code class="inline">cn-beijing</code>）</td></tr>
         <tr><th>② 微信小程序</th><td>AppID、AppSecret、服务器域名白名单、体验者真机 openid</td></tr>
         <tr><th>③ 云端语音转文字 API</th><td>默认阿里云 NLS 录音文件极速版；AppKey + 调用凭证</td></tr>
         <tr><th>④ 测试音频素材</th><td>4 段标准音频，存放 <code class="inline">tests/fixtures/audio/</code>，记录 sha256</td></tr>
@@ -522,7 +527,7 @@
         <li>OSS 控制台 → Bucket 列表 → 创建 Bucket，填写如下参数：
           <table class="kv" style="margin-top: 8px;">
             <tr><th>Bucket 名称</th><td><code class="inline">soniscope-audio</code>（全球唯一，若已被占用可加后缀如 <code class="inline">soniscope-audio-yyy</code>，并同步更新本手册全部引用）</td></tr>
-            <tr><th>地域</th><td><b>华东1（杭州）</b> = <code class="inline">cn-hangzhou</code>（必须与后续 FC / NLS 同 region，避免跨区流量费）</td></tr>
+            <tr><th>地域</th><td><b>华北2（北京）</b> = <code class="inline">cn-beijing</code>（本项目实际选用；PRD 原默认 <code class="inline">cn-hangzhou</code> 已调整。必须与后续 FC / NLS 同 region，避免跨区流量费）</td></tr>
             <tr><th>存储类型</th><td>标准存储 Standard</td></tr>
             <tr><th>读写权限 ACL</th><td><b>私有 private</b>（绝对不能选 public-read）</td></tr>
             <tr><th>同城冗余 / 版本控制</th><td>本期 MVP 全部关闭</td></tr>
@@ -536,10 +541,10 @@
       <ul class="checklist" data-block="block-a">
         <li><input type="checkbox" id="a1"><label for="a1">阿里云账号已完成 <b>个人实名认证</b>。</label></li>
         <li><input type="checkbox" id="a2"><label for="a2">账号余额 ≥ ¥100。</label></li>
-        <li><input type="checkbox" id="a3"><label for="a3">已创建 Bucket <code class="inline">soniscope-audio</code>（或同等命名），地域 <code class="inline">cn-hangzhou</code>。</label></li>
+        <li><input type="checkbox" id="a3"><label for="a3">已创建 Bucket <code class="inline">soniscope-audio</code>（或同等命名），地域 <code class="inline">cn-beijing</code>。</label></li>
         <li><input type="checkbox" id="a4"><label for="a4">OSS 控制台 → Bucket 概览页「读写权限」显示 <b>私有</b> ✅。</label></li>
         <li><input type="checkbox" id="a5"><label for="a5">终端跑 <code class="inline">ossutil ls oss://soniscope-audio/</code> 能成功列出（即使为空也算通过）。</label></li>
-        <li><input type="checkbox" id="a6"><label for="a6"><b>反例</b>：未登录浏览器访问 <code class="inline">https://soniscope-audio.oss-cn-hangzhou.aliyuncs.com/anything.txt</code> 返回 <code class="inline">AccessDenied</code>（不是 404）。</label></li>
+        <li><input type="checkbox" id="a6"><label for="a6"><b>反例</b>：未登录浏览器访问 <code class="inline">https://soniscope-audio.oss-cn-beijing.aliyuncs.com/anything.txt</code> 返回 <code class="inline">AccessDenied</code>（不是 404）。</label></li>
       </ul>
 
       <div class="callout warn">
@@ -683,7 +688,7 @@ export OSS_TOKEN=&lt;tmp security token&gt;</pre>
       <h3 class="step-title">操作步骤</h3>
       <ol class="steps">
         <li>访问 <a href="https://fcnext.console.aliyun.com/" target="_blank">函数计算 FC 控制台</a>，首次进入会自动创建服务关联角色 <code class="inline">AliyunFCDefaultRole</code>。</li>
-        <li>选择地域 <b>华东1（杭州）cn-hangzhou</b>（必须与 OSS 同 region）。</li>
+        <li>选择地域 <b>华北2（北京）cn-beijing</b>（必须与 OSS 同 region）。</li>
         <li>服务及函数 → 创建服务 → 名称 <code class="inline">soniscope-svc</code>。描述可填"日观声记 MVP 后端"。</li>
         <li>在 <code class="inline">soniscope-svc</code> 下创建第 1 个函数：
           <table class="kv" style="margin-top: 8px;">
@@ -706,7 +711,7 @@ export OSS_TOKEN=&lt;tmp security token&gt;</pre>
 
       <h3 class="step-title">验收清单</h3>
       <ul class="checklist" data-block="block-c">
-        <li><input type="checkbox" id="c1"><label for="c1">服务 <code class="inline">soniscope-svc</code> 已创建于 <code class="inline">cn-hangzhou</code>。</label></li>
+        <li><input type="checkbox" id="c1"><label for="c1">服务 <code class="inline">soniscope-svc</code> 已创建于 <code class="inline">cn-beijing</code>。</label></li>
         <li><input type="checkbox" id="c2"><label for="c2">函数 <code class="inline">issue-credential</code> 状态正常（Python 3.11，hello world）。</label></li>
         <li><input type="checkbox" id="c3"><label for="c3">函数 <code class="inline">verify-upload</code> 状态正常（Python 3.11，hello world）。</label></li>
         <li><input type="checkbox" id="c4"><label for="c4"><code class="inline">curl -i &lt;issue-credential URL&gt;</code> 返回 HTTP/2 200 + hello world 文本，<b>不是</b> 404 / 502 / 网络错误。</label></li>
@@ -741,7 +746,7 @@ curl -i https://&lt;account&gt;.&lt;region&gt;.fcapp.run/2016-08-15/proxy/sonisc
           <code class="inline">https://&lt;account&gt;.&lt;region&gt;.fcapp.run</code>
         </li>
         <li>在 <b>uploadFile 合法域名</b> 添加 OSS Bucket 域名：<br>
-          <code class="inline">https://soniscope-audio.oss-cn-hangzhou.aliyuncs.com</code>
+          <code class="inline">https://soniscope-audio.oss-cn-beijing.aliyuncs.com</code>
         </li>
         <li>保存（每月最多修改 50 次，无需担心配额）。</li>
       </ol>
@@ -946,8 +951,8 @@ cd my_soniscope</pre>
       <table class="kv">
         <tr><th>Key</th><th>说明 / 取值</th></tr>
         <tr><td><code class="inline">OSS_BUCKET</code></td><td>来自 A 块，固定值 <code class="inline">soniscope-audio</code></td></tr>
-        <tr><td><code class="inline">OSS_REGION</code></td><td><code class="inline">cn-hangzhou</code></td></tr>
-        <tr><td><code class="inline">OSS_ENDPOINT</code></td><td><code class="inline">oss-cn-hangzhou.aliyuncs.com</code></td></tr>
+        <tr><td><code class="inline">OSS_REGION</code></td><td><code class="inline">cn-beijing</code></td></tr>
+        <tr><td><code class="inline">OSS_ENDPOINT</code></td><td><code class="inline">oss-cn-beijing.aliyuncs.com</code></td></tr>
         <tr><td><code class="inline">RAM_ROLE_ARN</code></td><td>B-3 创建的 <code class="inline">soniscope-uploader-role</code> 的 ARN</td></tr>
         <tr><td><code class="inline">ALIYUN_AK_ID</code></td><td>B-1 创建的 <code class="inline">soniscope-fc</code> 子账号的 AK ID</td></tr>
         <tr><td><code class="inline">ALIYUN_AK_SECRET</code></td><td>同上 AK Secret（FC 控制台脱敏显示，可放心填）</td></tr>
@@ -959,7 +964,7 @@ cd my_soniscope</pre>
       <h3 class="step-title">H-2 Worker <code class="inline">~/SoniScope/config.yaml</code></h3>
       <p style="font-size: 13.5px;">在 G 块选定的 Worker 主机上创建配置文件，注入 OSS 读凭证 + ASR 凭证：</p>
 <pre>oss:
-  endpoint: oss-cn-hangzhou.aliyuncs.com
+  endpoint: oss-cn-beijing.aliyuncs.com
   bucket: soniscope-audio
   access_key_id: <span class="cmt">&lt;B-2 soniscope-local-reader 的 AK ID&gt;</span>
   access_key_secret: <span class="cmt">&lt;B-2 soniscope-local-reader 的 AK Secret&gt;</span>
@@ -972,7 +977,7 @@ transcriber:
   provider: aliyun-nls
   model: paraformer-v2
   params_version: v1
-  api_endpoint: <span class="cmt">&lt;E 块 NLS API endpoint，如 nls-meta.cn-shanghai.aliyuncs.com&gt;</span>
+  api_endpoint: <span class="cmt">&lt;E 块 NLS 录音文件转写 endpoint，本项目北京：filetrans.cn-beijing.aliyuncs.com&gt;</span>
   appkey: <span class="cmt">&lt;E 块 NLS AppKey&gt;</span>
   access_key_id: <span class="cmt">&lt;调用 NLS 的 RAM 子账号 AK ID&gt;</span>
   access_key_secret: <span class="cmt">&lt;调用 NLS 的 RAM 子账号 AK Secret&gt;</span>
