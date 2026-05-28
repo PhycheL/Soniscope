@@ -643,11 +643,12 @@
 <pre><span class="cmt"># 1) 配置 aliyun CLI（用 soniscope-fc 的 AK）</span>
 aliyun configure --profile soniscope-fc
 
-<span class="cmt"># 2) AssumeRole 拿临时凭证（policy 收紧到单 object key）</span>
+<span class="cmt"># 2) AssumeRole 拿临时凭证（policy 收紧到单 object key，有效期显式限制为 900 秒）</span>
 aliyun sts AssumeRole \
   --profile soniscope-fc \
   --RoleArn acs:ram::&lt;UID&gt;:role/soniscope-uploader-role \
   --RoleSessionName test \
+  --DurationSeconds 900 \
   --Policy '{"Version":"1","Statement":[{"Effect":"Allow","Action":["oss:PutObject"],"Resource":["acs:oss:*:*:soniscope-audio/recordings/test.mp3"]}]}'
 
 <span class="cmt"># 拿到 AccessKeyId / AccessKeySecret / SecurityToken，导出到环境变量</span>
@@ -661,7 +662,7 @@ export OSS_TOKEN=&lt;tmp security token&gt;</pre>
           <tr><th>反例 1</th><td>用上述临时凭证 <b>PutObject 到 <code class="inline">recordings/evil.mp3</code></b>（不在 Policy 内）→ 必须返回 <code class="inline">AccessDenied</code>。</td></tr>
           <tr><th>反例 2</th><td>用同一临时凭证 <b>ListObjects</b> → 必须返回 <code class="inline">AccessDenied</code>。</td></tr>
           <tr><th>反例 3</th><td>用同一临时凭证 <b>GetObject <code class="inline">recordings/test.mp3</code></b> → 必须返回 <code class="inline">AccessDenied</code>（凭证只有 PutObject 权限）。</td></tr>
-          <tr><th>反例 4</th><td><b>等待 16 分钟</b>后用同一临时凭证再 PutObject → 必须返回 <code class="inline">ExpiredToken</code>（凭证默认有效期 15 分钟）。</td></tr>
+          <tr><th>反例 4</th><td><b>等待 16 分钟</b>后用同一临时凭证再 PutObject → 必须返回 <code class="inline">ExpiredToken</code>（凭证有效期已通过 <code class="inline">--DurationSeconds 900</code> 显式指定为 15 分钟）。</td></tr>
         </table>
       </div>
 
@@ -675,7 +676,7 @@ export OSS_TOKEN=&lt;tmp security token&gt;</pre>
         <li><input type="checkbox" id="b6"><label for="b6"><b>反例 1</b>：PutObject <code class="inline">recordings/evil.mp3</code> → AccessDenied。</label></li>
         <li><input type="checkbox" id="b7"><label for="b7"><b>反例 2</b>：ListObjects → AccessDenied。</label></li>
         <li><input type="checkbox" id="b8"><label for="b8"><b>反例 3</b>：GetObject → AccessDenied。</label></li>
-        <li><input type="checkbox" id="b9"><label for="b9"><b>反例 4</b>：16 分钟后 PutObject → ExpiredToken。</label></li>
+        <li><input type="checkbox" id="b9"><label for="b9"><b>反例 4</b>：16 分钟后 PutObject → ExpiredToken（<code class="inline">--DurationSeconds 900</code> 显式限制，15 分钟到期）。</label></li>
         <li><input type="checkbox" id="b10"><label for="b10">角色 ARN 已记录到 runbook（值不含敏感信息，可进 git）。</label></li>
       </ul>
     </section>
