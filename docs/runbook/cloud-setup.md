@@ -178,31 +178,249 @@
 
 ### 5.4 联调基线（用 sample-10s.mp3 跑出来的真实结果）
 
--  联调日期：`<待填写>`
--  联调命令 / 工具：`<待填写>`（如 `官方 demo` / `curl` / `阿里云 SDK 测试脚本`）
+-  联调日期：`2026-05-29`
+-  联调命令 / 工具：`./test/test_asr.py`
 -  原音内容（口述了什么）：
 ```
-<待填写：把当时录的话原文写在这里，便于比对>
+人们也在可支配时间面前开始面临真正的选择，是这些选择造成了人与人最初的分野。
+始终是持续的优先级的甄选与落实，造就了每个人看上去的样子。
 ```
--  转写结果（关键字段，**不要贴敏感 token / signature**）：
+-  转写结果：
 ```json
 {
-  "task_id": "<填或脱敏>",
-  "status": "SUCCESS",
-  "result": {
-    "text": "<待填写：完整转写文本>",
-    "sentences": [
+  "TaskId": "579da9f608e6455a9e2fd91d531253ec",
+  "RequestId": "D208501F-D741-52CE-8141-32E230C18CB7",
+  "StatusText": "SUCCESS",
+  "BizDuration": 24021,
+  "SolveTime": 1780035661040,
+  "RequestTime": 1780035655314,
+  "StatusCode": 21050000,
+  "Result": {
+    "Words": [
       {
-        "begin_time": 0,
-        "end_time": 3200,
-        "text": "<待填写：第一句>"
+        "Word": "人们",
+        "EndTime": 1668,
+        "BeginTime": 1020,
+        "ChannelId": 0
+      },
+      {
+        "Word": "也",
+        "EndTime": 1994,
+        "BeginTime": 1669,
+        "ChannelId": 0
+      },
+      {
+        "Word": "在",
+        "EndTime": 2319,
+        "BeginTime": 1994,
+        "ChannelId": 0
+      },
+      {
+        "Word": "可支配",
+        "EndTime": 3294,
+        "BeginTime": 2319,
+        "ChannelId": 0
+      },
+      {
+        "Word": "时间",
+        "EndTime": 3942,
+        "BeginTime": 3294,
+        "ChannelId": 0
+      },
+      {
+        "Word": "面前",
+        "EndTime": 4593,
+        "BeginTime": 3943,
+        "ChannelId": 0
+      },
+      {
+        "Word": "开始",
+        "EndTime": 5243,
+        "BeginTime": 4593,
+        "ChannelId": 0
+      },
+      {
+        "Word": "面临",
+        "EndTime": 5891,
+        "BeginTime": 5243,
+        "ChannelId": 0
+      },
+      {
+        "Word": "真正",
+        "EndTime": 6542,
+        "BeginTime": 5892,
+        "ChannelId": 0
+      },
+      {
+        "Word": "的",
+        "EndTime": 6867,
+        "BeginTime": 6542,
+        "ChannelId": 0
+      },
+      {
+        "Word": "选择",
+        "EndTime": 7517,
+        "BeginTime": 6867,
+        "ChannelId": 0
+      },
+      {
+        "Word": "这是",
+        "EndTime": 8167,
+        "BeginTime": 7517,
+        "ChannelId": 0
+      },
+      {
+        "Word": "这些",
+        "EndTime": 8815,
+        "BeginTime": 8167,
+        "ChannelId": 0
+      },
+      {
+        "Word": "选择",
+        "EndTime": 9466,
+        "BeginTime": 8816,
+        "ChannelId": 0
+      },
+      {
+        "Word": "造成",
+        "EndTime": 10116,
+        "BeginTime": 9466,
+        "ChannelId": 0
+      },
+      {
+        "Word": "了",
+        "EndTime": 10441,
+        "BeginTime": 10116,
+        "ChannelId": 0
+      },
+      {
+        "Word": "人与人",
+        "EndTime": 11415,
+        "BeginTime": 10441,
+        "ChannelId": 0
+      },
+      {
+        "Word": "最初的",
+        "EndTime": 12390,
+        "BeginTime": 11415,
+        "ChannelId": 0
+      },
+      {
+        "Word": "分野",
+        "EndTime": 13040,
+        "BeginTime": 12390,
+        "ChannelId": 0
+      },
+      {
+        "Word": "始终",
+        "EndTime": 14148,
+        "BeginTime": 13520,
+        "ChannelId": 0
+      },
+      {
+        "Word": "是",
+        "EndTime": 14462,
+        "BeginTime": 14148,
+        "ChannelId": 0
+      },
+      {
+        "Word": "持续的",
+        "EndTime": 15404,
+        "BeginTime": 14462,
+        "ChannelId": 0
+      },
+      {
+        "Word": "优先级",
+        "EndTime": 16346,
+        "BeginTime": 15404,
+        "ChannelId": 0
+      },
+      {
+        "Word": "的",
+        "EndTime": 16660,
+        "BeginTime": 16346,
+        "ChannelId": 0
+      },
+      {
+        "Word": "甄选",
+        "EndTime": 17288,
+        "BeginTime": 16660,
+        "ChannelId": 0
+      },
+      {
+        "Word": "与",
+        "EndTime": 17602,
+        "BeginTime": 17288,
+        "ChannelId": 0
+      },
+      {
+        "Word": "落实",
+        "EndTime": 18230,
+        "BeginTime": 17602,
+        "ChannelId": 0
+      },
+      {
+        "Word": "造就",
+        "EndTime": 18859,
+        "BeginTime": 18231,
+        "ChannelId": 0
+      },
+      {
+        "Word": "了",
+        "EndTime": 19173,
+        "BeginTime": 18859,
+        "ChannelId": 0
+      },
+      {
+        "Word": "每个人",
+        "EndTime": 20115,
+        "BeginTime": 19173,
+        "ChannelId": 0
+      },
+      {
+        "Word": "看上去",
+        "EndTime": 21057,
+        "BeginTime": 20115,
+        "ChannelId": 0
+      },
+      {
+        "Word": "的",
+        "EndTime": 21371,
+        "BeginTime": 21057,
+        "ChannelId": 0
+      },
+      {
+        "Word": "样子",
+        "EndTime": 21999,
+        "BeginTime": 21371,
+        "ChannelId": 0
+      }
+    ],
+    "Sentences": [
+      {
+        "EndTime": 13040,
+        "SilenceDuration": 1,
+        "SpeakerId": "1",
+        "BeginTime": 1020,
+        "Text": "人们也在可支配时间面前开始面临真正的选择，这是这些选择造成了人与人最初的分野。",
+        "ChannelId": 0,
+        "SpeechRate": 194,
+        "EmotionValue": 6.0
+      },
+      {
+        "EndTime": 21999,
+        "SilenceDuration": 0,
+        "SpeakerId": "1",
+        "BeginTime": 13520,
+        "Text": "始终是持续的优先级的甄选与落实，造就了每个人看上去的样子。",
+        "ChannelId": 0,
+        "SpeechRate": 205,
+        "EmotionValue": 5.9
       }
     ]
   }
 }
 ```
--  主干文字与原音一致（允许标点 / 同音字差异）：☐ 通过
-
 ---
 
 ## 6. 测试基线音频素材
