@@ -161,7 +161,7 @@
 
 -  项目名：`soniscope`
 -  AppKey：`1k8tqkjQsq65wp2m`
--  API endpoint：当前没有特定选择 endpoint 的地方
+-  API endpoint：`cn-beijing`
 -  模型名 / 版本：`中文普通话 （识音石 V1 - 端到端模型)`
 -  调用凭证保存位置：`1Password` 中 `阿里云 soniscope-asr 账户 RAM` 
 
