@@ -455,7 +455,7 @@
    - 即使路径在 repo 内，也已被 `.gitignore` 覆盖
 4. **小程序端**：源代码内**绝不**包含任何长期 AccessKey 或业务密钥；上传 OSS 用 FC 签发的 STS 临时凭证（精确到单 object key）。
 5. **OSS 端**：Worker **绝不**调用 `DeleteObject`——OSS 文件永不删除（数据零丢失承诺）。
-6. **凭证密码管理器**：统一保管位置 `<待填写>`（如 `1Password Team Vault: soniscope`），并记录每个 AK 对应的 item 名称（已分散在 §2 / §4 / §5）。
+6. **凭证密码管理器**：统一保管位置 `1Password`，并记录每个 AK 对应的 item 名称（已分散在 §2 / §4 / §5）。
 
 ---
 

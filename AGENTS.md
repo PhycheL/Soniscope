@@ -53,8 +53,8 @@ my_soniscope/
 ├── scripts/                # 跨组件运维与验证脚本
 ├── tests/fixtures/audio/   # 共享测试音频 fixture（sha256 登记在 runbook）
 ├── docs/
-│   ├── PRD_v1.md           # 本期 PRD（权威）
-│   ├── requirements_v5.md  # 需求文档
+│   ├── PRD_v1.md           # 产品需求（WHAT + WHY）
+│   ├── tech-spec.md        # 技术设计（HOW）——唯一技术权威
 │   └── runbook/            # 人工准备登记表（非敏感）
 ├── pyproject.toml          # 根 uv workspace（不装业务依赖）
 ├── Makefile                # 唯一命令入口
@@ -93,7 +93,7 @@ my_soniscope/
 ### 配置与敏感信息
 - 配置走 Pydantic v2 schema；加载顺序 `$SONISCOPE_HOME/config.yaml` → `~/SoniScope/config.yaml`
 - 缺失必填字段时一次性列出**所有**缺失项
-- `access_key_secret` / `appkey` / `api_key` 在 `__repr__` / 日志中**只显示前后 4 位**
+- 敏感字段脱敏规则见 `docs/tech-spec.md` §2.3（`__repr__` / 日志中只显示前后 4 位）
 
 ---
 
@@ -132,8 +132,8 @@ make typecheck && make lint && make test
 
 | 文件 | 用途 |
 |------|------|
-| `docs/PRD_v1.md` | **本期 MVP 的权威需求文档** |
-| `docs/requirements/requirements_v5.md` | PRD 拆分前的原始需求；含 `manifest.json` 字段规范（§7.5） |
+| `docs/PRD_v1.md` | **产品需求（WHAT + WHY）** |
+| `docs/tech-spec.md` | **技术设计（HOW）——架构、API、数据模型、文件协议、ADR** |
 | `docs/runbook/cloud-setup.md` | 人工准备登记表（非敏感） |
 | `pyproject.toml` / `Makefile` | uv workspace 配置 / 唯一命令入口 |
 | `$SONISCOPE_HOME/config.yaml` | 运行时配置（含 AK），**不进 git** |
@@ -145,6 +145,7 @@ make typecheck && make lint && make test
 | 主题 | 文件 |
 |------|------|
 | 完整需求 / 各 user story 与 acceptance criteria | `docs/PRD_v1.md` |
+| 技术实现：架构、API 协议、数据模型、文件状态机、依赖、ADR | `docs/tech-spec.md` |
 
 ---
 
