@@ -56,10 +56,10 @@
 
 ### 2.3 子账号 soniscope-asr（供调用 NLS API，可选独立或复用）
 
--  登录名：`<待填写>`（建议 `soniscope-asr`；若复用其他子账号请注明）
+-  登录名： `soniscope-asr`
 -  用途：调用阿里云智能语音交互 NLS 录音文件极速版
--  绑定策略：`<待填写>`（如 `AliyunNLSFullAccess`）
--  AK 保存位置：`<待填写>`
+-  绑定策略：`AliyunNLSFullAccess`
+-  AK 保存位置：`1Password` 中 `阿里云 soniscope-asr 账户 RAM` 
 
 ### 2.4 角色 soniscope-uploader-role
 
@@ -163,14 +163,14 @@
 -  AppKey：`1k8tqkjQsq65wp2m`
 -  API endpoint：当前没有特定选择 endpoint 的地方
 -  模型名 / 版本：`中文普通话 （识音石 V1 - 端到端模型)`
--  调用凭证保存位置：`<待填写>`（如 `1Password vault: soniscope · item: ram-soniscope-asr`）
+-  调用凭证保存位置：`1Password` 中 `阿里云 soniscope-asr 账户 RAM` 
 
 ### 5.3 免费额度 & 成本估算
 
--  免费额度（每月）：`<待填写>`（如 `每月 X 小时录音文件转写`）
--  当前用量查询页路径：`<待填写>`（如 智能语音交互控制台 → 资源中心 → 资源包）
+-  免费额度（每月）：无
+-  当前用量查询页路径：https://nls-portal.console.aliyun.com/statistics
 -  **月度成本估算**（按日均 30 分钟录音 × 30 天 = 15 小时/月）：
-  - ASR 转写：`<待填写>`（如 `约 ¥X / 月，免费额度内 = ¥0`）
+  - ASR 转写：2.5元/小时，暂不购买资源包
   - OSS 存储：`<待填写>`（如 `15h MP3 ≈ 360MB ≈ ¥0.05 / 月`）
   - OSS 流量：`<待填写>`（同 region 内网拉取免费）
   - FC 调用：`<待填写>`（每月 ≤ 100 次调用，几乎为 0）
