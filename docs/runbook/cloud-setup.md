@@ -405,24 +405,23 @@
 
 ## 6. 测试基线音频素材
 
-> 对应 US-001 (F)。详细步骤见手册 §F。  
-> 文件位置：仓库内相对路径 `tests/fixtures/audio/`。
+> 文件位置：仓库内相对路径 `tests/audio/`。
 
 | 文件 | 用途 | 期望 duration | 期望 codec | sha256 |
 |---|---|---|---|---|
-| `sample-20s.wav` | E 联调 + US-017 真实闭环 | ≈ 20s | wav | `<待填写>` |
-| `sample-1min.wav` | P-01 性能基线 + US-017 性能 | ≈ 60s | wav | `<待填写>` |
+| `sample-20s.wav` | E 联调 + US-017 真实闭环 | ≈ 20s | wav | `b07dee76f9cab9cf4ed9ba482e7a6287409180fc05e476365bd9a92f665b7828` |
+| `sample-54s.wav` | P-01 性能基线 + US-017 性能 | ≈ 60s | wav | `9c454b212654f8948557123d9bc16d78ea6b2cf425484fca195b60fe9c7c9cde` |
 | `sample-25min.wav` | US-010 长录音分片 + §4.2 闭环 | ≈ 1500s | wav | `<待填写>` |
-| `sample-aac.aac` | OQ-1 / US-015 AAC 转码验证 | ≈ 10s | aac | `<待填写>` |
+| `sample-20s.m4a` | OQ-1 / US-015 m4a 转码验证 | ≈ 20s | m4a | `d3d2866128efe258ff95e841a16e7abb4d783fd37536692932a875f9fb5380fd` |
 
--  `ls tests/fixtures/audio/` 能看到 4 个文件
--  `shasum -a 256 tests/fixtures/audio/*.{mp3,aac}` 输出与上表一致
+-  `ls tests/audio/` 能看到 4 个文件
+-  `shasum -a 256 tests/audio/*.{mp3,aac}` 输出与上表一致
 -  `ffprobe sample-aac.aac` 显示 codec=aac（不是 mp3 假冒）
 -  每个文件能播放、人声清晰
 
 > 生成 sha256 的命令：
 > ```
-> shasum -a 256 tests/fixtures/audio/*.{mp3,aac}
+> shasum -a 256 tests/audio/*.{wav,m4a}
 > ```
 
 ---
@@ -431,15 +430,24 @@
 
 > 对应 US-001 (G)。详细步骤见手册 §G。
 
--  主机标识：`<待填写>`（如 `Mac Studio M2 Ultra · hostname=studio.local` 或 `阿里云 ECS · 172.16.x.y`）
--  OS 版本：`<待填写>`（如 `macOS 26.5` / `Ubuntu 22.04 LTS`）
--  Python 版本：`<待填写>`（≥ 3.11，跑 `python3 --version` 输出）
--  系统工具自检：☐ `git make curl ffmpeg ffprobe` 五条 `which` 均找到
--  工作目录环境变量：`SONISCOPE_HOME=<待填写>`（默认 `~/SoniScope/`）
--  工作目录可用磁盘空间：`<待填写>`（≥ 50GB，`df -h` 输出）
--  仓库 clone 路径：`<待填写>`（如 `~/ProjectCode/my_soniscope`）
+-  主机标识：`Mac Studio M4 Max`
+-  OS 版本：`macOS 26.5`
+-  Python 版本：`3.13.2`
+-  系统工具自检：
 
-> Worker 主机如未来切换（如从笔记本迁到 NAS），在本节追加历史记录而不是覆盖。
+```
+/usr/local/bin/git
+/usr/bin/make
+/usr/bin/curl
+/opt/homebrew/bin/ffmpeg
+/opt/homebrew/bin/ffprobe
+```
+
+
+
+-  工作目录环境变量：`SONISCOPE_HOME=/Volumes/Data/software/SoniScope`
+-  工作目录可用磁盘空间：`2.38TB`
+-  仓库 clone 路径：`/Volumes/Data/ProjectCode/my_soniscope`
 
 ---
 
