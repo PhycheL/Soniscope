@@ -151,23 +151,18 @@
 
 ## 5. 云端 ASR 服务
 
-> 对应 US-001 (E)。详细步骤见手册 §E。
-
 ### 5.1 服务商选型
 
--  服务商：`<待填写>`（默认 `阿里云智能语音交互 NLS 录音文件极速版`；若选备选请注明原因）
--  选型决策日期：`<待填写>`
--  选型理由备注（如换成备选）：
-```
-<待填写>
-```
+-  服务商：[阿里云智能语音交互](https://nls-portal.console.aliyun.com/app/627576/soniscope?appkey=1k8tqkjQsq65wp2m)
+-  选型决策日期：`2026-05-29`
+
 
 ### 5.2 项目 / 接入点
 
--  项目名：`<待填写>`（默认 `soniscope-mvp`）
--  AppKey：`<待填写>`（NLS 项目级标识，约 16 字符，**非 AccessKey，可入 git**）
--  API endpoint：`<待填写>`（录音文件转写极速版北京 endpoint：`filetrans.cn-beijing.aliyuncs.com`；如实际控制台返回不同值以控制台为准）
--  模型名 / 版本：`<待填写>`（如 `paraformer-v2`）
+-  项目名：`soniscope`
+-  AppKey：`1k8tqkjQsq65wp2m`
+-  API endpoint：当前没有特定选择 endpoint 的地方
+-  模型名 / 版本：`中文普通话 （识音石 V1 - 端到端模型)`
 -  调用凭证保存位置：`<待填写>`（如 `1Password vault: soniscope · item: ram-soniscope-asr`）
 
 ### 5.3 免费额度 & 成本估算
