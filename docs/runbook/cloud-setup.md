@@ -21,13 +21,11 @@
 - **首次完成时间**：`2026-05-28`
 - **最近修订时间**：`2026-05-28`
 - **本期 MVP 范围**：录音 → OSS 备份 → Worker 拉取 → 云端 ASR 转写 → 本地落盘
-- **实际使用 region**：`cn-beijing`（华北2 北京）—— PRD 默认建议 `cn-hangzhou`，本项目已统一调整为 `cn-beijing`。所有 endpoint / 环境变量 / 域名白名单都以北京为准。
+- **实际使用 region**：`cn-beijing`（华北2 北京）。所有 endpoint / 环境变量 / 域名白名单都以北京为准。
 
 ---
 
 ## 1. 阿里云 OSS
-
-> 对应 US-001 (A)。详细步骤见手册 §A。
 
 -  Bucket 名：`soniscope-audio`
 -  地域 (region)：`cn-beijing`（华北2 北京；本项目实际选用，PRD 默认建议 `cn-hangzhou`，已调整）
@@ -67,7 +65,7 @@
 -  **角色 ARN**：`acs:ram::1633875501759333:role/soniscope-uploader-role`
 -  信任主体：`acs:ram::1633875501759333:user/soniscope-fc`（精确到该子账号）
 -  绑定权限策略：`soniscope-upload-template`（PutObject 限 `soniscope-audio/recordings/*`）
--  默认会话有效期：`<待填写>`（建议 ≤ 900 秒 / 15 分钟）
+-  默认会话有效期：一小时
 
 ---
 
@@ -97,27 +95,6 @@
 
 -  `issue-credential` 公网 URL：https://issue-cedential-ottfirocds.cn-beijing.fcapp.run
 -  `verify-upload` 公网 URL：https://verify-upload-nnjpaoamhw.cn-beijing.fcapp.run
-
-### 3.3 FC 环境变量清单（**仅列 key 名，不列 value**）
-
-> 实际值在 FC 3.0 控制台 → 函数列表 → 函数详情 → **配置 → 环境变量** 中填入并脱敏显示。  
-> **此处禁止写明文值。**  
-> ⚠ FC 3.0 **无"服务级共享变量"**，下表 9 项必须在 `issue-credential` 和 `verify-upload` 两个函数下**各自配置一份**。后续 US-003 / US-005 部署脚本会用阿里云 SDK 自动同步，避免手工漏键。
-
-| Key | 来源 | 是否敏感 |
-|---|---|---|
-| `OSS_BUCKET` | §1 Bucket 名 | 否 |
-| `OSS_REGION` | §1 region | 否 |
-| `OSS_ENDPOINT` | §1 endpoint | 否 |
-| `RAM_ROLE_ARN` | §2.4 角色 ARN | 否 |
-| `ALIYUN_AK_ID` | §2.1 soniscope-fc AK ID | **是** |
-| `ALIYUN_AK_SECRET` | §2.1 soniscope-fc AK Secret | **是** |
-| `WX_APPID` | §4.1 小程序 AppID | 否 |
-| `WX_APP_SECRET` | §4.1 小程序 AppSecret | **是** |
-| `OPENID_ALLOWLIST` | §4.2 真机 openid（逗号分隔多值） | 否（轻敏感） |
-
--  `issue-credential` 函数下 9 个环境变量已填入并脱敏显示
--  `verify-upload` 函数下 9 个环境变量已 **独立** 填入（FC 3.0 无服务级共享，两份必须各自填全）
 
 ---
 
@@ -171,12 +148,15 @@
 -  当前用量查询页路径：https://nls-portal.console.aliyun.com/statistics
 -  **月度成本估算**（按日均 30 分钟录音 × 30 天 = 15 小时/月）：
   - ASR 转写：2.5元/小时，暂不购买资源包
-  - OSS 存储：`<待填写>`（如 `15h MP3 ≈ 360MB ≈ ¥0.05 / 月`）
-  - OSS 流量：`<待填写>`（同 region 内网拉取免费）
-  - FC 调用：`<待填写>`（每月 ≤ 100 次调用，几乎为 0）
-  - **合计**：`<待填写>`
+  - OSS 存储：0.12 元/GB/月，暂不购买资源包
+  - OSS 流量：
+    - 内/外网流入流量（数据上传到 OSS）：免费
+    - 内网流出流量（通过同地域 ECS 使用内网 Endpoint，下载 OSS 的数据）：免费
+    - 外网流出流量：00:00 - 08:00（闲时，5%）：0.25 元/GB；08:00 - 24:00（忙时，95%）：0.50 元/GB
+  - FC 调用：约 1.00 元/月（每月 ≤ 100 次调用。因单次执行耗时极短，触发“单小时有调用最低计费 0.01 元”规则。若 100 次分布在不同小时，最高 1.00 元）
+  - **合计**：约 38.72 元/月
 
-### 5.4 联调基线（用 sample-10s.mp3 跑出来的真实结果）
+### 5.4 联调基线（用 sample-20s.wav 跑出来的真实结果）
 
 -  联调日期：`2026-05-29`
 -  联调命令 / 工具：`./test/test_asr.py`
@@ -430,9 +410,9 @@
 
 | 文件 | 用途 | 期望 duration | 期望 codec | sha256 |
 |---|---|---|---|---|
-| `sample-10s.mp3` | E 联调 + US-017 真实闭环 | ≈ 10s | mp3 | `<待填写>` |
-| `sample-1min.mp3` | P-01 性能基线 + US-017 性能 | ≈ 60s | mp3 | `<待填写>` |
-| `sample-25min.mp3` | US-010 长录音分片 + §4.2 闭环 | ≈ 1500s | mp3 | `<待填写>` |
+| `sample-20s.wav` | E 联调 + US-017 真实闭环 | ≈ 20s | wav | `<待填写>` |
+| `sample-1min.wav` | P-01 性能基线 + US-017 性能 | ≈ 60s | wav | `<待填写>` |
+| `sample-25min.wav` | US-010 长录音分片 + §4.2 闭环 | ≈ 1500s | wav | `<待填写>` |
 | `sample-aac.aac` | OQ-1 / US-015 AAC 转码验证 | ≈ 10s | aac | `<待填写>` |
 
 -  `ls tests/fixtures/audio/` 能看到 4 个文件
