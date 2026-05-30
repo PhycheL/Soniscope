@@ -117,11 +117,11 @@ flowchart TD
     inbox["inbox/<br/>临时下载区"]
     part["&lt;fragment_id&gt;.part<br/>下载中"]
     failed["failed/<br/>转码失败留档（不参与轮询重试）"]
-    failedTmp["&lt;fragment_id&gt;.mp3.tmp"]
+    failedTmp["&lt;fragment_id&gt;.wav.tmp"]
     fragments["fragments/"]
     date["&lt;YYYY-MM-DD&gt;/"]
     fragment["&lt;fragment_id&gt;/"]
-    audio["audio.mp3<br/>原始音频（下载完成后原子写入）"]
+    audio["audio.wav<br/>标准化 WAV 音频（下载/转码完成后原子写入）"]
     manifest["manifest.json<br/>元数据（权威）"]
     transcriptJson["transcript.json<br/>结构化转写结果"]
     transcriptTxt["transcript.txt<br/>纯文本（从 transcript.json 派生）"]
@@ -203,7 +203,7 @@ transcriber:
 
 **Key**：
 ```
-recordings/<YYYY-MM-DD>/<fragment_id>.mp3
+recordings/<YYYY-MM-DD>/<fragment_id>.wav
 ```
 
 **用户自定义元数据（随 PutObject 一起写入）**：
@@ -215,7 +215,7 @@ recordings/<YYYY-MM-DD>/<fragment_id>.mp3
 | `x-oss-meta-chunk-total` | 整数 或 `0`（非分片时） | 前端 US-010/011 |
 | `x-oss-meta-recorded-at` | ISO 8601 带时区 | 前端 US-011 |
 | `x-oss-meta-duration` | 秒数（浮点字符串） | 前端 US-011 |
-| `x-oss-meta-original-format` | `mp3` 或 `aac` | 前端 US-007 |
+| `x-oss-meta-original-format` | 原始音频格式字符串，如 `wav` / `mp3` / `aac` / `m4a` / `amr` 等 | 前端 US-007 |
 | `x-oss-meta-sha256` | hex 编码的 sha256 | 前端 US-011 |
 
 > Worker 通过 `oss2.Bucket.head_object()` 读取这些 meta，写入 `manifest.json` 对应字段。`chunk_total=0` 表示非分片单条录音，manifest 中存为 `null`。`x-oss-meta-sha256` 对应 `upload.original_sha256`（前端计算的原始字节 hash）。`oss:PutObject` 权限天然允许同请求写入用户自定义元数据，无需额外 STS policy 调整。
@@ -224,7 +224,7 @@ recordings/<YYYY-MM-DD>/<fragment_id>.mp3
 
 每个 Fragment 目录下的 `manifest.json` 是该 Fragment 的**唯一权威状态来源**。
 
-**字段来源**：`fragment_id` / `device_id` 由 Worker 从 object key 中的 fragment_id 解析；`session_id` / `chunk_seq` / `chunk_total` / `recorded_at` / `duration_seconds` / `audio.original_format` 由 Worker 从 OSS 用户自定义元数据读取（见 §3.2）；`upload.original_sha256` 由 Worker 从 `x-oss-meta-sha256` 读取（前端计算的原始字节 hash）；`audio.*`（sha256/format/size_bytes）由 Worker 本地计算（转码后的最终文件）；`upload.original_size_bytes` / `transcription.*` 由 Worker 在对应流程中填入。
+**字段来源**：`fragment_id` / `device_id` 由 Worker 从 object key 中的 fragment_id 解析；`session_id` / `chunk_seq` / `chunk_total` / `recorded_at` / `duration_seconds` / `audio.original_format` 由 Worker 从 OSS 用户自定义元数据读取（见 §3.2）；`upload.original_sha256` 由 Worker 从 `x-oss-meta-sha256` 读取（前端计算的原始字节 hash）；`audio.*`（sha256/format/size_bytes）由 Worker 本地计算（标准化后的最终 WAV 文件）；`upload.original_size_bytes` / `transcription.*` 由 Worker 在对应流程中填入。
 
 ```json
 {
@@ -237,7 +237,7 @@ recordings/<YYYY-MM-DD>/<fragment_id>.mp3
   "duration_seconds": 87.5,
 
   "audio": {
-    "format": "mp3",
+    "format": "wav",
     "original_format": "mp3",
     "size_bytes": 1234567,
     "sha256": "abc123..."
@@ -265,8 +265,8 @@ recordings/<YYYY-MM-DD>/<fragment_id>.mp3
 ```
 
 **SHA256 一致性规则**：
-- 当 `audio.original_format == 'mp3'`（无转码）：`audio.sha256 == upload.original_sha256`，`audio.size_bytes == upload.original_size_bytes`
-- 当 `audio.original_format == 'aac'`（Worker 端转码）：`audio.sha256 != upload.original_sha256`，两者都必须真实计算，不允许留 null
+- 当 `audio.original_format == 'wav'` 且 Worker 判定可直通（无需转码 / 重封装）：`audio.sha256 == upload.original_sha256`，`audio.size_bytes == upload.original_size_bytes`
+- 当 `audio.original_format != 'wav'`，或 WAV 需要重封装/重采样才能满足本地标准：`audio.sha256` 通常不同于 `upload.original_sha256`；两者都必须真实计算，不允许留 null
 
 ### 3.4 `transcript.json` 结构
 
@@ -293,8 +293,8 @@ recordings/<YYYY-MM-DD>/<fragment_id>.mp3
 
 | 阶段 | 中间态文件（位置） | 完成态文件（位置） | 失败/中断的后果 |
 |---|---|---|---|
-| 下载 | `inbox/<fragment_id>.part` | `fragments/<date>/<id>/audio.mp3` | `.part` 残留在 `inbox/`，下次轮询重下 |
-| 下载-转码（AAC 路径） | `inbox/<fragment_id>.mp3.tmp` | 同上 `audio.mp3` | `.mp3.tmp` 残留在 `inbox/`，视为下载中断，下次重下重转码 |
+| 下载 | `inbox/<fragment_id>.part` | `fragments/<date>/<id>/audio.wav` | `.part` 残留在 `inbox/`，下次轮询重下 |
+| 下载-转码（非 WAV 路径） | `inbox/<fragment_id>.wav.tmp` | 同上 `audio.wav` | `.wav.tmp` 残留在 `inbox/`，视为转码中断，下次重下重转码 |
 | 转写 | `tmp/<fragment_id>.transcript.json.tmp` | `fragments/<date>/<id>/transcript.json` | `.tmp` 残留在 `tmp/`，下次启动清理并重新转写 |
 | 完成 | — | `fragments/<date>/<id>/.done` | 无 `.done` 意味着流程未完整结束，需重做 |
 
@@ -311,7 +311,7 @@ Worker 启动时分三段扫描，按 §3.5 中间态文件的实际位置处理
 | 文件 | 判定 | 动作 |
 |---|---|---|
 | `<fragment_id>.part` | 下载中断 | 删除 `.part`，下次轮询重下 |
-| `<fragment_id>.mp3.tmp` | 转码中断 | 删除 `.mp3.tmp`，下次轮询重下重转码。如果是转码错误（非中断），移到 `inbox/failed/` 留档（不再重试） |
+| `<fragment_id>.wav.tmp` | 转码中断 | 删除 `.wav.tmp`，下次轮询重下重转码。如果是转码错误（非中断），移到 `inbox/failed/` 留档（不再重试） |
 
 **第二段：扫描 `tmp/`（转写中断恢复）**
 
@@ -324,8 +324,8 @@ Worker 启动时分三段扫描，按 §3.5 中间态文件的实际位置处理
 | 目录内容 | 判定 | 动作 |
 |---|---|---|
 | 有 `.done` | 已完成 | 跳过 |
-| 无 `.done`，有 `audio.mp3` | 转写未完 | 进入转写流程 |
-| 无 `audio.mp3` | 空目录（下载尚未完成或目录为人工创建的残留） | 可安全删除空目录，或忽略等待下次 OSS 轮询下载 |
+| 无 `.done`，有 `audio.wav` | 转写未完 | 进入转写流程 |
+| 无 `audio.wav` | 空目录（下载尚未完成或目录为人工创建的残留） | 可安全删除空目录，或忽略等待下次 OSS 轮询下载 |
 
 ### 3.7 幂等与重转
 
@@ -390,7 +390,7 @@ FC 函数运行时依赖以下环境变量（在 FC 控制台 → 服务配置�
 3. 检查 `size ≤ MAX_UPLOAD_BYTES`（默认 52428800 = 50MB）；超过返回 `400 { "error": "SIZE_EXCEEDED", "limit_bytes": 52428800, "actual_bytes": <size> }`
 
 **STS 签发**：
-- 目标 object key：`recordings/<YYYY-MM-DD>/<fragment_id>.mp3`
+- 目标 object key：`recordings/<YYYY-MM-DD>/<fragment_id>.wav`
 - Policy Resource **精确等于** `acs:oss:*:*:<bucket>/<object_key>`（单条，不带通配符）
 - 有效期 ≤ 900 秒（15 分钟）
 
@@ -403,7 +403,7 @@ FC 函数运行时依赖以下环境变量（在 FC 控制台 → 服务配置�
   "expiration": "2026-05-26T15:03:00Z",
   "bucket": "soniscope-audio",
   "endpoint": "oss-cn-hangzhou.aliyuncs.com",
-  "object_key": "recordings/2026-05-26/20260526T144800_dev01_01HZX3K8MN5PQR9TFB7AYWVCDE.mp3"
+  "object_key": "recordings/2026-05-26/20260526T144800_dev01_01HZX3K8MN5PQR9TFB7AYWVCDE.wav"
 }
 ```
 
@@ -459,7 +459,7 @@ sequenceDiagram
       "Effect": "Allow",
       "Action": ["oss:PutObject"],
       "Resource": [
-        "acs:oss:*:*:soniscope-audio/recordings/2026-05-26/20260526T144800_dev01_01HZX3K8MN5PQR9TFB7AYWVCDE.mp3"
+        "acs:oss:*:*:soniscope-audio/recordings/2026-05-26/20260526T144800_dev01_01HZX3K8MN5PQR9TFB7AYWVCDE.wav"
       ]
     }
   ]
@@ -493,18 +493,18 @@ sequenceDiagram
 
 ## 5. 音频处理
 
-### 5.1 格式策略（MP3 优先 + AAC 降级转码）
+### 5.1 格式策略（前端保留原始格式 + Worker 统一标准化为 WAV）
 
-- 前端优先 `wx.getRecorderManager().start({ format: 'mp3' })`
-- 机型不支持 MP3 时 fallback 为 AAC，不在前端转码
-- 不论格式，manifest 中标注 `audio.original_format`；OSS object key 始终用 `.mp3` 扩展名
-- **Worker 负责格式标准化**：下载后用 `ffprobe` 检测格式，AAC 用 `ffmpeg` 转码为 MP3
+- 前端不做音频转码；录音时可优先请求体积较小、平台兼容性较好的格式（如 `mp3`），但必须以微信实际产出的文件为准
+- 若微信返回 AAC/M4A、MP3、WAV、AMR 或其他可用格式，前端均按原样保存并上传；不得在小程序端转码
+- 不论原始格式是什么，manifest 中都必须标注 `audio.original_format`；OSS object key 始终用 `.wav` 扩展名，表示 Worker 侧最终标准化目标
+- **Worker 负责格式标准化**：下载后用 `ffprobe` 检测真实格式；合规 WAV 可直通或无损重封装，任意非 WAV 格式用 `ffmpeg` 转码为 WAV
 - 转码失败时移到 `inbox/failed/` 留档，不污染 `fragments/` 目录
 
 ### 5.2 转写策略（OSS 签名 URL vs 直传）
 
-- **方案 A（首选）**：生成 OSS 临时签名 URL（有效期 1 小时），传给 NLS API 让其自行拉取。传给 NLS 的是 OSS 上的**原始 object**（非 Worker 本地转码后的 audio.mp3）
-- **方案 B（降级）**：当 `config.yaml` 中 `transcriber.upload_mode = 'direct'`、或 provider 不支持 URL 拉取时，Worker 把本地 `audio.mp3` 通过 multipart 上传给 API
+- **方案 A（首选）**：生成 OSS 临时签名 URL（有效期 1 小时），传给 NLS API 让其自行拉取。传给 NLS 的是 OSS 上的**原始 object**（可能不是 WAV）；Worker 本地仍然必须完成 `audio.wav` 标准化落盘
+- **方案 B（降级）**：当 `config.yaml` 中 `transcriber.upload_mode = 'direct'`、或 provider 不支持 URL 拉取原始 object 时，Worker 把本地标准化后的 `audio.wav` 通过 multipart 上传给 API
 - 签名 URL 过期处理：NLS 异步轮询超过 50 分钟时重新签发
 - 日志中打印 `mode=oss-url` / `mode=direct-upload`
 
@@ -589,7 +589,7 @@ class TranscriptResult:
 | FC（Python） | `alibabacloud-sts20150401`、`oss2`（HeadObject 校验用） |
 | FC 部署（Python） | `alibabacloud-fc20230330`（`make deploy-fc` 脚本用，不随函数打包） |
 | Worker（Python） | `oss2`、`pyyaml`、`pydantic>=2`、`typer`、`alibabacloud-nls20180628`；**本期不装** `faster-whisper` / `whisper.cpp` |
-| Worker（系统二进制） | `ffmpeg` + `ffprobe`（AAC → MP3 转码 + 格式检测）；缺失则启动失败并提示安装方式 |
+| Worker（系统二进制） | `ffmpeg` + `ffprobe`（各种音频格式 → WAV 转码 + 格式检测）；缺失则启动失败并提示安装方式 |
 
 ### 6.4 FC 部署与运维
 
@@ -640,7 +640,7 @@ class TranscriptResult:
 | `test-e2e-crash-recovery` | — | E2E 崩溃恢复（3 种场景完整跑通） | §4.1 |
 | `test-e2e-retranscribe` | — | E2E 显式重转验证 | §4.1 |
 | `test-e2e-security` | — | E2E 鉴权 + 越权反例验证 | §4.1 |
-| `test-*` | — | 各 story 专用自动验证（如 `test-mp3-passthrough` / `test-aac-transcode` / `test-idempotent-skip` / `test-transcribe` 等） | 各 story |
+| `test-*` | — | 各 story 专用自动验证（如 `test-wav-passthrough` / `test-audio-transcode-to-wav` / `test-idempotent-skip` / `test-transcribe` 等） | 各 story |
 | `verify-e2e-integrity` | — | 验证 100 条 Fragment 目录完整性（5 个文件） | §4.1 |
 | `verify-e2e-sha256` | — | sha256 完整性校验（规则见 §3.3）：OSS 侧 + 本地侧分路径校验 | §4.1 |
 | `verify-e2e-fields` | — | manifest 关键字段非空校验 | §4.1 |
@@ -746,11 +746,11 @@ Worker 每次调用 ASR API 后输出结构化日志行，用于监控免费额�
 
 ## 8. 架构决策记录（ADR）
 
-### ADR-1：小程序录音 MP3 格式兼容（原 OQ-1）
+### ADR-1：小程序录音原始格式与 WAV 标准化（原 OQ-1）
 
-- **背景**：`wx.getRecorderManager().start({ format: 'mp3' })` 在部分安卓机型会 fallback 到 AAC。
-- **决策**：能 MP3 就直出 MP3；不能则保持 AAC，由 Worker 用 ffmpeg 转码。
-- **理由**：前端转码拖累电量与延迟，Worker 端 ffmpeg 毫秒级完成。
+- **背景**：`wx.getRecorderManager()` 在不同机型、系统和参数下可能产出 MP3、AAC/M4A、WAV、AMR 等不同格式；前端无法可靠保证所有设备都输出同一种格式。
+- **决策**：前端保留微信实际产出的原始格式，不做转码；由 Worker 用 `ffprobe` 探测真实格式，并用 `ffmpeg` 将各种原始格式统一标准化为 WAV（合规 WAV 可直通或无损重封装）。
+- **理由**：前端转码拖累电量与延迟；WAV 作为本地长期处理格式更利于后续分析和模型兼容；Worker 端集中转码便于测试、恢复和失败留档。
 - **影响**：US-007 / US-015 / US-019 manifest schema / 依赖加 ffmpeg。
 
 ### ADR-2：前端 sha256 计算（原 OQ-2）
@@ -787,7 +787,7 @@ Worker 每次调用 ASR API 后输出结构化日志行，用于监控免费额�
 
 ### ADR-8（原 OQ-8）：前端元数据传输载体——OSS 用户自定义元数据
 
-- **背景**：`manifest.json` 要求 Worker 落盘 `session_id` / `chunk_seq` / `chunk_total` / `recorded_at` / `duration_seconds` 等**只有前端才知道**的字段。架构原则规定"OSS object 是唯一数据契约"，但前端只上传音频本体（`.mp3`），不上传 manifest，FC 请求体也不包含这些字段——Worker 物理上无法获取。
+- **背景**：`manifest.json` 要求 Worker 落盘 `session_id` / `chunk_seq` / `chunk_total` / `recorded_at` / `duration_seconds` 等**只有前端才知道**的字段。架构原则规定"OSS object 是唯一数据契约"，但前端只上传音频本体（object key 使用 `.wav` 标准化目标扩展名），不上传 manifest，FC 请求体也不包含这些字段——Worker 物理上无法获取。
 - **备选方案**：
   - **A. OSS 用户自定义元数据（x-oss-meta-*）**：前端在 `wx.uploadFile` 的 header 中附带 `x-oss-meta-session-id` 等字段，Worker 通过 `HeadObject` 读回。无需改 STS policy（`PutObject` 天然允许同请求写 meta）、不增加 object 数量。
   - **B. Sidecar 对象**：前端额外上传 `<fragment_id>.manifest.json` 到 OSS。需将 STS policy 从单 key 放宽到两个 key，增加上传步骤和原子性复杂度。

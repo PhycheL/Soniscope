@@ -144,8 +144,8 @@
   2. **(B 块)** 用 FC 部署凭证（来源由实现决定，**仅本机测试用**）调 STS AssumeRole，policy 限定到单个 object key → 拿到临时凭证 → 跑 4 个反例（越界 PutObject / ListBucket / GetObject / 等待超过 tech-spec §4.1 有效期上限后 ExpiredToken）→ 全部如预期失败才算 pass
   3. **(C 块)** `curl` FC 两个 URL → HTTP 状态码 200~499（不是 5xx / 网络错误）
   4. **(E 块)** 用 config 中的 NLS AppKey + AK，上传 `tests/audio/sample-20s.wav` → 拿到结构化转写结果 → 验证结构符合 tech-spec §3.4
-  5. **(F 块)** `tests/audio/sample-{20s,54s,25min}.wav` + `sample-20s.m4a` 四个文件存在 + sha256 与 runbook 中记录的一致 + ffprobe duration 与文件名标注的时长在 ±2s 内；额外检查 `sample-20s.m4a` 的 codec=aac（m4a 容器内为 AAC，验证 OQ-1 转码 fixture 就绪）
-  6. **(G 块)** Python 版本 ≥ 3.11；`SONISCOPE_HOME` 路径可写；可用磁盘 ≥ 50GB；`ffmpeg` + `ffprobe` 可用（**OQ-1 决议依赖**）
+  5. **(F 块)** `tests/audio/sample-{20s,54s,25min}.wav` + `sample-20s.m4a` 四个文件存在 + sha256 与 runbook 中记录的一致 + ffprobe duration 与文件名标注的时长在 ±2s 内；额外检查 `sample-20s.m4a` 的 codec=aac（m4a 容器内为 AAC，作为“非 WAV → WAV”转码 fixture）
+  6. **(G 块)** Python 版本 ≥ 3.11；`SONISCOPE_HOME` 路径可写；可用磁盘 ≥ 50GB；`ffmpeg` + `ffprobe` 可用（**音频统一标准化为 WAV 的依赖**）
   7. **(H 块)** `~/SoniScope/config.yaml` 权限为 600；所有必填字段非空
 - [ ] 单项失败时，输出中包含**修复指引**（如 "请重做 US-001 (B) 反例 3"，附 runbook 中对应章节锚点）
 - [ ] 全部通过时，最后一行打印 `✅ US-001 preparation verified. Ready for US-003+`
@@ -204,7 +204,7 @@
 - [ ] **wx-login 失败验证**：跑 `make test-fc-live` → 用 `tests/fixtures/wx-login-fixture.json` 中的伪造 code 调 `/issue-credential` → 验证返回 401 `INVALID_CODE`（证明 (A) 代码生效）
 - [ ] **allowlist 拒绝验证**：用真实 wx.login code（由用户在 DevTools 中临时获取并传入）调 `/issue-credential` → 验证 openid 不在 allowlist 时返回 403 `OPENID_NOT_ALLOWED`（**不需要用户回控制台**，只需 DevTools 跑 `wx.login` 一次）
 - [ ] **STS 签发成功验证**：用 allowlist 内 openid 的 code 调 `/issue-credential` 返回有效 STS 凭证（字段符合 tech-spec §4.1 成功响应定义）
-- [ ] **安全反例验证（拿到 STS 后越权）**：拿到的凭证尝试上传到 `recordings/<其他日期>/<其他 id>.mp3` → OSS 返回 `AccessDenied`
+- [ ] **安全反例验证（拿到 STS 后越权）**：拿到的凭证尝试上传到 `recordings/<其他日期>/<其他 id>.wav` → OSS 返回 `AccessDenied`
 - [ ] **安全反例验证**：拿到的凭证尝试 `GetObject` / `ListObjects` / `DeleteObject` → 全部返回 `AccessDenied`
 - [ ] **安全反例验证**：等待超过 tech-spec §4.1 有效期上限后用同一凭证再 PutObject → 返回 `ExpiredToken` 或等价错误
 - [ ] **大小反例验证**：用 `size=60000000` 调 `/issue-credential` → 返回 400 `SIZE_EXCEEDED`；用 `size=10000000` → 返回正常 STS 凭证
@@ -282,18 +282,18 @@
 - [ ] 录音过程中页面上实时显示已录时长（`mm:ss`，每秒刷新）
 - [ ] 再次点击后停止录音，得到一个本地临时音频文件路径
 - [ ] **音频格式策略（OQ-1 决议）**：按 tech-spec §5.1 执行。用户可观测行为——
-  - MP3 机型：落盘扩展名 `.mp3`
-  - AAC fallback 机型：落盘扩展名 `.aac`，不在前端转码
-  - manifest 草案中**显式标注 `audio.original_format`**（`mp3` 或 `aac`）
-  - OSS object key 始终用 `.mp3` 扩展名（格式标准化由 Worker US-015 负责）
+  - 前端不做转码，保留微信录音接口实际产出的本地临时音频文件格式（可能是 `mp3` / `aac` / `m4a` / `wav` / 其他平台可用格式）
+  - 本地临时文件扩展名应与实际格式一致；若微信返回路径无可靠扩展名，必须用探测结果补充 `audio.original_format`
+  - manifest 草案中**显式标注 `audio.original_format`**（记录实际原始格式，不再限定为 `mp3` 或 `aac`）
+  - OSS object key 始终用 `.wav` 扩展名；Worker 在 US-015 统一把各种原始格式标准化为 WAV
 
 **(B) 自动验证（`make` 命令一键跑完，无需人工操作）**
 - [ ] Typecheck / lint 通过
 
 **(C) 手动验证清单（用户在 DevTools / 真机上操作）**
-- [ ] **微信开发者工具验证**：在 DevTools 模拟器中点击"开始录音"→ 等 3 秒 → 点击"停止录音"，控制台无报错，能在小程序本地缓存目录下看到生成的音频文件，文件扩展名与 manifest 中 `audio.original_format` 一致
+- [ ] **微信开发者工具验证**：在 DevTools 模拟器中点击"开始录音"→ 等 3 秒 → 点击"停止录音"，控制台无报错，能在小程序本地缓存目录下看到生成的音频文件，文件扩展名或格式探测结果与 manifest 中 `audio.original_format` 一致
 - [ ] **真机预览验证**：用真机扫码预览，授权录音权限后完成一次开始→停止流程，页面状态正常切换，无 JS 报错；vConsole 打印出 `original_format` 字段
-- [ ] **多机型验证**：在至少 1 台 iOS 真机 + 1 台 Android 真机上分别录一次，记录各自得到的 `original_format` 到 runbook（用于 US-015 转码逻辑决定是否需要兜底）
+- [ ] **多机型验证**：在至少 1 台 iOS 真机 + 1 台 Android 真机上分别录一次，记录各自得到的 `original_format` 到 runbook（用于验证 US-015 的多格式 → WAV 标准化覆盖）
 
 #### US-008: 录音中断保护（锁屏 / 来电 / 切后台 / 杀进程 自动 stop + 保存草稿）
 
@@ -469,9 +469,9 @@
 
 ### 阶段 4：转写 Worker（Python 后端进程，运行环境无关）
 
-#### US-015: OSS 轮询 + 下载到 `.part` + 格式标准化（AAC → MP3）+ 原子 rename 为 `audio.mp3`
+#### US-015: OSS 轮询 + 下载到 `.part` + 格式标准化（各种格式 → WAV）+ 原子 rename 为 `audio.wav`
 
-**描述：** 作为Worker，我需要按 `config.yaml` 配置的频率轮询 OSS，发现新 object 时下载到临时文件，校验完整后做**格式标准化**（如果是 AAC 转码为 MP3，如果已经是 MP3 直接保留），最终原子 rename 到 `audio.mp3`。
+**描述：** 作为Worker，我需要按 `config.yaml` 配置的频率轮询 OSS，发现新 object 时下载到临时文件，校验完整后做**格式标准化**：无论原始音频是 MP3、AAC/M4A、WAV 或其他 ffmpeg 支持的格式，最终都标准化为本地 `audio.wav`；若原始音频已经是符合规范的 WAV，可直接保留或无损重封装后原子 rename。
 
 > **技术规范参考**：文件状态机协议见 `docs/tech-spec.md` §3.5，音频格式策略见 §5.1。
 
@@ -483,7 +483,7 @@
 - [ ] 对每个**本地尚未存在**或**本地存在但无 `.done`** 的对象：
   - 下载到 `~/SoniScope/inbox/<fragment_id>.part`
   - 下载完成后计算 **`original_sha256`**；与 OSS 元数据比对一致性；不一致 → 删除 `.part`，下一轮重下
-  - **格式检测与标准化**：按 tech-spec §5.1 / §3.5 执行格式检测 → MP3 直通 / 非 MP3 转码 → 原子 rename 到 `fragments/` 目录；转码失败 → 留档到 `inbox/failed/`（不参与自动重试，需人工介入）
+  - **格式检测与标准化**：按 tech-spec §5.1 / §3.5 执行格式检测 → WAV 合规直通 / 任意非 WAV 格式转码为 WAV → 原子 rename 到 `fragments/` 目录；转码失败 → 留档到 `inbox/failed/`（不参与自动重试，需人工介入）
   - **读取 OSS 用户自定义元数据**：通过 OSS API 获取前端上传时附带的元数据，写入 manifest 对应字段（tech-spec §3.2 / ADR-8）
   - 按 tech-spec §3.3「字段来源」填写 manifest 对应字段
 - [ ] **OSS 永不删除**：脚本任何路径下都**不会**调用 OSS 删除接口（代码中无 DeleteObject 调用，仅测试 mock 中允许出现）
@@ -493,9 +493,9 @@
 - [ ] 单元测试覆盖：sha256 校验、格式检测分支、转码失败处理、重复扫描跳过逻辑
 - [ ] **可配置验证**：`make test-poll-interval` → 把 `poll.interval_seconds` 改为 30 → 重启脚本 → 日志显示每 30 秒一次扫描
 - [ ] **下载中断验证**：`make test-download-interrupt` → 脚本下载过程中 `kill -9` → 重启后 `inbox/` 残留 `.part` 文件被识别为下载中断，重新下载，最终能完成
-- [ ] **MP3 直通验证**：`make test-mp3-passthrough` → 上传一段真实 MP3 → Worker 下载后跳过 ffmpeg → `audio.sha256` == `upload.original_sha256`
-- [ ] **AAC 转码验证**：`make test-aac-transcode` → 用 `tests/audio/sample-20s.m4a`（m4a 容器内为 AAC）模拟 AAC 上传 → Worker 下载后转码 → 生成 `audio.mp3` → 验证转码是否成功
-- [ ] **转码失败验证**：`make test-transcode-fail` → 上传一段被截断的 AAC（人为 corrupt） → Worker 转码失败 → `inbox/failed/` 下有留档 + 日志报错；不污染 fragments 目录
+- [ ] **WAV 直通验证**：`make test-wav-passthrough` → 上传一段真实 WAV → Worker 下载后识别为合规 WAV 并直通（或仅做无损重封装）→ 直通时 `audio.sha256` == `upload.original_sha256`
+- [ ] **多格式转 WAV 验证**：`make test-audio-transcode-to-wav` → 用 `tests/audio/sample-20s.m4a`（m4a 容器内为 AAC）等代表性非 WAV 音频模拟上传 → Worker 下载后转码 → 生成 `audio.wav` → 验证输出为 WAV 且可被 ffprobe 识别
+- [ ] **转码失败验证**：`make test-transcode-fail` → 上传一段被截断或 ffmpeg 不支持的音频（人为 corrupt） → Worker 转 WAV 失败 → `inbox/failed/` 下有留档 + 日志报错；不污染 fragments 目录
 - [ ] **重复扫描验证**：`make test-no-redownload` → 脚本不重启的情况下，扫描周期内已 `.done` 的 Fragment 不会被重新下载（通过日志或 OSS 调用计数验证）
 
 **(C) 手动验证清单**
@@ -517,9 +517,9 @@
 **(B) 自动验证（`make` 命令一键跑完，无需人工操作）**
 - [ ] Typecheck / lint 通过
 - [ ] 单元测试覆盖：启动扫描 4 种状态判定、写入协议各阶段原子性
-- [ ] **崩溃恢复验证（关键）**：`make test-crash-recovery` → 录入一条音频，等Worker下载完 `audio.mp3` 但还在调用云端 API 转写时 `kill -9` → 重启脚本 → 自动重新调用 API 转写并写出 `transcript.json` + `.done`
+- [ ] **崩溃恢复验证（关键）**：`make test-crash-recovery` → 录入一条音频，等Worker下载并标准化完成 `audio.wav` 但还在调用云端 API 转写时 `kill -9` → 重启脚本 → 自动重新调用 API 转写并写出 `transcript.json` + `.done`
 - [ ] **崩溃恢复验证（missing-done）**：`make simulate-worker-crash CASE=missing-done FRAGMENT_ID=<id>` → 等价于删掉 `.done` 标记 → 重启 Worker → 该条会被重新转写并补回 `.done`
-- [ ] **崩溃恢复验证（stale-part）**：`make simulate-worker-crash CASE=stale-part FRAGMENT_ID=<id>` → 等价于残留 `.part` 空文件 → 重启 Worker → 该残留被识别并重下，不会因此污染下游 `audio.mp3`
+- [ ] **崩溃恢复验证（stale-part）**：`make simulate-worker-crash CASE=stale-part FRAGMENT_ID=<id>` → 等价于残留 `.part` 空文件 → 重启 Worker → 该残留被识别并重下，不会因此污染下游 `audio.wav`
 
 **(C) 手动验证清单**
 
@@ -570,7 +570,7 @@
 - [ ] **正常轮询幂等判断**：转写前检查 `.done` 文件是否存在 → 存在则**直接跳过**（无论当前配置中的模型 / 参数版本是否与 manifest 中记录的一致）
 - [ ] `.done` 不存在 → 按当前配置进行转写
 - [ ] **转写元数据记录**：转写完成后，四元组由 `audio.sha256` + `transcription.{transcriber, model, params_version}` 组合而成（分别位于 manifest 的 `audio` 和 `transcription` 对象中，见 tech-spec §3.3），用于溯源和 CLI 筛选
-- [ ] OSS 端去重：同一 object key 重复下载只会覆盖本地 `audio.mp3`，不会产生新目录
+- [ ] OSS 端去重：同一 object key 重复下载只会覆盖本地 `audio.wav`，不会产生新目录
 - [ ] **显式重转 CLI（OQ-3 决议）**：提供 `retranscribe` 子命令（完整签名与 flag 行为见 tech-spec §3.7；顶层别名见 tech-spec §6.5 `make retranscribe`）。用户可观测行为：
   - 不带 flag → 已完成的 Fragment 给出提示而不重转
   - `--upgrade` → 仅对旧模型版本执行重转
@@ -609,9 +609,9 @@
 
 **(B) 自动验证（`make` 命令一键跑完，无需人工操作）**
 - [ ] Typecheck / lint 通过
-- [ ] 单元测试覆盖：manifest schema 校验、MP3/AAC 两种路径的 sha256 一致性断言、原子写入逻辑
+- [ ] 单元测试覆盖：manifest schema 校验、WAV 直通 / 非 WAV 转 WAV 两种路径的 sha256 一致性断言、原子写入逻辑
 - [ ] **完整性验证**：`make test-fragment-integrity` → 跑完一条 Fragment 后，目录里同时存在 5 个产物文件（清单见 tech-spec §2.2），且 manifest 中所有字段都已填充（无 null 残留，除非业务允许）
-- [ ] **幂等性验证**：`make test-manifest-idempotent` → 用一段固定测试音频跑两次（同样 MP3 输入），**得到的 `manifest.json` 中除时间戳字段外，其他字段完全一致**（fragment_id 一致、所有 sha256 一致、segments 数量一致）
+- [ ] **幂等性验证**：`make test-manifest-idempotent` → 用一段固定测试音频跑两次（同样 WAV 输入），**得到的 `manifest.json` 中除时间戳字段外，其他字段完全一致**（fragment_id 一致、所有 sha256 一致、segments 数量一致）
 
 **(C) 手动验证清单**
 
@@ -638,14 +638,14 @@
 
 **[正常路径 · 100 条录音落盘完整性]**
 
-- [ ] `make list-oss-objects DATE=<YYYY-MM-DD>` → 列出**完整的 100 个 `.mp3` 对象**（脚本化输出 + 计数 = 100），文件名与前端 `fragment_id` 一一对应；用户**无需打开 OSS 控制台**
+- [ ] `make list-oss-objects DATE=<YYYY-MM-DD>` → 列出**完整的 100 个 `.wav` 对象**（脚本化输出 + 计数 = 100），文件名与前端 `fragment_id` 一一对应；用户**无需打开 OSS 控制台**
 - [ ] `make verify-e2e-integrity` → 本地 `~/SoniScope/fragments/` 下出现**完整的 100 个 Fragment 目录**，每个目录都同时包含 5 个产物文件（清单见 tech-spec §2.2）
 - [ ] `make verify-e2e-sha256` → 每条 Fragment 的 sha256 完整性按 tech-spec §3.3 一致性规则校验通过（OSS 侧 + 本地侧）
 - [ ] `make verify-e2e-fields` → 每条 Fragment 的 `manifest.upload.verified_at` 非空、`manifest.transcription.completed_at` 非空
 
 **[异常路径 · 脚本崩溃恢复]**
 
-- [ ] `make test-e2e-crash-recovery` → Worker 运行中，对一条正在转写的 Fragment 执行 `kill -9` → 该目录残留 `audio.mp3` 但无 `.done` → 重启脚本 → 自动重新转写并补回 `.done` + 完整的 `transcript.json`
+- [ ] `make test-e2e-crash-recovery` → Worker 运行中，对一条正在转写的 Fragment 执行 `kill -9` → 该目录残留 `audio.wav` 但无 `.done` → 重启脚本 → 自动重新转写并补回 `.done` + 完整的 `transcript.json`
 
 **[异常路径 · 显式重转]**
 
@@ -657,7 +657,7 @@
 
 **[完整性扫描 · 无半成品残留]**
 
-- [ ] `make verify-no-stale` → 所有异常路径跑完后：OSS 上对象数 ≥ 本地 Fragment 目录数；`inbox/` 下无残留 `.part` / `.mp3.tmp`；`tmp/` 下无残留 `.transcript.json.tmp`（按 tech-spec §3.5，中间态文件写在中央 `inbox/` / `tmp/` 目录，不在 fragment 目录内）
+- [ ] `make verify-no-stale` → 所有异常路径跑完后：OSS 上对象数 ≥ 本地 Fragment 目录数；`inbox/` 下无残留 `.part` / `.wav.tmp`；`tmp/` 下无残留 `.transcript.json.tmp`（按 tech-spec §3.5，中间态文件写在中央 `inbox/` / `tmp/` 目录，不在 fragment 目录内）
 
 **[长期保留 · OSS 永不删除]**
 
@@ -710,7 +710,7 @@
 - **FR-13**：脚本启动时**必须**扫描 `~/SoniScope/fragments/`，对每个目录按状态机决定是跳过 / 重转 / 重下 / 新办（US-016）。
 - **FR-14**：转写**必须**通过抽象接口调用（tech-spec §5.3）；本期默认实现云端转写（调用云端语音转文字 API），且预留本地转写占位骨架；**本期不部署本地推理模型**（US-017）。
 - **FR-15**：转写幂等性**必须**基于 `.done` 标记文件判断——`.done` 存在即跳过，不因模型 / 参数版本变更自动重转；四元组 `(audio_sha256, transcriber, model, params_version)` 仅记录于 manifest 供溯源和 CLI 筛选（US-018）。
-- **FR-16**：每个 Fragment 目录最终**必须**同时存在 `audio.mp3` / `manifest.json` / `transcript.json` / `transcript.txt` / `.done` 五个文件（US-019）。
+- **FR-16**：每个 Fragment 目录最终**必须**同时存在 `audio.wav` / `manifest.json` / `transcript.json` / `transcript.txt` / `.done` 五个文件（US-019）。
 - **FR-17**：`manifest.json` 字段格式**必须**与 `docs/tech-spec.md` §3.3 定义的 schema 完全一致。
 
 ---
@@ -829,7 +829,7 @@
 
 | 编号 | 议题 | 决策 | 落到哪 |
 |---|---|---|---|
-| OQ-1 | 小程序录音 MP3 格式不支持时如何处理 | **能 MP3 就直出 MP3；不能则保持 AAC，由 Worker 下载后用 ffmpeg 转码** | US-007 / US-015 / US-019 manifest schema / tech-spec.md §6.3 依赖加 ffmpeg |
+| OQ-1 | 小程序录音格式不统一时如何处理 | **前端保留微信实际产出的原始格式，不做转码；由 Worker 用 ffmpeg 将各种格式统一标准化为 WAV** | US-007 / US-015 / US-019 manifest schema / tech-spec.md §6.3 依赖加 ffmpeg |
 | OQ-2 | 前端是否算 sha256 | **保持现状：前端算 sha256**（卡顿如严重再退化为 size-only verify） | 无需改 PRD，已是默认行为（US-011） |
 | OQ-3 | 是否提供单条 Fragment 强制重转 CLI | **要做，本期内提供** `make retranscribe`（完整签名见 tech-spec §3.7 / §6.5） | US-018 |
 | OQ-4 | 长录音多 chunk 在上传列表如何展示 | **折叠卡片 + 每个 chunk 独立可重传**（不整段强制一起重传） | US-014 |
