@@ -88,7 +88,7 @@
 | **(C) FC** | 开通 FC 3.0 + 创建 `issue-credential` / `verify-upload` 两个 Web 函数 + HTTP 触发器（anonymous） | — |
 | **(D) 微信小程序** | 注册小程序 + 配置服务器域名白名单 + 安装开发者工具 + 获取真机 openid | — |
 | **(E) ASR** | 开通云端 ASR 服务 + 创建项目 + 用测试音频完成一次真实联调基线 | — |
-| **(F) 测试音频** | 准备 4 段标准测试音频到 `tests/fixtures/audio/`，sha256 登记到 runbook | — |
+| **(F) 测试音频** | 准备 4 段标准测试音频到 `tests/audio/`，sha256 登记到 runbook | — |
 | **(G) Worker 环境** | 选定 Worker 主机 + Python ≥ 3.11 + 系统工具 + 工作目录 | — |
 | **(H) 凭证注入** | FC 环境变量填入 tech-spec §4.0 定义的变量 + Worker `config.yaml` 按 tech-spec §2.3 schema 填入 | tech-spec §4.0 / §2.3 |
 | **(I) 文档登记** | `docs/runbook/cloud-setup.md` 包含全部非敏感资源信息（无明文 AK） | — |
@@ -106,7 +106,7 @@
 - 跑 `aliyun oss stat oss://soniscope-audio` 验证 Bucket 私有
 - 跑 4 条 STS 反例（PutObject 越界 / ListBucket / GetObject / Expired）
 - `curl` 两个 FC URL 返回 200
-- `ls tests/fixtures/audio/` 4 个文件存在（3 mp3 + 1 aac）+ sha256 匹配
+- `ls tests/audio/` 4 个文件存在（3 mp3 + 1 aac）+ sha256 匹配
 - `make check-config` 读取 `~/SoniScope/config.yaml` 通过
 
 > ⚠️ `make verify-prep` 脚本本身由 AI 在 US-002 提供；US-001 完成时只需手工跑过反例验证 + 把信息记入 runbook 即可。
@@ -115,7 +115,7 @@
 
 > **AI 编程任务**：写 Python 项目骨架、配置 schema、CLI 入口、`make verify-prep` 一键校验脚本。
 >
-> **前置假设（来自 US-001）**：用户已按 US-001 H 块填好 `~/SoniScope/config.yaml`，已按 F 块准备好 `tests/fixtures/audio/*.mp3`。本 story 不要求用户做任何额外手工操作。
+> **前置假设（来自 US-001）**：用户已按 US-001 H 块填好 `~/SoniScope/config.yaml`，已按 F 块准备好 `tests/audio/*.mp3`。本 story 不要求用户做任何额外手工操作。
 
 **描述：** 作为开发者，我需要 AI 搭好 **monorepo 骨架**（顶层 uv workspace + `apps/worker/` Python 子项目 + 顶层 Makefile），实现 Worker 的配置 schema 与 CLI 入口，并提供 `make verify-prep` 脚本验证 US-001 准备的全部产物（OSS / RAM / FC / 测试音频 / config.yaml）真实可用。本 story **不**创建 `apps/miniprogram/` 与 `apps/fc/`（它们分别由 US-007+ 和 US-003+ 创建对应代码），但顶层 workspace 配置要为后续 member 留好位置。
 
@@ -143,8 +143,8 @@
   1. **(A 块)** 读取 `config.yaml` → 用只读 AK 验证 Bucket 存在且 ACL = private
   2. **(B 块)** 用 FC 部署凭证（来源由实现决定，**仅本机测试用**）调 STS AssumeRole，policy 限定到单个 object key → 拿到临时凭证 → 跑 4 个反例（越界 PutObject / ListBucket / GetObject / 等待超过 tech-spec §4.1 有效期上限后 ExpiredToken）→ 全部如预期失败才算 pass
   3. **(C 块)** `curl` FC 两个 URL → HTTP 状态码 200~499（不是 5xx / 网络错误）
-  4. **(E 块)** 用 config 中的 NLS AppKey + AK，上传 `tests/fixtures/audio/sample-10s.mp3` → 拿到结构化转写结果 → 验证结构符合 tech-spec §3.4
-  5. **(F 块)** `tests/fixtures/audio/sample-{10s,1min,25min}.mp3` + `sample-aac.aac` 四个文件存在 + sha256 与 runbook 中记录的一致 + ffprobe duration 与文件名标注的时长在 ±2s 内；额外检查 `sample-aac.aac` 的 codec=aac（验证 OQ-1 转码 fixture 就绪）
+  4. **(E 块)** 用 config 中的 NLS AppKey + AK，上传 `tests/audio/sample-10s.mp3` → 拿到结构化转写结果 → 验证结构符合 tech-spec §3.4
+  5. **(F 块)** `tests/audio/sample-{10s,1min,25min}.mp3` + `sample-aac.aac` 四个文件存在 + sha256 与 runbook 中记录的一致 + ffprobe duration 与文件名标注的时长在 ±2s 内；额外检查 `sample-aac.aac` 的 codec=aac（验证 OQ-1 转码 fixture 就绪）
   6. **(G 块)** Python 版本 ≥ 3.11；`SONISCOPE_HOME` 路径可写；可用磁盘 ≥ 50GB；`ffmpeg` + `ffprobe` 可用（**OQ-1 决议依赖**）
   7. **(H 块)** `~/SoniScope/config.yaml` 权限为 600；所有必填字段非空
 - [ ] 单项失败时，输出中包含**修复指引**（如 "请重做 US-001 (B) 反例 3"，附 runbook 中对应章节锚点）
@@ -494,7 +494,7 @@
 - [ ] **可配置验证**：`make test-poll-interval` → 把 `poll.interval_seconds` 改为 30 → 重启脚本 → 日志显示每 30 秒一次扫描
 - [ ] **下载中断验证**：`make test-download-interrupt` → 脚本下载过程中 `kill -9` → 重启后 `inbox/` 残留 `.part` 文件被识别为下载中断，重新下载，最终能完成
 - [ ] **MP3 直通验证**：`make test-mp3-passthrough` → 上传一段真实 MP3 → Worker 下载后跳过 ffmpeg → `audio.sha256` == `upload.original_sha256`
-- [ ] **AAC 转码验证**：`make test-aac-transcode` → 用 `tests/fixtures/audio/sample-aac.aac` 模拟 AAC 上传 → Worker 下载后转码 → 生成 `audio.mp3` → 验证转码是否成功
+- [ ] **AAC 转码验证**：`make test-aac-transcode` → 用 `tests/audio/sample-aac.aac` 模拟 AAC 上传 → Worker 下载后转码 → 生成 `audio.mp3` → 验证转码是否成功
 - [ ] **转码失败验证**：`make test-transcode-fail` → 上传一段被截断的 AAC（人为 corrupt） → Worker 转码失败 → `inbox/failed/` 下有留档 + 日志报错；不污染 fragments 目录
 - [ ] **重复扫描验证**：`make test-no-redownload` → 脚本不重启的情况下，扫描周期内已 `.done` 的 Fragment 不会被重新下载（通过日志或 OSS 调用计数验证）
 

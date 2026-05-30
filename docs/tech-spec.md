@@ -75,7 +75,7 @@ flowchart TD
     fc["fc/&lt;function&gt;/<br/>阿里云函数计算函数源码"]
     worker["worker/<br/>Python Worker（包名 soniscope-worker）"]
     scripts["scripts/<br/>跨组件运维与验证脚本"]
-    audio["tests/fixtures/audio/<br/>共享测试音频 fixture"]
+    audio["tests/audio/<br/>共享测试音频 fixture"]
     docs["docs/"]
     prd["PRD_v1.md<br/>产品需求（WHAT + WHY）"]
     spec["tech-spec.md<br/>本文档：技术设计（HOW）"]

@@ -51,7 +51,7 @@ my_soniscope/
 │   ├── fc/<function>/      # 阿里云函数计算函数源码
 │   └── worker/             # Python Worker（包名 soniscope-worker）
 ├── scripts/                # 跨组件运维与验证脚本
-├── tests/fixtures/audio/   # 共享测试音频 fixture（sha256 登记在 runbook）
+├── tests/audio/            # 共享测试音频 fixture（sha256 登记在 runbook）
 ├── docs/
 │   ├── PRD_v1.md           # 产品需求（WHAT + WHY）
 │   ├── tech-spec.md        # 技术设计（HOW）——唯一技术权威
@@ -112,7 +112,7 @@ my_soniscope/
 ## 测试
 
 - **运行测试**：`make test`
-- **测试位置**：`apps/<member>/tests/` + 跨组件 E2E 放 `tests/`，共享 fixture 在 `tests/fixtures/audio/`
+- **测试位置**：`apps/<member>/tests/` + 跨组件 E2E 放 `tests/`，共享 fixture 在 `tests/audio/`
 - **测试模式**：单元测试中云端调用一律 **mock**，不打真实云端；真实云端验证通过专用 `make test-*-live` / E2E target 触发
 - **崩溃恢复**：用 `kill -9` + 重启断言恢复，不依赖内存状态
 
