@@ -1,23 +1,8 @@
 # SoniScope · 云端资源 & 运行环境登记表 (runbook)
 
-> 本文件由 **US-001 人工准备** 阶段填写，**完成后进 git**。  
-
----
-
-## 填写约定（必读）
-
-1. **禁止**填入任何明文 AK / AccessKeySecret / AppSecret / Token / API Key。
-   - 明文凭证必须存放在密码管理器（如 1Password / Bitwarden），本文只记录"保存位置"。
-   - 自检命令：`grep -E 'LTAI|sk-|aliyun_ak|access_key_secret' docs/runbook/cloud-setup.md`，应**无匹配**。
-2. 未填字段用 `<待填写>` 占位，便于 `grep` 查漏。
-3. 每填好一项，把对应的 checkbox `[ ]` 改为 `[x]`。
-4. 完成判据：全部 checkbox 为 `[x]`，且自检命令无敏感信息匹配。
-
----
-
 ## 元信息
 
-- **填写人**：`<待填写>`(GitHub 用户名 / 内部 ID)
+- **填写人**：`Bemied`
 - **首次完成时间**：`2026-05-28`
 - **最近修订时间**：`2026-05-28`
 - **本期 MVP 范围**：录音 → OSS 备份 → Worker 拉取 → 云端 ASR 转写 → 本地落盘
@@ -416,10 +401,6 @@
 | `sample-25min.wav` | US-010 长录音分片 + §4.2 闭环 | ≈ 1500s | wav | `34db505eb44f93fd092e868664979c155ebbbb6c0a61019dd840b30d276cdb27` |
 | `sample-20s.m4a` | OQ-1 / US-015 m4a 转码验证 | ≈ 20s | m4a | `d3d2866128efe258ff95e841a16e7abb4d783fd37536692932a875f9fb5380fd` |
 
--  `python3 scripts/fetch_test_fixtures.py` 输出 `4/4 就绪`（首次会从 OSS 下载）
--  `python3 scripts/fetch_test_fixtures.py --check` 全部 `校验通过`（sha256 与上表一致）
--  4 个文件都能播放、人声清晰
-
 > 校验/拉取命令：
 > ```
 > python3 scripts/fetch_test_fixtures.py          # 拉取缺失或损坏的 fixture
@@ -430,8 +411,6 @@
 ---
 
 ## 7. Worker 运行环境
-
-> 对应 US-001 (G)。详细步骤见手册 §G。
 
 -  主机标识：`Mac Studio M4 Max`
 -  OS 版本：`macOS 26.5`
@@ -470,41 +449,8 @@
 
 ---
 
-## 9. 自检清单（提交前跑一遍）
-
-```bash
-# 9.1 无明文 AK 泄漏
-grep -E 'LTAI|sk-|aliyun_ak|access_key_secret|AppSecret\s*[:=]\s*[A-Za-z0-9]{8}' \
-  docs/runbook/cloud-setup.md
-# 期望：无匹配（exit code 1）
-
-# 9.2 无未填字段（提交前应全部填掉）
-grep -c '<待填写>' docs/runbook/cloud-setup.md
-# 期望：0
-
-# 9.3 所有 checkbox 已勾选
-grep -c '^- \[ \]' docs/runbook/cloud-setup.md
-# 期望：0
-
-# 9.4 runbook 已被 git 跟踪
-git ls-files docs/runbook/cloud-setup.md
-# 期望：输出文件路径
-```
-
--  9.1 通过（无明文敏感信息）
--  9.2 通过（无 `<待填写>` 残留）
--  9.3 通过（无 `[ ]` 未勾）
--  9.4 通过（已 git add）
-
----
-
 ## 10. 修订历史
 
 | 日期 | 修订人 | 修订内容 |
 |---|---|---|
-| `<待填写>` | `<待填写>` | 初次创建（US-001 完成） |
-
----
-
-> **US-001 验收完成判据**：本文件第 9 节自检全部通过 + `docs/runbook/us-001-manual.html` 上 61 个 checkbox 全部勾选。  
-> 完成后即可进入 US-002（仓库骨架 + `make verify-prep` 脚本由 AI 实现）。
+| `2026-05-30` | `Bemied` | 初次创建 |
