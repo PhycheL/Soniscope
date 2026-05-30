@@ -649,7 +649,7 @@ aliyun sts AssumeRole \
   --RoleArn acs:ram::&lt;UID&gt;:role/soniscope-uploader-role \
   --RoleSessionName test \
   --DurationSeconds 900 \
-  --Policy '{"Version":"1","Statement":[{"Effect":"Allow","Action":["oss:PutObject"],"Resource":["acs:oss:*:*:soniscope-audio/recordings/test.mp3"]}]}'
+  --Policy '{"Version":"1","Statement":[{"Effect":"Allow","Action":["oss:PutObject"],"Resource":["acs:oss:*:*:soniscope-audio/recordings/test.wav"]}]}'
 
 <span class="cmt"># 拿到 AccessKeyId / AccessKeySecret / SecurityToken，导出到环境变量</span>
 export OSS_AK_ID=&lt;tmp ak id&gt;
@@ -659,9 +659,9 @@ export OSS_TOKEN=&lt;tmp security token&gt;</pre>
       <div class="counter-tests">
         <div class="ct-head">必须全部按预期"失败"的反例</div>
         <table>
-          <tr><th>反例 1</th><td>用上述临时凭证 <b>PutObject 到 <code class="inline">recordings/evil.mp3</code></b>（不在 Policy 内）→ 必须返回 <code class="inline">AccessDenied</code>。</td></tr>
+          <tr><th>反例 1</th><td>用上述临时凭证 <b>PutObject 到 <code class="inline">recordings/evil.wav</code></b>（不在 Policy 内）→ 必须返回 <code class="inline">AccessDenied</code>。</td></tr>
           <tr><th>反例 2</th><td>用同一临时凭证 <b>ListObjects</b> → 必须返回 <code class="inline">AccessDenied</code>。</td></tr>
-          <tr><th>反例 3</th><td>用同一临时凭证 <b>GetObject <code class="inline">recordings/test.mp3</code></b> → 必须返回 <code class="inline">AccessDenied</code>（凭证只有 PutObject 权限）。</td></tr>
+          <tr><th>反例 3</th><td>用同一临时凭证 <b>GetObject <code class="inline">recordings/test.wav</code></b> → 必须返回 <code class="inline">AccessDenied</code>（凭证只有 PutObject 权限）。</td></tr>
           <tr><th>反例 4</th><td><b>等待 16 分钟</b>后用同一临时凭证再 PutObject → 必须返回 <code class="inline">ExpiredToken</code>（凭证有效期已通过 <code class="inline">--DurationSeconds 900</code> 显式指定为 15 分钟）。</td></tr>
         </table>
       </div>
@@ -672,8 +672,8 @@ export OSS_TOKEN=&lt;tmp security token&gt;</pre>
         <li><input type="checkbox" id="b2"><label for="b2">子账号 <code class="inline">soniscope-local-reader</code> 已创建，AK 已保存，仅绑自定义 <code class="inline">soniscope-bucket-readonly</code>。</label></li>
         <li><input type="checkbox" id="b3"><label for="b3">角色 <code class="inline">soniscope-uploader-role</code> 已创建，信任策略 Principal 精确到 <code class="inline">acs:ram::&lt;UID&gt;:user/soniscope-fc</code>。</label></li>
         <li><input type="checkbox" id="b4"><label for="b4">角色绑定的权限策略 <code class="inline">soniscope-upload-template</code> Resource 限定 <code class="inline">soniscope-audio/recordings/*</code>。</label></li>
-        <li><input type="checkbox" id="b5"><label for="b5"><b>正例</b>：用临时凭证 PutObject 到 <code class="inline">recordings/test.mp3</code> 成功。</label></li>
-        <li><input type="checkbox" id="b6"><label for="b6"><b>反例 1</b>：PutObject <code class="inline">recordings/evil.mp3</code> → AccessDenied。</label></li>
+        <li><input type="checkbox" id="b5"><label for="b5"><b>正例</b>：用临时凭证 PutObject 到 <code class="inline">recordings/test.wav</code> 成功。</label></li>
+        <li><input type="checkbox" id="b6"><label for="b6"><b>反例 1</b>：PutObject <code class="inline">recordings/evil.wav</code> → AccessDenied。</label></li>
         <li><input type="checkbox" id="b7"><label for="b7"><b>反例 2</b>：ListObjects → AccessDenied。</label></li>
         <li><input type="checkbox" id="b8"><label for="b8"><b>反例 3</b>：GetObject → AccessDenied。</label></li>
         <li><input type="checkbox" id="b9"><label for="b9"><b>反例 4</b>：16 分钟后 PutObject → ExpiredToken（<code class="inline">--DurationSeconds 900</code> 显式限制，15 分钟到期）。</label></li>
@@ -841,7 +841,7 @@ curl -i https://verify-upload-yyyyyyyy.cn-beijing.fcapp.run/
       <table class="kv">
         <tr><th>场景</th><td>日均 30 分钟录音 × 30 天 = 15 小时/月</td></tr>
         <tr><th>NLS 录音文件极速版</th><td>按小时计费，免费额度通常足够个人使用；超出部分约 ¥1.4/小时</td></tr>
-        <tr><th>OSS 存储</th><td>15 小时 ≈ 360 MB MP3/月，几乎可忽略</td></tr>
+        <tr><th>OSS 存储</th><td>15 小时 ≈ 1.6 GB WAV/月（16kHz 单声道 PCM），按 OSS 标准存储计费每月仍约 ¥0.2，几乎可忽略</td></tr>
       </table>
 
       <h3 class="step-title">验收清单</h3>
