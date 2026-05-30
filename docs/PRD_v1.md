@@ -106,7 +106,7 @@
 - 跑 `aliyun oss stat oss://soniscope-audio` 验证 Bucket 私有
 - 跑 4 条 STS 反例（PutObject 越界 / ListBucket / GetObject / Expired）
 - `curl` 两个 FC URL 返回 200
-- `ls tests/audio/` 4 个文件存在（3 mp3 + 1 aac）+ sha256 匹配
+- `ls tests/audio/` 4 个文件存在（3 wav + 1 m4a）+ sha256 匹配
 - `make check-config` 读取 `~/SoniScope/config.yaml` 通过
 
 > ⚠️ `make verify-prep` 脚本本身由 AI 在 US-002 提供；US-001 完成时只需手工跑过反例验证 + 把信息记入 runbook 即可。
@@ -115,7 +115,7 @@
 
 > **AI 编程任务**：写 Python 项目骨架、配置 schema、CLI 入口、`make verify-prep` 一键校验脚本。
 >
-> **前置假设（来自 US-001）**：用户已按 US-001 H 块填好 `~/SoniScope/config.yaml`，已按 F 块准备好 `tests/audio/*.mp3`。本 story 不要求用户做任何额外手工操作。
+> **前置假设（来自 US-001）**：用户已按 US-001 H 块填好 `~/SoniScope/config.yaml`，已按 F 块准备好 `tests/audio/*.{wav,m4a}`。本 story 不要求用户做任何额外手工操作。
 
 **描述：** 作为开发者，我需要 AI 搭好 **monorepo 骨架**（顶层 uv workspace + `apps/worker/` Python 子项目 + 顶层 Makefile），实现 Worker 的配置 schema 与 CLI 入口，并提供 `make verify-prep` 脚本验证 US-001 准备的全部产物（OSS / RAM / FC / 测试音频 / config.yaml）真实可用。本 story **不**创建 `apps/miniprogram/` 与 `apps/fc/`（它们分别由 US-007+ 和 US-003+ 创建对应代码），但顶层 workspace 配置要为后续 member 留好位置。
 
@@ -143,8 +143,8 @@
   1. **(A 块)** 读取 `config.yaml` → 用只读 AK 验证 Bucket 存在且 ACL = private
   2. **(B 块)** 用 FC 部署凭证（来源由实现决定，**仅本机测试用**）调 STS AssumeRole，policy 限定到单个 object key → 拿到临时凭证 → 跑 4 个反例（越界 PutObject / ListBucket / GetObject / 等待超过 tech-spec §4.1 有效期上限后 ExpiredToken）→ 全部如预期失败才算 pass
   3. **(C 块)** `curl` FC 两个 URL → HTTP 状态码 200~499（不是 5xx / 网络错误）
-  4. **(E 块)** 用 config 中的 NLS AppKey + AK，上传 `tests/audio/sample-10s.mp3` → 拿到结构化转写结果 → 验证结构符合 tech-spec §3.4
-  5. **(F 块)** `tests/audio/sample-{10s,1min,25min}.mp3` + `sample-aac.aac` 四个文件存在 + sha256 与 runbook 中记录的一致 + ffprobe duration 与文件名标注的时长在 ±2s 内；额外检查 `sample-aac.aac` 的 codec=aac（验证 OQ-1 转码 fixture 就绪）
+  4. **(E 块)** 用 config 中的 NLS AppKey + AK，上传 `tests/audio/sample-20s.wav` → 拿到结构化转写结果 → 验证结构符合 tech-spec §3.4
+  5. **(F 块)** `tests/audio/sample-{20s,54s,25min}.wav` + `sample-20s.m4a` 四个文件存在 + sha256 与 runbook 中记录的一致 + ffprobe duration 与文件名标注的时长在 ±2s 内；额外检查 `sample-20s.m4a` 的 codec=aac（m4a 容器内为 AAC，验证 OQ-1 转码 fixture 就绪）
   6. **(G 块)** Python 版本 ≥ 3.11；`SONISCOPE_HOME` 路径可写；可用磁盘 ≥ 50GB；`ffmpeg` + `ffprobe` 可用（**OQ-1 决议依赖**）
   7. **(H 块)** `~/SoniScope/config.yaml` 权限为 600；所有必填字段非空
 - [ ] 单项失败时，输出中包含**修复指引**（如 "请重做 US-001 (B) 反例 3"，附 runbook 中对应章节锚点）
@@ -494,7 +494,7 @@
 - [ ] **可配置验证**：`make test-poll-interval` → 把 `poll.interval_seconds` 改为 30 → 重启脚本 → 日志显示每 30 秒一次扫描
 - [ ] **下载中断验证**：`make test-download-interrupt` → 脚本下载过程中 `kill -9` → 重启后 `inbox/` 残留 `.part` 文件被识别为下载中断，重新下载，最终能完成
 - [ ] **MP3 直通验证**：`make test-mp3-passthrough` → 上传一段真实 MP3 → Worker 下载后跳过 ffmpeg → `audio.sha256` == `upload.original_sha256`
-- [ ] **AAC 转码验证**：`make test-aac-transcode` → 用 `tests/audio/sample-aac.aac` 模拟 AAC 上传 → Worker 下载后转码 → 生成 `audio.mp3` → 验证转码是否成功
+- [ ] **AAC 转码验证**：`make test-aac-transcode` → 用 `tests/audio/sample-20s.m4a`（m4a 容器内为 AAC）模拟 AAC 上传 → Worker 下载后转码 → 生成 `audio.mp3` → 验证转码是否成功
 - [ ] **转码失败验证**：`make test-transcode-fail` → 上传一段被截断的 AAC（人为 corrupt） → Worker 转码失败 → `inbox/failed/` 下有留档 + 日志报错；不污染 fragments 目录
 - [ ] **重复扫描验证**：`make test-no-redownload` → 脚本不重启的情况下，扫描周期内已 `.done` 的 Fragment 不会被重新下载（通过日志或 OSS 调用计数验证）
 
@@ -549,7 +549,7 @@
 **(B) 自动验证（`make` 命令一键跑完，无需人工操作）**
 - [ ] Typecheck / lint 通过
 - [ ] 单元测试覆盖：工厂方法、方案 A/B 切换、签名 URL 过期续签、云端转写失败重试逻辑（mock API）、本地转写占位调用时抛异常
-- [ ] **真实闭环验证（关键）**：`make test-transcribe` → 取 US-001 (E) 中跑通的同一段 10 秒测试 MP3 → 在 Worker 中调用云端转写（**用 OSS URL 方案**）→ 返回的文字内容与 US-001 (E) 控制台验证结果一致（允许小幅模型版本差异，但**主干文字必须能对得上**）
+- [ ] **真实闭环验证（关键）**：`make test-transcribe` → 取 US-001 (E) 中跑通的同一段 20 秒测试音频（`sample-20s.wav`）→ 在 Worker 中调用云端转写（**用 OSS URL 方案**）→ 返回的文字内容与 US-001 (E) 控制台验证结果一致（允许小幅模型版本差异，但**主干文字必须能对得上**）
 - [ ] **方案 A 验证**：`make test-transcribe-oss-url` → 日志显示 `mode=oss-url`；用 `make show-oss-object` 能看到该对象在转写时段的访问日志（NLS 真的来拉过了）；Worker 端**不产生**上行流量到 NLS（用 `nethogs` 或同等工具确认转写期间 Worker 上行流量极小）
 - [ ] **降级方案 B 验证**：`make test-transcribe-direct` → 临时改 `config.yaml` 中 `transcriber.upload_mode = 'direct'` → 重新转写一条 → 日志显示 `mode=direct-upload`；转写结果与方案 A 一致
 - [ ] **性能验证（P-01 基线）**：`make test-transcribe-perf` → 用一段 1 分钟标准音频跑云端转写 → 端到端耗时符合 §9 P-01 目标（视服务商不同可调整阈值，写进 runbook 作为基线）

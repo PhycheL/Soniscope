@@ -492,7 +492,7 @@
         <tr><th>① 阿里云资源</th><td>账号、OSS 私有 Bucket、RAM 两个子账号 + 一个角色、<b>FC 3.0 两个 Web 函数槽位</b>（region: <code class="inline">cn-beijing</code>；FC 3.0 已无"服务"层级）</td></tr>
         <tr><th>② 微信小程序</th><td>AppID、AppSecret、服务器域名白名单、体验者真机 openid</td></tr>
         <tr><th>③ 云端语音转文字 API</th><td>默认阿里云 NLS 录音文件极速版；AppKey + 调用凭证</td></tr>
-        <tr><th>④ 测试音频素材</th><td>4 段标准音频，存放 <code class="inline">tests/fixtures/audio/</code>，记录 sha256</td></tr>
+        <tr><th>④ 测试音频素材</th><td>4 段标准音频（3 wav + 1 m4a），存于 OSS 私有 bucket，本地 <code class="inline">tests/audio/</code> 经脚本拉取，记录 sha256</td></tr>
         <tr><th>⑤ Worker 运行环境</th><td>任意可跑 Python 3.11+ 的主机；<code class="inline">$SONISCOPE_HOME</code> 工作目录（默认 <code class="inline">~/SoniScope/</code>）</td></tr>
         <tr><th>⑥ 凭证注入</th><td>FC 环境变量（9 项）+ Worker <code class="inline">~/SoniScope/config.yaml</code>（chmod 600）</td></tr>
       </table>
@@ -833,7 +833,7 @@ curl -i https://verify-upload-yyyyyyyy.cn-beijing.fcapp.run/
         <li>项目创建后，复制 <b>AppKey</b>（项目级标识，约 16 字符）保存到 runbook。注意：AppKey 不是 AccessKey，可入 runbook。</li>
         <li>调用 API 的 AccessKey 复用 A 块账号下的另一个 RAM 子账号（如已用 <code class="inline">soniscope-fc</code> 不要复用，建议新建一个 <code class="inline">soniscope-asr</code> 子账号并授予 <code class="inline">AliyunNLSFullAccess</code>），AK / Secret 保存到密码管理器。</li>
         <li>查看免费额度：智能语音交互 → 资源中心 → 资源包，确认录音文件转写免费时长（通常每月若干小时）。</li>
-        <li><b>真实联调基线</b>：用官方 demo 或 curl 调用录音文件极速版，提交 F 块准备的 <code class="inline">sample-10s.mp3</code> 的 OSS 公网 URL，等待返回结构化结果。<a href="https://help.aliyun.com/document_detail/90727.html" target="_blank">官方文档</a>。</li>
+        <li><b>真实联调基线</b>：用官方 demo 或 curl 调用录音文件极速版，提交 F 块准备的 <code class="inline">sample-20s.wav</code> 的 OSS 公网 URL，等待返回结构化结果。<a href="https://help.aliyun.com/document_detail/90727.html" target="_blank">官方文档</a>。</li>
         <li>把返回 JSON 的关键字段（含完整文字 + segments + 时间戳）粘贴到 runbook 作为基线参考，方便后续比对。</li>
       </ol>
 
@@ -849,7 +849,7 @@ curl -i https://verify-upload-yyyyyyyy.cn-beijing.fcapp.run/
         <li><input type="checkbox" id="e1"><label for="e1">已选定 ASR 服务商（默认 NLS 录音文件极速版；如选备选已在 runbook 记录原因）。</label></li>
         <li><input type="checkbox" id="e2"><label for="e2">已开通服务，控制台能看到项目 <code class="inline">soniscope-mvp</code> 和 AppKey。</label></li>
         <li><input type="checkbox" id="e3"><label for="e3">已领取并确认免费额度数量，已在 runbook 估算月度成本。</label></li>
-        <li><input type="checkbox" id="e4"><label for="e4">用 <code class="inline">sample-10s.mp3</code> 跑过一次官方 demo 联调，拿到结构化转写结果。</label></li>
+        <li><input type="checkbox" id="e4"><label for="e4">用 <code class="inline">sample-20s.wav</code> 跑过一次官方 demo 联调，拿到结构化转写结果。</label></li>
         <li><input type="checkbox" id="e5"><label for="e5">转写文本与原始口述内容主干一致（允许标点 / 同音字差异）。</label></li>
         <li><input type="checkbox" id="e6"><label for="e6">联调 JSON 输出关键字段已贴入 runbook 作为基线。</label></li>
         <li><input type="checkbox" id="e7"><label for="e7">AppKey + API endpoint 已记录到 runbook；调用 AK / Secret 已保存到密码管理器。</label></li>
@@ -859,56 +859,54 @@ curl -i https://verify-upload-yyyyyyyy.cn-beijing.fcapp.run/
     <!-- ============== F ============== -->
     <section class="block" id="block-f">
       <h2><span class="chip">F</span>测试基线音频素材<span class="state" id="state-block-f"></span></h2>
-      <p class="lead">目标：在 <code class="inline">tests/fixtures/audio/</code> 准备 4 段标准音频，提供 sha256，供 US-015 / US-017 + §4 最终验收复用。</p>
+      <p class="lead">目标：准备 4 段标准音频（3 wav + 1 m4a），上传到 OSS 私有 bucket，本地 <code class="inline">tests/audio/</code> 经脚本拉取并提供 sha256，供 US-015 / US-017 + §4 最终验收复用。音频<b>不进 git</b>。</p>
 
       <h3 class="step-title">需要准备的 4 个文件</h3>
       <table class="kv">
         <tr><th>文件</th><th>用途 / 时长 / 格式</th></tr>
-        <tr><td><code class="inline">sample-10s.mp3</code></td><td>约 10 秒 MP3，清晰人声，无背景音。US-001 E 联调 + US-017 真实闭环用。</td></tr>
-        <tr><td><code class="inline">sample-1min.mp3</code></td><td>约 60 秒 MP3，含 5~10 句话。P-01 性能基线 + US-017 性能验证用。</td></tr>
-        <tr><td><code class="inline">sample-25min.mp3</code></td><td>约 25 分钟 MP3。US-010 长录音分片 + §4.2 手动验收闭环用。</td></tr>
-        <tr><td><code class="inline">sample-aac.aac</code></td><td>约 10 秒 AAC 格式。验证 AAC 转码（OQ-1 / US-015 强依赖）。</td></tr>
+        <tr><td><code class="inline">sample-20s.wav</code></td><td>约 20 秒 wav，清晰人声，无背景音。US-001 E 联调 + US-017 真实闭环用。</td></tr>
+        <tr><td><code class="inline">sample-54s.wav</code></td><td>约 54 秒 wav，含 5~10 句话。P-01 性能基线 + US-017 性能验证用。</td></tr>
+        <tr><td><code class="inline">sample-25min.wav</code></td><td>约 25 分钟 wav。US-010 长录音分片 + §4.2 手动验收闭环用。</td></tr>
+        <tr><td><code class="inline">sample-20s.m4a</code></td><td>约 20 秒 m4a（容器内为 AAC）。验证 AAC/m4a 转码（OQ-1 / US-015 强依赖）。</td></tr>
       </table>
 
       <h3 class="step-title">操作步骤</h3>
       <ol class="steps">
-        <li>用手机录音 App（如「微信语音转文字」「讯飞语记」「QuickTime」）录制 3 段 MP3，时长分别约 10s / 60s / 25min。可念新闻、读书摘录或自由讲话。</li>
-        <li>用 <code class="inline">ffmpeg</code> 把 <code class="inline">sample-10s.mp3</code> 转出 AAC 版：
-<pre>ffmpeg -i tests/fixtures/audio/sample-10s.mp3 \
-  -c:a aac -b:a 128k \
-  tests/fixtures/audio/sample-aac.aac</pre>
+        <li>准备 4 段音频：3 段 wav（约 20s / 54s / 25min，念新闻、读书摘录或自由讲话皆可）+ 1 段 m4a（约 20s，容器内为 AAC，用于验证 Worker 转码）。</li>
+        <li>把 4 个文件上传到 OSS 私有 bucket <code class="inline">soniscope-audio</code> 的 <code class="inline">sample/</code> 前缀下（如 <code class="inline">sample/sample-20s.wav</code>）。<b>音频不进 git。</b></li>
+        <li>把每个文件的 sha256 + 用途 + 时长登记到 <code class="inline">tests/audio/fixtures.manifest.json</code> 与 <code class="inline">docs/runbook/cloud-setup.md</code> §6：
+<pre>shasum -a 256 &lt;本地音频文件&gt;
+<span class="cmt"># 写入 manifest 的 sha256 字段 + runbook §6 表格</span></pre>
         </li>
-        <li>把 4 个文件放到 <code class="inline">tests/fixtures/audio/</code>（仓库相对路径）。</li>
-        <li>计算并记录 sha256：
-<pre>shasum -a 256 tests/fixtures/audio/*.{mp3,aac}
-
-<span class="cmt"># 把每个文件的 sha256 抄到 docs/runbook/cloud-setup.md</span></pre>
+        <li>本地拉取并校验（任意机器，需 <code class="inline">~/SoniScope/config.yaml</code> 中的只读 OSS 凭证）：
+<pre>python3 scripts/fetch_test_fixtures.py         <span class="cmt"># 从 OSS 下载到 tests/audio/</span>
+python3 scripts/fetch_test_fixtures.py --check <span class="cmt"># 只按 sha256 校验，不下载</span></pre>
         </li>
-        <li>用 ffprobe 检查 codec / duration：
+        <li>用 ffprobe 抽查 codec / duration：
 <pre>ffprobe -v error -show_entries stream=codec_name,duration \
-  -of default=noprint_wrappers=1 tests/fixtures/audio/sample-1min.mp3
-<span class="cmt"># 期望：codec_name=mp3, duration ≈ 60</span>
+  -of default=noprint_wrappers=1 tests/audio/sample-54s.wav
+<span class="cmt"># 期望：codec_name=pcm_*（wav），duration ≈ 54</span>
 
 ffprobe -v error -show_entries stream=codec_name \
-  -of default=noprint_wrappers=1 tests/fixtures/audio/sample-aac.aac
-<span class="cmt"># 期望：codec_name=aac（不能是 mp3，否则后续 AAC 转码验证假阳）</span></pre>
+  -of default=noprint_wrappers=1 tests/audio/sample-20s.m4a
+<span class="cmt"># 期望：codec_name=aac（m4a 容器内为 AAC，供转码验证）</span></pre>
         </li>
       </ol>
 
       <div class="callout warn">
-        <span class="title">⚠ 文件大小约束</span>
-        4 个 fixture 总大小通常 &lt; 50 MB，可直接进 git。如担心仓库膨胀，可考虑用 git-lfs 管理，但本期 MVP 暂不要求。
+        <span class="title">⚠ 存储位置</span>
+        音频 fixture <b>不进 git</b>（其中 sample-25min.wav 约 130 MB）。统一存于 OSS 私有 bucket <code class="inline">soniscope-audio</code> 的 <code class="inline">sample/</code> 前缀，本地通过 <code class="inline">scripts/fetch_test_fixtures.py</code> 按 sha256 拉取；git 只跟踪 <code class="inline">tests/audio/fixtures.manifest.json</code> 与转写文本 <code class="inline">*.md</code>。
       </div>
 
       <h3 class="step-title">验收清单</h3>
       <ul class="checklist" data-block="block-f">
-        <li><input type="checkbox" id="f1"><label for="f1"><code class="inline">ls -la tests/fixtures/audio/</code> 能看到 4 个文件。</label></li>
-        <li><input type="checkbox" id="f2"><label for="f2"><code class="inline">shasum -a 256 tests/fixtures/audio/*</code> 输出与 runbook 中记录的一致（每行长度 64 字符 hex）。</label></li>
+        <li><input type="checkbox" id="f1"><label for="f1"><code class="inline">python3 scripts/fetch_test_fixtures.py</code> 输出 <code class="inline">4/4 就绪</code>（首次从 OSS 下载）。</label></li>
+        <li><input type="checkbox" id="f2"><label for="f2"><code class="inline">python3 scripts/fetch_test_fixtures.py --check</code> 全部校验通过（sha256 与 runbook 一致）。</label></li>
         <li><input type="checkbox" id="f3"><label for="f3">每个文件用播放器试听，能听到清晰人声、无明显杂音。</label></li>
-        <li><input type="checkbox" id="f4"><label for="f4"><code class="inline">ffprobe sample-1min.mp3</code> 显示 duration ≈ 60s + codec=mp3。</label></li>
-        <li><input type="checkbox" id="f5"><label for="f5"><code class="inline">ffprobe sample-25min.mp3</code> 显示 duration ≈ 1500s（25 分钟）。</label></li>
-        <li><input type="checkbox" id="f6"><label for="f6"><code class="inline">ffprobe sample-aac.aac</code> 显示 codec=aac（不是 mp3 假冒）。</label></li>
-        <li><input type="checkbox" id="f7"><label for="f7">sha256 + duration + codec 三项信息已写入 runbook。</label></li>
+        <li><input type="checkbox" id="f4"><label for="f4"><code class="inline">ffprobe sample-54s.wav</code> 显示 duration ≈ 54s + codec=pcm_*（wav）。</label></li>
+        <li><input type="checkbox" id="f5"><label for="f5"><code class="inline">ffprobe sample-25min.wav</code> 显示 duration ≈ 1500s（25 分钟）。</label></li>
+        <li><input type="checkbox" id="f6"><label for="f6"><code class="inline">ffprobe sample-20s.m4a</code> 显示 codec=aac（m4a 容器内为 AAC，供转码验证）。</label></li>
+        <li><input type="checkbox" id="f7"><label for="f7">sha256 + duration + codec 三项信息已写入 runbook + manifest。</label></li>
       </ul>
     </section>
 
@@ -1081,7 +1079,7 @@ git status docs/runbook/cloud-setup.md</pre>
         <li><code class="inline">docs/runbook/cloud-setup.md</code> 已包含 8 个章节，无明文 AK。</li>
         <li>4 个 STS 反例验证已亲手跑过（B-4），结果与预期完全一致。</li>
         <li>两个 FC 函数 URL 用 <code class="inline">curl</code> 都能返回 200。</li>
-        <li>用 <code class="inline">sample-10s.mp3</code> 跑通了一次 ASR 联调，转写结果与原音内容主干一致。</li>
+        <li>用 <code class="inline">sample-20s.wav</code> 跑通了一次 ASR 联调，转写结果与原音内容主干一致。</li>
       </ol>
 
       <h3 class="step-title">未来 <code class="inline">make verify-prep</code>（US-002 提供）会跑以下检查</h3>
@@ -1092,7 +1090,7 @@ make verify-prep
 <span class="cmt">#   aliyun oss stat oss://soniscope-audio    # 验证 Bucket 私有</span>
 <span class="cmt">#   4 条 STS 反例（PutObject 越界 / ListBucket / GetObject / Expired）</span>
 <span class="cmt">#   curl 两个 FC URL 返回 200</span>
-<span class="cmt">#   ls tests/fixtures/audio/*.mp3 三个文件存在 + sha256 匹配</span>
+<span class="cmt">#   python3 scripts/fetch_test_fixtures.py --check  4 个 fixture 校验通过</span>
 <span class="cmt">#   make check-config 读取 ~/SoniScope/config.yaml 通过</span>
 
 <span class="cmt"># 输出：pass/fail 汇总报告</span></pre>
