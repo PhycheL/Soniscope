@@ -177,3 +177,8 @@ pyrightconfig.json
 
 # My Gitignore
 .DS_Store
+
+# 测试音频 fixture：体积大，不进 git。存于阿里云 OSS，通过脚本按 sha256 拉取。
+# 保留同目录的 .md 转写文本与 test_asr.py。
+tests/audio/*.wav
+tests/audio/*.m4a

@@ -1,0 +1,41 @@
+{
+  "_comment": "测试音频 fixture 清单。音频二进制不进 git，存于阿里云 OSS 私有 bucket，由 scripts/fetch_test_fixtures.py 按 sha256 拉取到本目录。sha256 同时登记在 docs/runbook/cloud-setup.md §6。",
+  "bucket": "soniscope-audio",
+  "endpoint": "oss-cn-beijing.aliyuncs.com",
+  "region": "cn-beijing",
+  "dest_dir": "tests/audio",
+  "fixtures": [
+    {
+      "name": "sample-20s.wav",
+      "oss_key": "sample/sample-20s.wav",
+      "sha256": "b07dee76f9cab9cf4ed9ba482e7a6287409180fc05e476365bd9a92f665b7828",
+      "size_bytes": 2306126,
+      "codec": "wav",
+      "duration_seconds": 20
+    },
+    {
+      "name": "sample-54s.wav",
+      "oss_key": "sample/sample-54s.wav",
+      "sha256": "9c454b212654f8948557123d9bc16d78ea6b2cf425484fca195b60fe9c7c9cde",
+      "size_bytes": 5162958,
+      "codec": "wav",
+      "duration_seconds": 54
+    },
+    {
+      "name": "sample-25min.wav",
+      "oss_key": "sample/sample-25min.wav",
+      "sha256": "34db505eb44f93fd092e868664979c155ebbbb6c0a61019dd840b30d276cdb27",
+      "size_bytes": 135505870,
+      "codec": "wav",
+      "duration_seconds": 1500
+    },
+    {
+      "name": "sample-20s.m4a",
+      "oss_key": "sample/sample-20s.m4a",
+      "sha256": "d3d2866128efe258ff95e841a16e7abb4d783fd37536692932a875f9fb5380fd",
+      "size_bytes": 209833,
+      "codec": "m4a",
+      "duration_seconds": 20
+    }
+  ]
+}

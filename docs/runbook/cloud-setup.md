@@ -405,23 +405,26 @@
 
 ## 6. 测试基线音频素材
 
-> 文件位置：仓库内相对路径 `tests/audio/`。
+> **存储方式**：音频二进制**不进 git**（体积大），存于 OSS 私有 bucket `soniscope-audio` 的 `sample/` 前缀下（如 `sample/sample-20s.wav`）。
+> 本地通过 `python3 scripts/fetch_test_fixtures.py` 按 sha256 拉取到 `tests/audio/`（清单见 `tests/audio/fixtures.manifest.json`）。
+> 同目录的转写文本 `*.md` 与 `test_asr.py` 仍在 git 中跟踪。下方 sha256 为唯一权威校验源。
 
 | 文件 | 用途 | 期望 duration | 期望 codec | sha256 |
 |---|---|---|---|---|
 | `sample-20s.wav` | E 联调 + US-017 真实闭环 | ≈ 20s | wav | `b07dee76f9cab9cf4ed9ba482e7a6287409180fc05e476365bd9a92f665b7828` |
 | `sample-54s.wav` | P-01 性能基线 + US-017 性能 | ≈ 60s | wav | `9c454b212654f8948557123d9bc16d78ea6b2cf425484fca195b60fe9c7c9cde` |
-| `sample-25min.wav` | US-010 长录音分片 + §4.2 闭环 | ≈ 1500s | wav | `<待填写>` |
+| `sample-25min.wav` | US-010 长录音分片 + §4.2 闭环 | ≈ 1500s | wav | `34db505eb44f93fd092e868664979c155ebbbb6c0a61019dd840b30d276cdb27` |
 | `sample-20s.m4a` | OQ-1 / US-015 m4a 转码验证 | ≈ 20s | m4a | `d3d2866128efe258ff95e841a16e7abb4d783fd37536692932a875f9fb5380fd` |
 
--  `ls tests/audio/` 能看到 4 个文件
--  `shasum -a 256 tests/audio/*.{mp3,aac}` 输出与上表一致
--  `ffprobe sample-aac.aac` 显示 codec=aac（不是 mp3 假冒）
--  每个文件能播放、人声清晰
+-  `python3 scripts/fetch_test_fixtures.py` 输出 `4/4 就绪`（首次会从 OSS 下载）
+-  `python3 scripts/fetch_test_fixtures.py --check` 全部 `校验通过`（sha256 与上表一致）
+-  4 个文件都能播放、人声清晰
 
-> 生成 sha256 的命令：
+> 校验/拉取命令：
 > ```
-> shasum -a 256 tests/audio/*.{wav,m4a}
+> python3 scripts/fetch_test_fixtures.py          # 拉取缺失或损坏的 fixture
+> python3 scripts/fetch_test_fixtures.py --check  # 只校验本地，不下载
+> shasum -a 256 tests/audio/*.{wav,m4a}           # 手动核对 sha256
 > ```
 
 ---
