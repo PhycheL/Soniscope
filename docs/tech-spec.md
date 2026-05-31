@@ -218,7 +218,7 @@ recordings/<YYYY-MM-DD>/<fragment_id>.wav
 | `x-oss-meta-original-format` | 原始音频格式字符串，如 `wav` / `mp3` / `aac` / `m4a` / `amr` 等 | 前端 US-007 |
 | `x-oss-meta-sha256` | hex 编码的 sha256 | 前端 US-011 |
 
-> Worker 通过 `oss2.Bucket.head_object()` 读取这些 meta，写入 `manifest.json` 对应字段。`chunk_total=0` 表示非分片单条录音，manifest 中存为 `null`。`x-oss-meta-sha256` 对应 `upload.original_sha256`（前端计算的原始字节 hash）。`oss:PutObject` 权限天然允许同请求写入用户自定义元数据，无需额外 STS policy 调整。
+> Worker 通过 `client.head_object()`（alibabacloud-oss-v2）读取这些 meta，写入 `manifest.json` 对应字段。`chunk_total=0` 表示非分片单条录音，manifest 中存为 `null`。`x-oss-meta-sha256` 对应 `upload.original_sha256`（前端计算的原始字节 hash）。`oss:PutObject` 权限天然允许同请求写入用户自定义元数据，无需额外 STS policy 调整。
 
 ### 3.3 `manifest.json` Schema
 
@@ -586,9 +586,9 @@ class TranscriptResult:
 | 组件 | 依赖 |
 |---|---|
 | 小程序 | `miniprogram-recorder-manager`（系统 API）、`wasm-crypto`（可选，前端 sha256） |
-| FC（Python） | `alibabacloud-sts20150401`、`oss2`（HeadObject 校验用） |
+| FC（Python） | `alibabacloud-sts20150401`、`alibabacloud-oss-v2`(HeadObject 校验用) |
 | FC 部署（Python） | `alibabacloud-fc20230330`（`make deploy-fc` 脚本用，不随函数打包） |
-| Worker（Python） | `oss2`、`pyyaml`、`pydantic>=2`、`typer`、`alibabacloud-nls20180628`；**本期不装** `faster-whisper` / `whisper.cpp` |
+| Worker（Python） | `alibabacloud-oss-v2`、`pyyaml`、`pydantic>=2`、`typer`、`alibabacloud-nls20180628`；**本期不装** `faster-whisper` / `whisper.cpp` |
 | Worker（系统二进制） | `ffmpeg` + `ffprobe`（各种音频格式 → WAV 转码 + 格式检测）；缺失则启动失败并提示安装方式 |
 
 ### 6.4 FC 部署与运维

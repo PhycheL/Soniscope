@@ -21,7 +21,7 @@
 | 微信小程序（原生） | 前端录音、草稿、直传 OSS |
 | Python 3.11+ | FC 函数与 Worker 统一运行时 |
 | uv（workspace） | monorepo 下多子项目依赖管理 |
-| Pydantic v2 / Typer / oss2 / PyYAML | Worker 配置 schema、CLI、OSS 客户端 |
+| Pydantic v2 / Typer / alibabacloud-oss-v2 / PyYAML | Worker 配置 schema、CLI、OSS 客户端 |
 | 阿里云 NLS（录音文件极速版） | 本期默认云端 ASR provider |
 | ffmpeg / ffprobe（系统二进制） | Worker 端音频格式检测与转码 |
 | mypy（strict）/ ruff / pytest | 类型检查 / Lint / 测试 |

@@ -399,7 +399,7 @@
 **(B) 自动验证（`make` 命令一键跑完，无需人工操作）**
 - [ ] Typecheck / lint 通过
 - [ ] 单元测试覆盖：指数退避重试逻辑（mock）、FC 错误码映射、STS 签名构造
-- [ ] `make test-sts-escape`：脚本自动模拟"小程序拿到 STS 凭证后试图写另一个 object key"的场景（用 oss2 SDK 直接调用，跳过小程序 UI），期望返回 `AccessDenied`（验证 US-003 (B) 的单 key 级别 policy 生效）
+- [ ] `make test-sts-escape`：脚本自动模拟"小程序拿到 STS 凭证后试图写另一个 object key"的场景（用 alibabacloud-oss-v2 SDK 直接调用，跳过小程序 UI），期望返回 `AccessDenied`（验证 US-003 (B) 的单 key 级别 policy 生效）
 
 **(C) 手动验证清单（用户在 DevTools / 真机上操作）**
 - [ ] **真实闭环验证（关键）**：从 DevTools 录一条 5 秒音频 → 保存并上传 → 用户跑 `make show-oss-object FRAGMENT_ID=<前端打印的 id>` 能 stat 到该对象 + 大小与前端记录的 `audio.size_bytes` 一致；**用户无需打开 OSS 控制台**

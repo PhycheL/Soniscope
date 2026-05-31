@@ -104,14 +104,37 @@ def load_oss_credentials(config_path: Path) -> tuple[str, str]:
     return str(oss["access_key_id"]), str(oss["access_key_secret"])
 
 
-def build_bucket(manifest: dict, config_path: Path):
+def _import_oss():
     try:
-        import oss2  # type: ignore
+        import alibabacloud_oss_v2 as oss  # type: ignore
+
+        return oss
     except ImportError:
-        _fail("缺少依赖 oss2，请先 `pip install oss2`（或在 worker 环境中运行）。")
+        _fail(
+            "缺少依赖 alibabacloud-oss-v2，请先 "
+            "`pip install alibabacloud-oss-v2`（或在 worker 环境中运行）。"
+        )
+
+
+def build_client(manifest: dict, config_path: Path):
+    oss = _import_oss()
     ak_id, ak_secret = load_oss_credentials(config_path)
-    auth = oss2.Auth(ak_id, ak_secret)
-    return oss2.Bucket(auth, manifest["endpoint"], manifest["bucket"])
+    cfg = oss.config.load_default()
+    cfg.credentials_provider = oss.credentials.StaticCredentialsProvider(
+        access_key_id=ak_id, access_key_secret=ak_secret
+    )
+    cfg.region = manifest["region"]
+    cfg.endpoint = manifest["endpoint"]
+    return oss.Client(cfg)
+
+
+def download_to(client, manifest: dict, oss_key: str, dest: Path) -> None:
+    """下载单个 object 到本地文件（V2 SDK 内置 CRC64 校验）。"""
+    oss = _import_oss()
+    client.get_object_to_file(
+        oss.GetObjectRequest(bucket=manifest["bucket"], key=oss_key),
+        str(dest),
+    )
 
 
 def load_manifest() -> dict:
@@ -131,7 +154,7 @@ def main() -> int:
     dest_dir.mkdir(parents=True, exist_ok=True)
     fixtures = manifest["fixtures"]
 
-    bucket = None  # 延迟构建：纯校验或全部命中时无需凭证
+    client = None  # 延迟构建：纯校验或全部命中时无需凭证
     ok = downloaded = skipped = 0
 
     for fx in fixtures:
@@ -159,13 +182,13 @@ def main() -> int:
             print(f"[fetch-fixtures] 缺失：{name}", file=sys.stderr)
             continue
 
-        if bucket is None:
-            bucket = build_bucket(manifest, resolve_config_path())
+        if client is None:
+            client = build_client(manifest, resolve_config_path())
 
         part = dest_dir / f"{name}.part"
         try:
             print(f"[fetch-fixtures] 下载：{fx['oss_key']} → {name}")
-            bucket.get_object_to_file(fx["oss_key"], str(part))
+            download_to(client, manifest, fx["oss_key"], part)
             size = part.stat().st_size
             if size != fx["size_bytes"]:
                 _fail(
