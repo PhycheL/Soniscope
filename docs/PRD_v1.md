@@ -16,8 +16,8 @@
 
 整个系统分四层：
 - **微信小程序**：极薄前端，只做录音、草稿管理、上传、上传列表展示
-- **阿里云函数计算 FC**：签发单 object key 级别的 STS 临时凭证 + 上传完整性校验
-- **阿里云 OSS（私有 Bucket）**：长期音频备份，**永不删除**
+- **阿里云函数计算 FC 3.0**：两个顶级 Web 函数（无 service 层级）签发单 object key 级别的 STS 临时凭证 + 上传完整性校验
+- **阿里云 OSS（私有 Bucket）**：实际 Bucket 为 `soniscope-audio`，region = `cn-beijing`（华北2 北京），公网 endpoint = `oss-cn-beijing.aliyuncs.com`；长期音频备份，**永不删除**
 - **Python Worker（后端进程）**：可配置频率轮询 OSS、下载、**调用云端语音转文字 API 转写**、按文件状态机落盘；运行环境与操作系统无关，可部署在 Linux 服务器 / Docker / 个人电脑 / NAS 等任意位置（本期不做本地模型推理）
 
 ---
@@ -83,14 +83,14 @@
 
 | 块 | 需要完成的事项 | 技术参考 |
 |---|---|---|
-| **(A) OSS** | 阿里云实名 + 充值 + 创建私有 Bucket（ACL = private） | — |
-| **(B) RAM** | 创建两个 RAM 子账号（`soniscope-fc` + `soniscope-local-reader`）+ 一个角色（`soniscope-uploader-role`）；STS 正例/反例验证通过 | tech-spec §4.4 |
-| **(C) FC** | 开通 FC 3.0 + 创建 `issue-credential` / `verify-upload` 两个 Web 函数 + HTTP 触发器（anonymous） | — |
-| **(D) 微信小程序** | 注册小程序 + 配置服务器域名白名单 + 安装开发者工具 + 获取真机 openid | — |
-| **(E) ASR** | 开通云端 ASR 服务 + 创建项目 + 用测试音频完成一次真实联调基线 | — |
-| **(F) 测试音频** | 准备 4 段标准测试音频到 `tests/audio/`，sha256 登记到 runbook | — |
-| **(G) Worker 环境** | 选定 Worker 主机 + Python ≥ 3.11 + 系统工具 + 工作目录 | — |
-| **(H) 凭证注入** | FC 环境变量填入 tech-spec §4.0 定义的变量 + Worker `config.yaml` 按 tech-spec §2.3 schema 填入 | tech-spec §4.0 / §2.3 |
+| **(A) OSS** | 阿里云实名 + 充值 + 创建私有 Bucket `soniscope-audio`（ACL = private；region = `cn-beijing`；endpoint = `oss-cn-beijing.aliyuncs.com`） | — |
+| **(B) RAM** | 创建三个 RAM 子账号（`soniscope-fc` + `soniscope-local-reader` + `soniscope-asr`）+ 一个角色（`soniscope-uploader-role`，ARN `acs:ram::1633875501759333:role/soniscope-uploader-role`）；STS 正例/反例验证通过 | tech-spec §4.4 |
+| **(C) FC** | 开通 FC 3.0 + 创建 `issue-credential` / `verify-upload` 两个顶级 Web 函数（**不创建 `soniscope-svc` service**）+ HTTP 触发器（anonymous，GET + POST，公网 URL 已开启） | — |
+| **(D) 微信小程序** | 注册小程序（AppID `wx3f973c7297728b0c`）+ 配置服务器域名白名单（两个 FC request 域名 + 北京 OSS uploadFile 域名）+ 安装开发者工具 + 获取真机 openid（runbook 已登记 2 个体验者） | — |
+| **(E) ASR** | 开通阿里云智能语音交互 NLS 项目 `soniscope`（endpoint `cn-beijing`，模型 `中文普通话（识音石 V1 - 端到端模型)`，无免费额度）+ 用测试音频完成一次真实联调基线 | — |
+| **(F) 测试音频** | 4 段标准测试音频二进制不进 git，存于 OSS `sample/` 前缀；本地通过 `python3 scripts/fetch_test_fixtures.py` 拉取到 `tests/audio/`，sha256 以 runbook 为准 | — |
+| **(G) Worker 环境** | 选定 Worker 主机（当前：Mac Studio M4 Max / macOS 26.5 / Python 3.13.2）+ 系统工具 + `SONISCOPE_HOME=/Volumes/Data/software/SoniScope` | — |
+| **(H) 凭证注入** | FC 环境变量填入 tech-spec §4.0 定义的变量 + Worker `$SONISCOPE_HOME/config.yaml`（实际路径 `/Volumes/Data/software/SoniScope/config.yaml`）按 tech-spec §2.3 schema 填入；长期密钥仅保存在 FC 环境变量 / 1Password / `$SONISCOPE_HOME`，不进 repo | tech-spec §4.0 / §2.3 |
 | **(I) 文档登记** | `docs/runbook/cloud-setup.md` 包含全部非敏感资源信息（无明文 AK） | — |
 
 **完成判据**：
@@ -103,11 +103,11 @@
 **最终验收命令（一行跑完所有可自动化的检查项）**：
 
 完成后，AI 将在 US-002 中提供一个 `make verify-prep` 脚本，执行下面这些检查并汇总 pass/fail 报告：
-- 跑 `aliyun oss stat oss://soniscope-audio` 验证 Bucket 私有
+- 跑 `aliyun oss stat oss://soniscope-audio --endpoint oss-cn-beijing.aliyuncs.com` 验证 Bucket 私有
 - 跑 4 条 STS 反例（PutObject 越界 / ListBucket / GetObject / Expired）
-- `curl` 两个 FC URL 返回 200
-- `ls tests/audio/` 4 个文件存在（3 wav + 1 m4a）+ sha256 匹配
-- `make check-config` 读取 `~/SoniScope/config.yaml` 通过
+- `curl` runbook 登记的两个 FC 3.0 URL（`https://issue-cedential-ottfirocds.cn-beijing.fcapp.run`、`https://verify-upload-nnjpaoamhw.cn-beijing.fcapp.run`）返回 200~499，且不是 5xx / 网络错误
+- `python3 scripts/fetch_test_fixtures.py --check` 验证 `tests/audio/` 4 个文件存在（3 wav + 1 m4a）+ sha256 与 runbook §6 匹配
+- `make check-config` 读取 `$SONISCOPE_HOME/config.yaml`（实际 `/Volumes/Data/software/SoniScope/config.yaml`）通过
 
 > ⚠️ `make verify-prep` 脚本本身由 AI 在 US-002 提供；US-001 完成时只需手工跑过反例验证 + 把信息记入 runbook 即可。
 
@@ -115,7 +115,7 @@
 
 > **AI 编程任务**：写 Python 项目骨架、配置 schema、CLI 入口、`make verify-prep` 一键校验脚本。
 >
-> **前置假设（来自 US-001）**：用户已按 US-001 H 块填好 `~/SoniScope/config.yaml`，已按 F 块准备好 `tests/audio/*.{wav,m4a}`。本 story 不要求用户做任何额外手工操作。
+> **前置假设（来自 US-001）**：用户已按 US-001 H 块填好 `$SONISCOPE_HOME/config.yaml`（实际 `/Volumes/Data/software/SoniScope/config.yaml`），已按 F 块通过 `python3 scripts/fetch_test_fixtures.py` 准备好 `tests/audio/*.{wav,m4a}`。本 story 不要求用户做任何额外手工操作。
 
 **描述：** 作为开发者，我需要 AI 搭好 **monorepo 骨架**（顶层 uv workspace + `apps/worker/` Python 子项目 + 顶层 Makefile），实现 Worker 的配置 schema 与 CLI 入口，并提供 `make verify-prep` 脚本验证 US-001 准备的全部产物（OSS / RAM / FC / 测试音频 / config.yaml）真实可用。本 story **不**创建 `apps/miniprogram/` 与 `apps/fc/`（它们分别由 US-007+ 和 US-003+ 创建对应代码），但顶层 workspace 配置要为后续 member 留好位置。
 
@@ -136,7 +136,7 @@
 
 **(C) CLI 命令**
 - [ ] `make check-config` → 读取配置 → 打印脱敏摘要 → 对缺失字段报错并退出非零
-- [ ] `make init-dirs` → 在 `SONISCOPE_HOME`（默认 `~/SoniScope/`）下创建 `inbox/` / `fragments/` / `tmp/`，已存在时幂等不报错
+- [ ] `make init-dirs` → 在 `SONISCOPE_HOME`（本项目实际 `/Volumes/Data/software/SoniScope`；未设置时才回退到 `~/SoniScope/`）下创建 `inbox/` / `fragments/` / `tmp/`，已存在时幂等不报错
 
 **(D) `make verify-prep` 一键校验 US-001 全部产物（本 story 最关键的产出）**
 - [ ] `make verify-prep` 依次执行下列检查，并输出汇总 pass/fail 报告：
@@ -146,7 +146,7 @@
   4. **(E 块)** 用 config 中的 NLS AppKey + AK，上传 `tests/audio/sample-20s.wav` → 拿到结构化转写结果 → 验证结构符合 tech-spec §3.4
   5. **(F 块)** `tests/audio/sample-{20s,54s,25min}.wav` + `sample-20s.m4a` 四个文件存在 + sha256 与 runbook 中记录的一致 + ffprobe duration 与文件名标注的时长在 ±2s 内；额外检查 `sample-20s.m4a` 的 codec=aac（m4a 容器内为 AAC，作为“非 WAV → WAV”转码 fixture）
   6. **(G 块)** Python 版本 ≥ 3.11；`SONISCOPE_HOME` 路径可写；可用磁盘 ≥ 50GB；`ffmpeg` + `ffprobe` 可用（**音频统一标准化为 WAV 的依赖**）
-  7. **(H 块)** `~/SoniScope/config.yaml` 权限为 600；所有必填字段非空
+  7. **(H 块)** `$SONISCOPE_HOME/config.yaml`（实际 `/Volumes/Data/software/SoniScope/config.yaml`）权限为 600；所有必填字段非空
 - [ ] 单项失败时，输出中包含**修复指引**（如 "请重做 US-001 (B) 反例 3"，附 runbook 中对应章节锚点）
 - [ ] 全部通过时，最后一行打印 `✅ US-001 preparation verified. Ready for US-003+`
 - [ ] **runbook 中 sha256 校验失败**时（用户改动了 fixture）→ 明确提示并指向 US-001 (F) 块的更新步骤
@@ -168,7 +168,7 @@
 
 > **AI 编程任务**：写 `/issue-credential` 的 handler 代码 + FC 部署能力首版（`make deploy-fc`）+ 在云端真实联调全部 AC。
 >
-> **前置假设（来自 US-001）**：FC 服务 `soniscope-svc` 已开通、两个函数槽位已建好（hello world 状态）、HTTP 触发器已配置、微信合法域名白名单已配置、FC 环境变量已注入。本 story 不要求用户回控制台做任何配置。
+> **前置假设（来自 US-001）**：FC 3.0 已开通；**不创建 `soniscope-svc` service**；两个顶级 Web 函数 `issue-credential` / `verify-upload` 已建好（hello world 状态），HTTP 触发器 anonymous + GET/POST + 公网 URL 已配置，微信合法域名白名单已配置，FC 环境变量已注入。本 story 不要求用户回控制台做任何配置。
 >
 > **本 story 完整闭环**：写完即部署到云端真实 FC、云端 AC 全部 verify 通过，故事独立可交付。
 
@@ -199,7 +199,7 @@
 
 > 下列 AC 中的错误码字面值（如 `INVALID_CODE`、`SIZE_EXCEEDED`）用于观测验证，权威定义见 tech-spec §4.1 / §4.2。
 
-- [ ] 跑 `make deploy-fc FUNCTION=issue_credential` 把 (A)(B) 代码推到云端，部署日志显示 200 + curl 存活验证通过
+- [ ] 跑 `make deploy-fc FUNCTION=issue-credential` 把 (A)(B) 代码推到云端，部署日志显示 200 + curl 存活验证通过
 - [ ] **公网 curl 拒绝匿名验证**：从任意可访问公网的终端用 `curl` 直接调用 FC 公网 URL（不带 code 或带伪造 code）**必须**被拒（400/401/403），不会拿到任何凭证
 - [ ] **wx-login 失败验证**：跑 `make test-fc-live` → 用 `tests/fixtures/wx-login-fixture.json` 中的伪造 code 调 `/issue-credential` → 验证返回 401 `INVALID_CODE`（证明 (A) 代码生效）
 - [ ] **allowlist 拒绝验证**：用真实 wx.login code（由用户在 DevTools 中临时获取并传入）调 `/issue-credential` → 验证 openid 不在 allowlist 时返回 403 `OPENID_NOT_ALLOWED`（**不需要用户回控制台**，只需 DevTools 跑 `wx.login` 一次）
@@ -216,12 +216,12 @@
 - [ ] 单元测试覆盖：handler 字段校验、鉴权逻辑、allowlist 判定、STS 签发、大小上限边界、部署脚本打包与错误重试（mock 云端依赖）
 
 **(F) 用户操作清单（用户只需跑命令，不回控制台）**
-- [ ] 用户跑 `make deploy-fc FUNCTION=issue_credential` 一次 → 部署成功 + curl 验证通过
+- [ ] 用户跑 `make deploy-fc FUNCTION=issue-credential` 一次 → 部署成功 + curl 验证通过
 - [ ] 用户跑 `make test-fc-live` → (D) 中所有云端反例 + 正例自动跑完并汇总 pass/fail
 - [ ] 用户跑 `make fc-logs FUNCTION=issue-credential` → 能看到上面请求的日志
-- [ ] 后续 `issue-credential` 代码改动只需重跑 `make deploy-fc FUNCTION=issue_credential`，**不需要打开 FC 控制台**
+- [ ] 后续 `issue-credential` 代码改动只需重跑 `make deploy-fc FUNCTION=issue-credential`，**不需要打开 FC 控制台**
 
-> ❌ 本 story **不**做的事（已在 US-001 完成）：开通 FC 服务 / 创建函数槽位 / 配置 HTTP 触发器 / 微信合法域名白名单 / 注入 FC 环境变量。这些都是 US-001 C/D/H 块的一次性人工准备，AI 不要试图自动化。
+> ❌ 本 story **不**做的事（已在 US-001 完成）：开通 FC 3.0 / 创建顶级 Web 函数槽位 / 配置 HTTP 触发器 / 微信合法域名白名单 / 注入 FC 环境变量。这些都是 US-001 C/D/H 块的一次性人工准备，AI 不要试图自动化。
 
 #### US-005: FC `/verify-upload` 完整交付（HeadObject + 扩展部署 + 云端 verify）
 
@@ -244,11 +244,11 @@
 
 **(B) 扩展 `make deploy-fc` 支持第二个函数**
 - [ ] FC 函数源码组织符合 tech-spec §2.1（US-003 已建 workspace 配置，此处仅新增函数子目录）
-- [ ] 跑 `make deploy-fc FUNCTION=verify_upload` 能复用 US-003 已建的部署能力（备份 / 回滚 / 日志 / 工程化基线全部复用，**不应**新写一份）
-- [ ] 跑不带参的 `make deploy-fc` 能自动扫描 `apps/fc/*/` 并部署所有函数（此时应同时部署 `issue_credential` + `verify_upload`）；日志显示两个函数各自的 zip sha256 + curl 存活验证结果
+- [ ] 跑 `make deploy-fc FUNCTION=verify-upload` 能复用 US-003 已建的部署能力（备份 / 回滚 / 日志 / 工程化基线全部复用，**不应**新写一份）
+- [ ] 跑不带参的 `make deploy-fc` 能自动扫描 `apps/fc/*/` 并部署所有函数（此时应同时部署云端函数 `issue-credential` + `verify-upload`；如代码目录使用 snake_case，由部署脚本负责映射）；日志显示两个函数各自的 zip sha256 + curl 存活验证结果
 
 **(C) 云端联调（必须在云端真实 FC 上 verify）**
-- [ ] 跑 `make deploy-fc FUNCTION=verify_upload` 把 (A) 代码推到云端，部署日志显示 200 + curl 存活验证通过
+- [ ] 跑 `make deploy-fc FUNCTION=verify-upload` 把 (A) 代码推到云端，部署日志显示 200 + curl 存活验证通过
 - [ ] **真实闭环验证（脚本化）**：AI 提供 `make test-verify-upload` 脚本自动完成「上传测试对象 → 调用 `/verify-upload` 期望 `verified: true` → 删除对象（复用 `oss-delete-obj` 能力，仅测试用）→ 再次调用期望 `verified: false, reason: OBJECT_NOT_FOUND`」全流程，**用户无需手工操作 OSS 控制台**
 - [ ] **大小不一致验证**：上传一个 100 字节对象 → 用 `expected_size=200` 调 `/verify-upload` → 返回 `verified: false, reason: SIZE_MISMATCH, actual_size: 100`
 - [ ] **鉴权拒绝验证**：不带 code / 伪造 code → 同 US-003 (D)，返回 400/401
@@ -261,10 +261,10 @@
 - [ ] 单元测试覆盖：handler 字段校验、OSS 校验三种返回路径、鉴权逻辑、allowlist 判定（mock 云端依赖）
 
 **(E) 用户操作清单（用户只需跑命令，不回控制台）**
-- [ ] 用户跑 `make deploy-fc FUNCTION=verify_upload` 一次 → 部署成功 + curl 验证通过
+- [ ] 用户跑 `make deploy-fc FUNCTION=verify-upload` 一次 → 部署成功 + curl 验证通过
 - [ ] 用户跑 `make test-verify-upload` → (C) 中闭环验证自动跑完
 - [ ] 用户跑 `make fc-logs FUNCTION=verify-upload` → 能看到日志
-- [ ] 后续 `verify-upload` 代码改动只需重跑 `make deploy-fc FUNCTION=verify_upload`，**不需要打开 FC 控制台**
+- [ ] 后续 `verify-upload` 代码改动只需重跑 `make deploy-fc FUNCTION=verify-upload`，**不需要打开 FC 控制台**
 
 ---
 
@@ -481,7 +481,7 @@
 
 - [ ] 脚本启动后按 `poll.interval_seconds`（默认值见 tech-spec §2.3）周期轮询 OSS，列出 `recordings/` 前缀下所有对象
 - [ ] 对每个**本地尚未存在**或**本地存在但无 `.done`** 的对象：
-  - 下载到 `~/SoniScope/inbox/<fragment_id>.part`
+  - 下载到 `$SONISCOPE_HOME/inbox/<fragment_id>.part`（本项目实际 `/Volumes/Data/software/SoniScope/inbox/<fragment_id>.part`）
   - 下载完成后计算 **`original_sha256`**；与 OSS 元数据比对一致性；不一致 → 删除 `.part`，下一轮重下
   - **格式检测与标准化**：按 tech-spec §5.1 / §3.5 执行格式检测 → WAV 合规直通 / 任意非 WAV 格式转码为 WAV → 原子 rename 到 `fragments/` 目录；转码失败 → 留档到 `inbox/failed/`（不参与自动重试，需人工介入）
   - **读取 OSS 用户自定义元数据**：通过 OSS API 获取前端上传时附带的元数据，写入 manifest 对应字段（tech-spec §3.2 / ADR-8）
@@ -543,7 +543,7 @@
 - [ ] 云端转写失败重试策略符合 tech-spec §1.5（网络错误 / 5xx 指数退避；4xx 立即失败）
 - [ ] 预留本地转写占位骨架（本期不调用），证明接口预留可扩展
 - [ ] 转写器选择由配置决定（tech-spec §2.3 + §5.3）；当前默认云端转写，未来切换不需要改业务代码
-- [ ] **成本可观测**：每次 ASR 调用后输出结构化日志，字段符合 tech-spec §6.8 定义，便于运行过程中监控免费额度
+- [ ] **成本可观测**：每次 ASR 调用后输出结构化日志，字段符合 tech-spec §6.8 定义，便于运行过程中监控用量与成本（当前 ASR 无免费额度，见 runbook §5.3）
 - [ ] 输出的 `transcript.json` 结构稳定，字段符合 tech-spec §3.4 定义
 
 **(B) 自动验证（`make` 命令一键跑完，无需人工操作）**
@@ -639,7 +639,7 @@
 **[正常路径 · 100 条录音落盘完整性]**
 
 - [ ] `make list-oss-objects DATE=<YYYY-MM-DD>` → 列出**完整的 100 个 `.wav` 对象**（脚本化输出 + 计数 = 100），文件名与前端 `fragment_id` 一一对应；用户**无需打开 OSS 控制台**
-- [ ] `make verify-e2e-integrity` → 本地 `~/SoniScope/fragments/` 下出现**完整的 100 个 Fragment 目录**，每个目录都同时包含 5 个产物文件（清单见 tech-spec §2.2）
+- [ ] `make verify-e2e-integrity` → 本地 `$SONISCOPE_HOME/fragments/`（本项目实际 `/Volumes/Data/software/SoniScope/fragments/`）下出现**完整的 100 个 Fragment 目录**，每个目录都同时包含 5 个产物文件（清单见 tech-spec §2.2）
 - [ ] `make verify-e2e-sha256` → 每条 Fragment 的 sha256 完整性按 tech-spec §3.3 一致性规则校验通过（OSS 侧 + 本地侧）
 - [ ] `make verify-e2e-fields` → 每条 Fragment 的 `manifest.upload.verified_at` 非空、`manifest.transcription.completed_at` 非空
 
@@ -707,7 +707,7 @@
 - **FR-10**：Worker**必须**按 `config.yaml` 中可配置的 `poll.interval_seconds`（默认值见 tech-spec §2.3）周期轮询 OSS（US-015）。
 - **FR-11**：Worker**绝不**调用 OSS `DeleteObject`，OSS 文件永久保留（US-015 + §4 最终验收 AC）。
 - **FR-12**：本地文件操作**必须**走"先临时 → 原子 rename → 写 `.done`"写入协议（tech-spec §3.5 / US-016）。
-- **FR-13**：脚本启动时**必须**扫描 `~/SoniScope/fragments/`，对每个目录按状态机决定是跳过 / 重转 / 重下 / 新办（US-016）。
+- **FR-13**：脚本启动时**必须**扫描 `$SONISCOPE_HOME/fragments/`（本项目实际 `/Volumes/Data/software/SoniScope/fragments/`），对每个目录按状态机决定是跳过 / 重转 / 重下 / 新办（US-016）。
 - **FR-14**：转写**必须**通过抽象接口调用（tech-spec §5.3）；本期默认实现云端转写（调用云端语音转文字 API），且预留本地转写占位骨架；**本期不部署本地推理模型**（US-017）。
 - **FR-15**：转写幂等性**必须**基于 `.done` 标记文件判断——`.done` 存在即跳过，不因模型 / 参数版本变更自动重转；四元组 `(audio_sha256, transcriber, model, params_version)` 仅记录于 manifest 供溯源和 CLI 筛选（US-018）。
 - **FR-16**：每个 Fragment 目录最终**必须**同时存在 `audio.wav` / `manifest.json` / `transcript.json` / `transcript.txt` / `.done` 五个文件（US-019）。
@@ -825,7 +825,7 @@
 
 ## 10. Open Questions / 待澄清的问题
 
-> **状态**：本期 PRD v1 起 8 个 OQ **全部已决议**（OQ-1~7 于 2026-05-26，OQ-8 于后续审计补入）。具体决策落到了对应 user stories 的 acceptance criteria 中；本节保留为决策索引，便于追溯。完整技术背景见 tech-spec §8（ADR-1 ~ ADR-8）。
+> **状态**：本期 PRD v1 起 8 个 OQ **全部已决议**。实际云端资源与选型的登记时间以 runbook 为准（首次完成 `2026-05-28`，ASR 选型 `2026-05-29`，最近修订 `2026-05-30`）。具体决策落到了对应 user stories 的 acceptance criteria 中；本节保留为决策索引，便于追溯。完整技术背景见 tech-spec §8（ADR-1 ~ ADR-8）。
 
 | 编号 | 议题 | 决策 | 落到哪 |
 |---|---|---|---|
@@ -834,7 +834,7 @@
 | OQ-3 | 是否提供单条 Fragment 强制重转 CLI | **要做，本期内提供** `make retranscribe`（完整签名见 tech-spec §3.7 / §6.5） | US-018 |
 | OQ-4 | 长录音多 chunk 在上传列表如何展示 | **折叠卡片 + 每个 chunk 独立可重传**（不整段强制一起重传） | US-014 |
 | OQ-5 | FC 是否对 expected_size 做上限校验 | **要加**（默认值见 tech-spec §4.0 `MAX_UPLOAD_BYTES`，可调） | US-003 (B) |
-| OQ-6 | 选哪家云端语音转文字 API | **暂定阿里云智能语音交互 NLS 录音文件极速版**；执行 US-001 (E) 实测时若有调整需同步更新 PRD + runbook | US-001 (E) / tech-spec.md §6.2 / US-017 |
+| OQ-6 | 选哪家云端语音转文字 API | **已按 runbook 选定阿里云智能语音交互 NLS**：项目 `soniscope`，endpoint `cn-beijing`，模型 `中文普通话（识音石 V1 - 端到端模型)`，无免费额度；后续若调整必须同步更新 PRD + tech-spec + runbook | US-001 (E) / tech-spec.md §6.2 / US-017 |
 | OQ-7 | NLS 拉 OSS URL vs Worker 直传 | **方案 A：传 OSS 签名 URL 让 NLS 自己拉**（更省流量）；不支持的 provider 降级到方案 B | US-017 |
 | OQ-8 | 前端 manifest 元数据如何送达 Worker | **OSS 用户自定义元数据（`x-oss-meta-*`）**：前端 PutObject 时附带元数据（完整 key 清单见 tech-spec §3.2），Worker 通过 OSS API 读回 | US-011 / US-012 / US-015 / tech-spec §3.2 ADR-8 |
 

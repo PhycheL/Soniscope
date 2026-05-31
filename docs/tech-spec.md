@@ -13,8 +13,8 @@
 | 层 | 组件 | 职责 |
 |---|---|---|
 | 手机端 | 微信小程序 | 录音、中断保护、草稿管理、本地缓存、调用 FC（静默登录 + 拿临时凭证）、直传音频到 OSS、调用 FC 验证上传、上传列表呈现 |
-| 云端（无服务器） | 阿里云函数计算 FC | 校验 openid → 为指定 Fragment 签发**单文件级别**的 STS 临时凭证；提供 `/verify-upload` 接口对 OSS 做 HeadObject 校验 |
-| 云端（存储） | 阿里云 OSS（私有 Bucket）| 静默存储音频文件，无计算能力；作为长期备份 |
+| 云端（无服务器） | 阿里云函数计算 FC 3.0（两个顶级 Web 函数，无 service 层级） | 校验 openid → 为指定 Fragment 签发**单文件级别**的 STS 临时凭证；提供 `/verify-upload` 接口对 OSS 做 HeadObject 校验 |
+| 云端（存储） | 阿里云 OSS（私有 Bucket：`soniscope-audio`，region `cn-beijing`）| 静默存储音频文件，无计算能力；作为长期备份 |
 | 后端 | Python Worker | 可配置频率轮询 OSS → 下载 → 格式标准化 → 幂等去重 → 调用云端 API 转写 → 按文件状态机落盘 |
 
 ### 1.2 架构图
@@ -23,7 +23,7 @@
 flowchart TD
     MiniProgram["微信小程序"]
     FC["阿里云函数计算 FC<br/>- 校验 openid allowlist<br/>- 调用 STS 签发单文件级别临时凭证"]
-    OSS[(阿里云 OSS<br/>私有 Bucket)]
+    OSS[(阿里云 OSS<br/>私有 Bucket soniscope-audio<br/>cn-beijing)]
     Worker["Python Worker<br/>- 下载到 .part → 校验 sha256 → 格式标准化 → 原子 rename<br/>- 幂等判断（.done 标记 → 跳过已完成 Fragment）<br/>- 调用云端 API 转写 → 写 transcript.json.tmp → rename<br/>- 写 .done 完成标记 + 写 / 更新 manifest.json"]
 
     MiniProgram -- "① wx.login → code<br/>② POST /issue-credential<br/>{ code, fragment_id, size }" --> FC
@@ -106,14 +106,14 @@ flowchart TD
 3. 顶层 Makefile 提供统一命令入口，用户无需进入子目录。
 4. 本期不抽共享 Python 包；FC 与 Worker 如有重复逻辑各自保留。
 5. 构建产物落 `build/`，已 gitignore。
-6. **FC 命名双轨**：目录用 snake_case（`apps/fc/issue_credential/`），HTTP URL path 用 kebab-case（`/issue-credential`）。`make` 参数中 `FUNCTION=` 接受 snake_case 目录名（如 `make deploy-fc FUNCTION=issue_credential`），`make fc-logs FUNCTION=` 接受 kebab-case URL 名（因为日志按函数 URL 路由查询）。
+6. **FC 3.0 命名**：阿里云侧函数是顶级 Web 函数，**没有 service 层级**；云端函数名 / URL 子域名前缀用 kebab-case（`issue-credential` / `verify-upload`）。代码目录可保留 snake_case（如 `apps/fc/issue_credential/`），但 `make deploy-fc FUNCTION=` / `make rollback-fc FUNCTION=` / `make fc-logs FUNCTION=` 以云端函数名为准（kebab-case）。
 7. **Worker 模块清单**（`apps/worker/src/soniscope_worker/`）：`__init__.py` / `__main__.py` / `cli.py` / `config.py` / `paths.py`（后续 story 按需扩展）。
 
 ### 2.2 运行时数据目录
 
 ```mermaid
 flowchart TD
-    home["~/SoniScope/<br/>$SONISCOPE_HOME（默认）"]
+    home["/Volumes/Data/software/SoniScope/<br/>$SONISCOPE_HOME（本项目实际值）"]
     inbox["inbox/<br/>临时下载区"]
     part["&lt;fragment_id&gt;.part<br/>下载中"]
     failed["failed/<br/>转码失败留档（不参与轮询重试）"]
@@ -151,7 +151,7 @@ flowchart TD
 
 ```yaml
 oss:
-  endpoint: oss-cn-hangzhou.aliyuncs.com
+  endpoint: oss-cn-beijing.aliyuncs.com
   bucket: soniscope-audio
   access_key_id: <soniscope-local-reader 的 AK ID>
   access_key_secret: <soniscope-local-reader 的 AK Secret>
@@ -160,9 +160,9 @@ poll:
 transcriber:
   name: cloud-speech              # 工厂方法选择：cloud-speech | whisper-local
   provider: aliyun-nls
-  model: paraformer-v2
+  model: "中文普通话（识音石 V1 - 端到端模型)"
   params_version: v1
-  api_endpoint: <NLS endpoint>
+  api_endpoint: cn-beijing
   appkey: <NLS AppKey>
   access_key_id: <调用 NLS 的 AK>
   access_key_secret: <调用 NLS 的 AK Secret>
@@ -171,7 +171,7 @@ transcriber:
     enabled: false                # whisper-local 子配置开关，不参与工厂选择（工厂只看 name）
 ```
 
-**加载顺序**：① `$SONISCOPE_HOME/config.yaml` → ② `~/SoniScope/config.yaml`（即 `SONISCOPE_HOME` 默认值）。两个路径实际可能指向同一个文件；找不到时报错并提示用户参考 PRD US-001 (H)。
+**加载顺序**：① `$SONISCOPE_HOME/config.yaml` → ② `~/SoniScope/config.yaml`（未设置 `SONISCOPE_HOME` 时的兜底默认）。本项目实际 `SONISCOPE_HOME=/Volumes/Data/software/SoniScope`，因此实际配置文件为 `/Volumes/Data/software/SoniScope/config.yaml`；找不到时报错并提示用户参考 PRD US-001 (H)。
 
 用 Pydantic v2 定义 `SoniScopeConfig` 模型。敏感字段（`access_key_secret` / `appkey` / `api_key`）在 `__repr__` / 日志中只显示前后 4 位。缺失必填字段时一次性列出所有缺失项。
 
@@ -256,7 +256,7 @@ recordings/<YYYY-MM-DD>/<fragment_id>.wav
     "completed_at": "2026-05-26T14:49:12+08:00",
     "elapsed_seconds": 12.3,
     "transcriber": "cloud-speech",
-    "model": "paraformer-v2",
+    "model": "中文普通话（识音石 V1 - 端到端模型)",
     "params_version": "v1",
     "provider": "aliyun-nls",
     "upload_mode": "oss-url"
@@ -277,7 +277,7 @@ recordings/<YYYY-MM-DD>/<fragment_id>.wav
     { "start": 2.5, "end": 5.1, "text": "我准备去公园跑步" }
   ],
   "language": "zh",
-  "model": "paraformer-v2",
+  "model": "中文普通话（识音石 V1 - 端到端模型)",
   "params_version": "v1",
   "provider": "aliyun-nls"
 }
@@ -362,9 +362,9 @@ FC 函数运行时依赖以下环境变量（在 FC 控制台 → 服务配置�
 | 变量名 | 说明 | 示例 / 备注 |
 |---|---|---|
 | `OSS_BUCKET` | OSS Bucket 名 | `soniscope-audio` |
-| `OSS_REGION` | Bucket 所在 region | `cn-hangzhou` |
-| `OSS_ENDPOINT` | OSS endpoint | `oss-cn-hangzhou.aliyuncs.com` |
-| `RAM_ROLE_ARN` | STS AssumeRole 的角色 ARN | `acs:ram::*:role/soniscope-uploader-role` |
+| `OSS_REGION` | Bucket 所在 region | `cn-beijing` |
+| `OSS_ENDPOINT` | OSS endpoint | `oss-cn-beijing.aliyuncs.com` |
+| `RAM_ROLE_ARN` | STS AssumeRole 的角色 ARN | `acs:ram::1633875501759333:role/soniscope-uploader-role` |
 | `ALIYUN_AK_ID` | FC 子账号 `soniscope-fc` 的 AK ID | — |
 | `ALIYUN_AK_SECRET` | FC 子账号 `soniscope-fc` 的 AK Secret | — |
 | `WX_APPID` | 微信小程序 AppID | — |
@@ -373,6 +373,8 @@ FC 函数运行时依赖以下环境变量（在 FC 控制台 → 服务配置�
 | `MAX_UPLOAD_BYTES` | 上传大小上限（可选，默认 52428800 = 50MB） | §4.1 使用 |
 
 > PRD US-001(H) 负责定义人工注入流程，本表是变量名与语义的**唯一权威定义**。
+>
+> FC 3.0 实际公网 URL 以 runbook 为准：`issue-credential` = `https://issue-cedential-ottfirocds.cn-beijing.fcapp.run`；`verify-upload` = `https://verify-upload-nnjpaoamhw.cn-beijing.fcapp.run`。微信小程序 `request` 合法域名必须分别加入这两个 URL；`uploadFile` 合法域名为 `https://soniscope-audio.oss-cn-beijing.aliyuncs.com`。
 
 ### 4.1 FC `/issue-credential`
 
@@ -402,7 +404,7 @@ FC 函数运行时依赖以下环境变量（在 FC 控制台 → 服务配置�
   "security_token": "...",
   "expiration": "2026-05-26T15:03:00Z",
   "bucket": "soniscope-audio",
-  "endpoint": "oss-cn-hangzhou.aliyuncs.com",
+  "endpoint": "oss-cn-beijing.aliyuncs.com",
   "object_key": "recordings/2026-05-26/20260526T144800_dev01_01HZX3K8MN5PQR9TFB7AYWVCDE.wav"
 }
 ```
@@ -529,7 +531,7 @@ class Transcriber(Protocol):
 class TranscriptResult:
     segments: list[Segment]   # [{"start": float, "end": float, "text": str}, ...]
     language: str              # e.g. "zh"
-    model: str                 # e.g. "paraformer-v2"
+    model: str                 # e.g. "中文普通话（识音石 V1 - 端到端模型)"
     params_version: str        # e.g. "v1"
     provider: str              # e.g. "aliyun-nls"
     duration: float            # 音频总时长（秒）；仅内存使用，不落盘到 transcript.json
@@ -564,7 +566,7 @@ class TranscriptResult:
   | `mock-verify-fail` | `/verify-upload` 永远返回 `verified: false` | US-013 verify 失败 → 待人工 verify |
 
 - **OSS 直传**：必须使用 STS 临时凭证 + V4 签名直传，不走 FC 中转
-- **Worker 运行环境**：Python 3.11+，无 GPU 要求（本期不做本地推理）；`$SONISCOPE_HOME` 所在磁盘可用空间 ≥ 50GB（音频积压 + 转写文件长期保留预留）；系统工具依赖 `git` / `make` / `curl` / `ffmpeg` / `ffprobe`
+- **Worker 运行环境**：当前验证主机为 Mac Studio M4 Max（macOS 26.5，Python 3.13.2，`SONISCOPE_HOME=/Volumes/Data/software/SoniScope`，可用磁盘 2.38TB）；代码仍要求 Python 3.11+，无 GPU 要求（本期不做本地推理）；`$SONISCOPE_HOME` 所在磁盘可用空间 ≥ 50GB（音频积压 + 转写文件长期保留预留）；系统工具依赖 `git` / `make` / `curl` / `ffmpeg` / `ffprobe`
 - **音频 sha256**：前端用 wasm-crypto 或类似库计算，避免主线程阻塞
 - **小程序 SDK 接口约定**：
 
@@ -579,7 +581,7 @@ class TranscriptResult:
 
 ### 6.2 云端 ASR 选型
 
-暂定**阿里云智能语音交互 NLS 录音文件极速版**。理由：与 OSS 同账号 / 同 region 免外网流量 / 有免费额度 / 支持 OSS URL 拉取。备选：OpenAI Whisper API、通义听悟。
+本项目实际选用**阿里云智能语音交互 NLS**（项目 `soniscope`，endpoint `cn-beijing`，模型 `中文普通话（识音石 V1 - 端到端模型)`，无免费额度）。理由：与 OSS 同账号 / 同 region（北京）便于权限与链路管理 / 支持 OSS URL 拉取。备选：OpenAI Whisper API、通义听悟。
 
 ### 6.3 依赖清单
 
@@ -591,9 +593,22 @@ class TranscriptResult:
 | Worker（Python） | `alibabacloud-oss-v2`、`pyyaml`、`pydantic>=2`、`typer`、`alibabacloud-nls20180628`；**本期不装** `faster-whisper` / `whisper.cpp` |
 | Worker（系统二进制） | `ffmpeg` + `ffprobe`（各种音频格式 → WAV 转码 + 格式检测）；缺失则启动失败并提示安装方式 |
 
+### 6.3.1 测试基线音频素材
+
+测试音频二进制**不进 git**，存于 OSS 私有 Bucket `soniscope-audio` 的 `sample/` 前缀；本地通过 `python3 scripts/fetch_test_fixtures.py` 按 sha256 拉取到 `tests/audio/`，清单为 `tests/audio/fixtures.manifest.json`。sha256 以 runbook §6 为准：
+
+| 文件 | 期望 duration | 期望 codec | sha256 |
+|---|---|---|---|
+| `sample-20s.wav` | ≈ 20s | wav | `b07dee76f9cab9cf4ed9ba482e7a6287409180fc05e476365bd9a92f665b7828` |
+| `sample-54s.wav` | ≈ 60s | wav | `9c454b212654f8948557123d9bc16d78ea6b2cf425484fca195b60fe9c7c9cde` |
+| `sample-25min.wav` | ≈ 1500s | wav | `34db505eb44f93fd092e868664979c155ebbbb6c0a61019dd840b30d276cdb27` |
+| `sample-20s.m4a` | ≈ 20s | m4a | `d3d2866128efe258ff95e841a16e7abb4d783fd37536692932a875f9fb5380fd` |
+
 ### 6.4 FC 部署与运维
 
-**打包**：`make deploy-fc` 脚本为每个 FC 函数独立打包（`handler.py` + 依赖）→ 上传至阿里云 FC。打包产物落 `build/fc/<function_name>/`。
+**FC 形态**：本项目使用 FC 3.0 顶级 Web 函数，**不创建 / 不依赖 `soniscope-svc` service 层级**。实际云端函数名为 `issue-credential`、`verify-upload`，分别有独立的 `*.cn-beijing.fcapp.run` 公网 URL。
+
+**打包**：`make deploy-fc` 脚本为每个 FC 函数独立打包（`handler.py` + 依赖）→ 上传至阿里云 FC 3.0 对应顶级函数。打包产物落 `build/fc/<function_name>/`。
 
 **备份**：部署前自动备份当前线上版本到 `build/fc/backup/<YYYYMMDD-HHMMSS>/<function_name>.zip`，含函数代码 + 环境变量快照（仅变量名，不含值）。
 
@@ -628,9 +643,9 @@ class TranscriptResult:
 | `typecheck` | — | mypy strict | US-002 |
 | `lint` | — | ruff | US-002 |
 | `test` | — | pytest（单元测试，mock 云端） | US-002 |
-| `deploy-fc` | `FUNCTION=<snake_name>` | 打包 + 上传 FC 函数（见 §6.4） | US-003 |
-| `rollback-fc` | `FUNCTION=<snake_name>` | 从最新备份恢复 FC 函数 | US-003 |
-| `fc-logs` | `FUNCTION=<kebab-name>` | 拉取近 1 小时 FC 日志 | US-003 |
+| `deploy-fc` | `FUNCTION=<function-name>` | 打包 + 上传 FC 函数（见 §6.4；如 `issue-credential` / `verify-upload`） | US-003 |
+| `rollback-fc` | `FUNCTION=<function-name>` | 从最新备份恢复 FC 函数（如 `issue-credential` / `verify-upload`） | US-003 |
+| `fc-logs` | `FUNCTION=<function-name>` | 拉取近 1 小时 FC 日志（如 `issue-credential` / `verify-upload`） | US-003 |
 | `test-fc-live` | — | FC 云端联调（正例 + 反例） | US-003 |
 | `test-verify-upload` | — | FC `/verify-upload` 云端联调 | US-005 |
 | `retranscribe` | `FRAGMENT_ID=<id>` 或 `ARGS="--all-from <date> --upgrade"` | 显式重转 CLI 入口（单条用 FRAGMENT_ID，批量用 ARGS） | US-018 |
@@ -650,7 +665,7 @@ class TranscriptResult:
 | `show-oss-object` | `FRAGMENT_ID=<id>` | 查看单个 OSS 对象详情 / 访问日志 | US-012 |
 | `oss-delete-obj` | `FRAGMENT_ID=<id>` | **仅测试用**：删除 OSS 对象（模拟 verify 失败场景，见下方红线说明）| US-005 |
 
-> 上述 target 随 story 实现逐步添加。`FUNCTION=` 参数用 snake_case 目录名（deploy/rollback）或 kebab-case URL 名（fc-logs），见 §2.1 约定 6。
+> 上述 target 随 story 实现逐步添加。`FUNCTION=` 参数统一使用云端函数名（kebab-case：`issue-credential` / `verify-upload`），见 §2.1 约定 6；如实现层代码目录用 snake_case，部署脚本负责映射。
 >
 > **红线说明**：「OSS 永不删除」约束的主体是 **Worker 业务路径**（PRD FR-11 / R-07）。测试 / 运维脚本（如 `oss-delete-obj`、`ossutil rm`）用于构造验证场景，不受此约束，但必须标注 `仅测试用` 且不出现在 Worker 源码中。
 
@@ -658,11 +673,12 @@ class TranscriptResult:
 
 | 项 | 月成本 |
 |---|---|
-| FC 调用（含 issue + verify）| ¥0（免费额度内）|
+| FC 调用（含 issue + verify）| 约 ¥1.00/月（按 runbook 当前调用规模估算） |
 | STS 调用 | ¥0（免费）|
-| OSS 存储（1TB）| ~¥120 |
-| 云端 ASR（日均 30 分钟）| 视免费额度（开发期通常免费）|
-| **合计** | **~¥120/月** |
+| OSS 存储（约 1.6GB WAV/月）| 约 ¥0.19/月 |
+| OSS 外网流出（Worker 经外网下载约 1.6GB/月）| 约 ¥0.78/月 |
+| 云端 ASR（日均 30 分钟 × 30 天 = 15 小时/月）| 2.5 元/小时 × 15 小时 = ¥37.50/月（无免费额度） |
+| **合计** | **约 ¥39.47/月** |
 
 ### 6.7 前端上传状态机
 
@@ -702,7 +718,7 @@ stateDiagram-v2
 
 ### 6.8 成本可观测日志
 
-Worker 每次调用 ASR API 后输出结构化日志行，用于监控免费额度消耗：
+Worker 每次调用 ASR API 后输出结构化日志行，用于监控 ASR 用量与成本（当前 runbook 登记为无免费额度）：
 
 ```json
 {
@@ -711,7 +727,7 @@ Worker 每次调用 ASR API 后输出结构化日志行，用于监控免费额�
   "audio_duration_seconds": 87.5,
   "elapsed_seconds": 12.3,
   "provider": "aliyun-nls",
-  "model": "paraformer-v2",
+  "model": "中文普通话（识音石 V1 - 端到端模型)",
   "estimated_cost_yuan": 0.06,
   "cumulative_calls_today": 15,
   "cumulative_duration_today_seconds": 1200.0
@@ -776,8 +792,8 @@ Worker 每次调用 ASR API 后输出结构化日志行，用于监控免费额�
 
 ### ADR-6：云端 ASR 选型（原 OQ-6）
 
-- **决策**：暂定阿里云 NLS 录音文件极速版；实测有障碍可调整。
-- **理由**：同账号 / 同 region / 免费额度 / 支持 OSS URL 拉取。
+- **决策**：按 runbook 选定阿里云智能语音交互 NLS；项目 `soniscope`，endpoint `cn-beijing`，模型 `中文普通话（识音石 V1 - 端到端模型)`，无免费额度。
+- **理由**：同账号 / 同 region（北京）/ 支持 OSS URL 拉取；成本按 runbook 当前基线约 ¥39.47/月。
 
 ### ADR-7：NLS 拉 OSS URL vs Worker 直传（原 OQ-7）
 
