@@ -981,6 +981,20 @@ cd my_soniscope</pre>
         <tr><td><code class="inline">OPENID_ALLOWLIST</code></td><td>D-4 拿到的真机 openid（单值或逗号分隔多值）</td></tr>
       </table>
 
+      <h4 class="sub-title">JSON 模板（用于批量录入 / 同步）</h4>
+<pre>{
+  "OSS_BUCKET": "soniscope-audio",
+  "OSS_REGION": "cn-beijing",
+  "OSS_ENDPOINT": "oss-cn-beijing.aliyuncs.com",
+  "RAM_ROLE_ARN": "acs:ram::&lt;UID&gt;:role/soniscope-uploader-role",
+  "ALIYUN_AK_ID": "&lt;B-1 soniscope-fc 的 AK ID&gt;",
+  "ALIYUN_AK_SECRET": "&lt;B-1 soniscope-fc 的 AK Secret&gt;",
+  "WX_APPID": "&lt;D-1 小程序 AppID&gt;",
+  "WX_APP_SECRET": "&lt;D-1 小程序 AppSecret&gt;",
+  "OPENID_ALLOWLIST": "&lt;D-4 真机 openid，多个用英文逗号分隔&gt;"
+}</pre>
+      <p style="font-size: 13.5px; color: var(--muted);">这份 JSON 只作为录入模板；实际文件和 runbook 中不要保存明文 Secret。填好后分别同步到 <code class="inline">issue-credential</code> 与 <code class="inline">verify-upload</code> 两个函数。</p>
+
       <h3 class="step-title">H-2 Worker <code class="inline">~/SoniScope/config.yaml</code></h3>
       <p style="font-size: 13.5px;">在 G 块选定的 Worker 主机上创建配置文件，注入 OSS 读凭证 + ASR 凭证：</p>
 <pre>oss:

@@ -2,9 +2,11 @@
 """拉取测试音频 fixture。
 
 音频二进制不进 git，存于阿里云 OSS 私有 bucket。本脚本读取
-`tests/audio/fixtures.manifest.json`，用 `$SONISCOPE_HOME/config.yaml`
-（或 `~/SoniScope/config.yaml`）中的 OSS 只读凭证，把每个 fixture 下载到
-本地并按 sha256 校验。
+`tests/audio/fixtures.manifest.json`，用工作目录下 `config.yaml` 中的 OSS
+只读凭证，把每个 fixture 下载到本地并按 sha256 校验。
+
+工作目录按以下优先级解析（与 scripts/gen_worker_config.sh 一致，以 runbook 为准）：
+runbook §7 的 `SONISCOPE_HOME` → 环境变量 `$SONISCOPE_HOME` → `~/SoniScope`。
 
 下载遵循项目三段式协议：先写 `<name>.part` → 校验 size + sha256 → 原子
 rename 为最终文件。已存在且 sha256 匹配的文件直接跳过（幂等）。
@@ -21,11 +23,13 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 MANIFEST_PATH = REPO_ROOT / "tests" / "audio" / "fixtures.manifest.json"
+RUNBOOK_PATH = REPO_ROOT / "docs" / "runbook" / "cloud-setup.md"
 _CHUNK = 1024 * 1024
 
 
@@ -42,12 +46,33 @@ def sha256_of(path: Path) -> str:
     return h.hexdigest()
 
 
+def runbook_home() -> "str | None":
+    """从 runbook §7「工作目录环境变量：`SONISCOPE_HOME=...`」读取工作目录。
+
+    runbook（docs/runbook/cloud-setup.md）是工作目录的权威来源，与
+    scripts/gen_worker_config.sh 保持一致：两个脚本必须指向同一个 config.yaml。
+    """
+    if not RUNBOOK_PATH.is_file():
+        return None
+    m = re.search(r"SONISCOPE_HOME=([^\s`]+)", RUNBOOK_PATH.read_text(encoding="utf-8"))
+    return m.group(1) if m else None
+
+
 def resolve_config_path() -> Path:
-    home = os.environ.get("SONISCOPE_HOME")
+    # 目录来源优先级（以 runbook 为准）：runbook §7 → $SONISCOPE_HOME → ~/SoniScope
     candidates = []
+    rb = runbook_home()
+    if rb:
+        candidates.append(Path(rb).expanduser() / "config.yaml")
+    home = os.environ.get("SONISCOPE_HOME")
     if home:
         candidates.append(Path(home).expanduser() / "config.yaml")
     candidates.append(Path("~/SoniScope/config.yaml").expanduser())
+
+    # 去重保序
+    seen: set[Path] = set()
+    candidates = [p for p in candidates if not (p in seen or seen.add(p))]
+
     for p in candidates:
         if p.is_file():
             return p
@@ -55,8 +80,8 @@ def resolve_config_path() -> Path:
     _fail(
         "找不到 config.yaml，已尝试以下路径：\n  "
         f"{tried}\n"
-        "请参考 PRD US-001 (H) 准备运行时配置，其中需包含 oss.access_key_id / "
-        "oss.access_key_secret（soniscope-local-reader 只读凭证）。"
+        "请先运行 scripts/gen_worker_config.sh 生成运行时配置，其中需包含 "
+        "oss.access_key_id / oss.access_key_secret（soniscope-local-reader 只读凭证）。"
     )
 
 
