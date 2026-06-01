@@ -81,6 +81,36 @@
   color: #333333;
 }
 
+/* 草稿信息（停止录音后显示） */
+.draft-info {
+  margin-top: 24px;
+  padding: 20px;
+  background-color: #f0f9f0;
+  border-radius: 12px;
+  width: 300px;
+  text-align: left;
+}
+
+.draft-label {
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
+  color: #07c160;
+  margin-bottom: 12px;
+}
+
+.draft-detail {
+  display: flex;
+  flex-direction: column;
+}
+
+.draft-item {
+  font-size: 13px;
+  color: #666666;
+  margin-bottom: 6px;
+  word-break: break-all;
+}
+
 .nav-section {
   margin-top: 40px;
 }

@@ -18,6 +18,16 @@
     <view class="record-timer" wx:if="{{recording}}">
       <text class="timer-text">{{timerDisplay}}</text>
     </view>
+
+    <!-- 草稿信息（停止录音后显示） -->
+    <view class="draft-info" wx:if="{{draftSaved && !recording}}">
+      <text class="draft-label">草稿已保存</text>
+      <view class="draft-detail">
+        <text class="draft-item">时长：{{draftDurationDisplay}}</text>
+        <text class="draft-item">原始格式：{{draftFormat}}</text>
+        <text class="draft-item">OSS Key：{{draftOssKeyPreview}}</text>
+      </view>
+    </view>
   </view>
 
   <!-- 导航到上传列表 -->
