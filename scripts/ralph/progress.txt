@@ -15,6 +15,14 @@
 - `scripts/` 下独立脚本不在 uv workspace 内，测试时应 `sys.path.insert(0, ...)` 导入函式，而非 subprocess 调用。
 - ffprobe `-of csv` 输出对含逗号的 format_name 加引号，需 `.strip('"')` 处理。
 - `subprocess.run()` 运行在独立解释器中，patch 模块级常量无效 — 只测函式逻辑。
+- FC 3.0 目录约定：源码用 snake_case（`issue_credential`），云端函数名用 kebab-case（`issue-credential`），`FUNCTION_DIR_MAP` 映射两者。
+- FC 函数间共享代码放在 `apps/fc/shared/`，每个函数独立打包时以 `shared/` 前缀写入 zip。
+- FC 共享模块优先使用 Python stdlib（`urllib.request`、`hmac`、`hashlib`），减少部署依赖。
+- FC safe_handler 是统一包装器：JSON 解析 → 字段校验 → 鉴权 → 业务逻辑 → 错误映射 — 新 FC 函数只需实现 `_handle(data, openid, t_start)`。
+- `apps/fc/<function>/` 目录需要 `__init__.py` 文件才能被 pytest 以包形式导入测试。
+- 阿里云云 API（STS 等）HMAC-SHA1 v1 签名使用 `GET&%2F&<percent-encoded-canonical-query>` 模式签名。`SignatureNonce` 用 `uuid.uuid4().hex`。
+- AuthError 支持 `extra` dict 字段，在 auth_error_to_response 中合并到 JSON body — 用于 SIZE_EXCEEDED 等需要额外字段的错误响应。
+- 当 SharedConfig (NamedTuple) 增加字段时，所有测试的 `_set_env` fixture 和 `os.environ.update({...})` 都需要补齐新字段。
 
 ## 2026-06-01 23:59 - US-003
 - 实现了测试音频 fixture duration 和 codec 校验功能
@@ -93,26 +101,25 @@
   - 有用的上下文: US-006 完成后，US-007（issue-credential STS）和 US-009（verify-upload HeadObject）只需实现 `_handle` 业务逻辑即可
 ---
 
-## 2026-06-02 01:05 - US-006
-- 实现了 FC 共享鉴权、请求校验与安全日志模块
+## 2026-06-02 01:30 - US-007
+- 实现了 FC issue-credential STS 单文件凭证签发
 - 更改的文件:
-  - `apps/fc/shared/__init__.py` (new) — 共享模块入口，导出所有公共 API
-  - `apps/fc/shared/auth.py` (new) — 鉴权核心：jscode2session 换 openid、OPENID_ALLOWLIST 校验、safe_handler 统一入口、parse_request_body、require_fields、AuthError
-  - `apps/fc/shared/config.py` (new) — 环境变量读取与校验，SharedConfig 命名元组
-  - `apps/fc/shared/errors.py` (new) — 稳定错误码常量与 HTTP 响应构建器
-  - `apps/fc/shared/logging.py` (new) — 安全日志：openid 哈希化（SHA-256 前 12 位）、不记录 code/AK/Secret/Token
-  - `apps/fc/issue_credential/handler.py` (modified) — 使用 shared 模块的 safe_handler
-  - `apps/fc/verify_upload/handler.py` (modified) — 使用 shared 模块的 safe_handler
-  - `scripts/deploy_fc.py` (modified) — _package_function 自动收集 shared/ 目录文件并打包到 zip
-  - `apps/worker/tests/test_us006.py` (new) — 30 个测试覆盖 config、errors、parse、require_fields、authenticate、safe_logging、safe_handler 集成、shared 导入兼容性、部署打包
-  - `apps/worker/tests/test_us005.py` (modified) — 更新 handler 导入测试以适配 safe_handler 校验逻辑
+  - `apps/fc/shared/sts.py` (new) — 使用 HMAC-SHA1 (v1) 签名调用阿里云 STS AssumeRole REST API；纯 stdlib 实现
+  - `apps/fc/shared/config.py` (modified) — SharedConfig 增加 RAM_ROLE_ARN, ALIYUN_AK_ID, ALIYUN_AK_SECRET
+  - `apps/fc/shared/auth.py` (modified) — AuthError 增加 extra 字段（SIZE_EXCEEDED 需要返回 limit_bytes/actual_bytes）
+  - `apps/fc/shared/__init__.py` (modified) — 导出 issue_sts_credential
+  - `apps/fc/issue_credential/handler.py` (modified) — 实现 _handle 业务逻辑：size 校验 → fragment_id 解析 → STS 签发
+  - `apps/fc/issue_credential/__init__.py` (new) — 使目录可作为 Python 包导入（测试用）
+  - `apps/fc/verify_upload/__init__.py` (new) — 同上
+  - `apps/worker/tests/test_us007.py` (new) — 27 个测试
+  - `apps/worker/tests/test_us005.py` (modified) — 适配新增 3 个 env vars
+  - `apps/worker/tests/test_us006.py` (modified) — 适配新增 3 个 env vars
 - **未来迭代的学习：**
-  - 发现的 patterns: FC 3.0 顶级 Web 函数无 service 层级，`shared/` 模块放在 `apps/fc/shared/`，部署时打包到每个函数的 zip 中
-  - 发现的 patterns: FC handler 用 `sys.path.insert(0, _FC_ROOT)` 确保 shared 可导入（因为 FC 3.0 运行时不会把上级目录放入 sys.path）
-  - 发现的 patterns: deploy_fc.py 的 `_package_function` 需同时收集函数专属文件和 shared/ 文件，shared/ 文件在 zip 中的 arcname 保持 `shared/` 前缀
-  - 发现的 patterns: jscode2session 使用 stdlib `urllib.request`，不引入额外 FC 依赖
-  - 发现的 patterns: safe_handler 是统一的 FC handler 包装器，处理 JSON 解析、字段校验、鉴权、错误映射全流程
-  - 遇到的陷阱: 旧 US-005 测试用空 body `{}` 调 handler 期望 200，shared auth 引入后正确返回 400（bad request），需要更新旧测试传入有效 JSON body
-  - 有用的上下文: auth.py 的 `_code_to_openid` 被 mock 以便单元测试，`safe_handler` 调用 `authenticate` 后调用业务函数
-  - 有用的上下文: US-006 完成后，US-007（issue-credential STS）和 US-009（verify-upload HeadObject）只需实现 `_handle` 业务逻辑即可
+  - 发现的 patterns: FC 函数代码目录需要 `__init__.py` 才能在 pytest 中作为包导入（`from issue_credential.handler import handler`）
+  - 发现的 patterns: 阿里云 STS AssumeRole REST API 使用 HMAC-SHA1 v1 签名（`SignatureMethod=HMAC-SHA1`、`SignatureVersion=1.0`）
+  - 发现的 patterns: Policy JSON 放入 URL query string 前需要百分号编码
+  - 发现的 patterns: AuthError 添加 extra 字段可让业务层返回额外 JSON 字段（如 SIZE_EXCEEDED 的 limit_bytes/actual_bytes）
+  - 遇到的陷阱: SharedConfig 增加字段会破坏所有未设置新 env var 的测试，需要逐一定位并注入
+  - 有用的上下文: fragment_id 的日期解析从 `<YYYYMMDD>T<HHMMSS>_...` 中拆分，用 `T` 作为分隔符
+  - 有用的上下文: issue_credential 的 handler 将 STS 后端错误映射为 502（INTERNAL_ERROR after masking），避免泄露内部错误细节
 ---
