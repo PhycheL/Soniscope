@@ -27,7 +27,8 @@
 - 小程序常量定义在 utils/constants.js 中集中管理（FC URL、OSS domain、分片阈值、状态枚举），不使用 process.env。
 - 小程序安全日志工具（utils/logger.js）对敏感字段名（access_key_secret/appsecret/token 等）自动脱敏，避免打印明文。
 - `node -c` 用于 Makefile 中的小程序 JS 语法快速检查。
-- 小程序测试用纯文件内容正则匹配验证代码结构和字段存在性，不模拟 wx API 调用（微信 API 只能在 DevTools/真机环境运行）。
+- 小程序测试用纯文件内容正则匹配验证代码结构和字段存在性，不模拟 wx API 调用（微信 API 只能在 DevTools/真机环境运行）
+- 草稿确认态使用 `draftPreviewMode` 布尔值替代早期 US-012 的 `draftSaved` 字段，两者语义不同：`draftPreviewMode` 表示整页进入确认态（显示试听/重录/删除/保存并上传），`draftSaved` 只是简单标记草稿已保存。后续测试检查草稿确认态应搜索 `draftPreviewMode`。。
 
 ## 2026-06-01 23:59 - US-003
 - 实现了测试音频 fixture duration 和 codec 校验功能
@@ -232,4 +233,42 @@
   - 遇到的陷阱: 微信真机临时音频文件名不一定包含扩展名，需要同时检测扩展名并保留 'unknown' 回退
   - 有用的上下文: US-012 完成后 US-013（录音中断保护）可直接在此基础上添加 onInterruptionBegin 和 onHide 中断逻辑
   - 有用的上下文: 需要微信开发者工具模拟器或真机验证录音和 original_format 日志 — 自动测试只能验证代码结构和语法
+---
+
+## 2026-06-02 05:30 - US-013
+- 实现了小程序录音中断保护与草稿恢复提示
+- 更改的文件:
+  - `apps/miniprogram/pages/index/index.js` (modified) — 添加 onInterruptionBegin 回调注册、_handleInterruption 中断处理（支持 interruption/hide 两种来源）、_saveInterruptedDraft/ _checkInterruptedDraft/_clearInterruptedDraft 中断草稿管理、onKeepDraft/onDiscardDraft/onContinueNew 恢复操作按钮处理、_interrupted 标记防止重复中断、onShow 回到前台检查中断草稿、onHide 切后台时通过 _handleInterruption 而非直接 stop、_doStartRecord 重置 _interrupted 标记
+  - `apps/miniprogram/pages/index/index.wxml` (modified) — 添加中断恢复提示弹窗（showRecoveryModal 条件渲染）：标题"上次录音被中断"、显示已保存草稿时长和格式、保留/丢弃/继续新录三个操作按钮
+  - `apps/miniprogram/pages/index/index.wxss` (modified) — 添加弹窗样式：.recovery-modal-mask 遮罩层、.recovery-modal 内容卡片（圆角+阴影）、.recovery-btn-keep (绿色)/.recovery-btn-discard (红色)/.recovery-btn-new (蓝色) 三色区分按钮
+  - `apps/worker/tests/test_us013.py` (new) — 36 个单元测试覆盖：onInterruptionBegin 注册、中断处理调用 stop、_interrupted 标记、onHide 生命周期中断、中断草稿独立存储 key (soniscope_interrupted_draft)、interrupted 标记字段、duration 记录、清理逻辑、onShow 恢复检查、showRecoveryModal 状态、WXML 弹窗文案、三个按钮 handler（onKeepDraft/onDiscardDraft/onContinueNew）、保留→_saveDraft、丢弃→_clearInterruptedDraft、继续新录→_startRecording、WXML 按钮绑定、条件渲染、弹窗显示时长、重复中断去重、setStorageSync 覆写模式、WXSS 样式完整性、JS 语法、密钥安全、生命周期集成、状态迁移完整性、data 字段声明
+- **未来迭代的学习：**
+  - 发现的 patterns: 中断保护使用 `_interrupted` 内部标记区分 onStop 回调路径（正常停止 vs 中断停止），中断草稿存入独立 storage key `soniscope_interrupted_draft`（覆写模式），回到前台在 onShow 中检查并弹窗
+  - 发现的 patterns: 中断来源有两类：`recorderManager.onInterruptionBegin`（系统中断：锁屏/来电）和 `onHide`（小程序生命周期切后台），统一走 `_handleInterruption(source)` 处理
+  - 发现的 patterns: 恢复弹窗三个按钮各有明确状态迁移：保留→_saveDraft 移入正式草稿列表、丢弃→_clearInterruptedDraft 清理存储、继续新录→清理+_startRecording
+  - 遇到的陷阱: onHide 中不能直接调 `_stopRecording()`（会走正常保存路径），必须改为调 `_handleInterruption('hide')` 设置中断标记后再 stop，确保草稿进入中断存储
+  - 遇到的陷阱: 连续两次中断（如锁屏后又来电）需要在 _handleInterruption 开头检查 `_interrupted` 标记，已标记则直接 return，避免重复 stop 和重复生成草稿
+  - 有用的上下文: 微信小程序的 `recorderManager.onInterruptionBegin` 在锁屏、来电、其他 App 占用麦克风时触发；`onHide` 在切后台、按 Home 键时触发
+  - 有用的上下文: 中断恢复弹窗的"继续新录"按钮直接调用 `_startRecording()` 启动新一轮录音，用户无需手动点录音按钮
+  - 有用的上下文: 需要微信开发者工具模拟器或真机验证中断保护流程（锁屏录音中断→解锁→弹窗→保留/丢弃/继续新录）— 自动测试只能验证代码结构和语法
+---
+
+## 2026-06-02 06:30 - US-014
+- 实现了草稿确认态、试听、重录、删除与保存并上传入口
+- 更改的文件:
+  - `apps/miniprogram/pages/index/index.js` (rewrite) — 新增草稿确认态（draftPreviewMode）数据结构；停止录音后进入草稿确认态而非直接显示草稿信息；试听（wx.createInnerAudioContext 播放/暂停/错误处理/结束时停止）；重录（_clearCurrentDraft + _startRecording）；删除（二次确认弹窗 + 清理草稿 + 退出确认态）；保存并上传（冻结草稿 → 生成 fragmentId → 创建 uploadRecord → 推入 upload_list → 重置确认态）；防重复点击（saveInProgress 标记）；中断恢复弹窗完整保留；onHide 时暂停试听；onUnload 时销毁音频上下文
+  - `apps/miniprogram/pages/index/index.wxml` (rewrite) — 录音区域仅在非草稿确认态显示（wx:if="{{!draftPreviewMode}}"）；新增草稿确认态区域（draft-preview-section）：草稿信息卡片（时长/格式/大小/OSS Key）、试听区域（播放/暂停按钮 + 状态文本）、操作按钮行（重录/删除/保存并上传，颜色区分）；新增 draftFileSize 显示
+  - `apps/miniprogram/pages/index/index.wxss` (rewrite) — 新增 .draft-preview-section/.draft-preview-title 确认态容器样式；新增 .audition-section/.audition-label/.audition-controls/.audition-btn 试听区域样式；新增 .draft-actions/.draft-action-btn/.draft-action-re-record/.draft-action-delete/.draft-action-save-upload 操作按钮样式（蓝/红/绿三色区分）；删除旧的 .draft-info（已移入确认态区域）、.draft-label、.draft-detail、.draft-item（保留在确认态区域内）；保留所有 US-013 中断恢复弹窗样式
+  - `apps/worker/tests/test_us014.py` (new) — 47 个单元测试覆盖：草稿确认态进入、试听（createInnerAudioContext/播放/暂停/状态标记/销毁）、重录（清理草稿+回到录音态）、删除（二次确认/清理/不生成Fragment/退出确认态）、保存并上传（Fragment记录/upload_list/queued状态/Toast/退出确认态）、防重复点击（saveInProgress标记/检查/按钮禁用/重置）、WXML模板完整性（确认态区域/信息显示/试听/暂停/重录/删除/保存上传按钮/中断弹窗保留）、WXSS样式完整性（标题/试听区域/操作按钮颜色区分/中断弹窗保留）、JS语法、密钥安全、Makefile覆盖、状态迁移完整性、Page data字段声明
+  - `apps/worker/tests/test_us012.py` (modified) — 适配 US-014：test_draft_saved_flag 和 test_draft_info_display 从检查 draftSaved 改为接受 draftPreviewMode 或 draftSaved
+- **未来迭代的学习：**
+  - 发现的 patterns: 草稿确认态用 `draftPreviewMode` 布尔值控制显示，录音按钮区域用 `!draftPreviewMode` 隐藏，两者互斥
+  - 发现的 patterns: 试听音频用 `wx.createInnerAudioContext()` 创建，在 onHide 时暂停，在 onUnload 时 destroy，避免音频资源泄漏
+  - 发现的 patterns: Fragment 记录使用 `upload_list` storage key 管理（与 soniscope_drafts 草稿 storage key 分离），状态用 constants.UPLOAD_STATUS.QUEUED
+  - 发现的 patterns: 防重复点击用 `saveInProgress` 标记：onSaveAndUpload 开头检查并提前 return，按钮用 `disabled="{{saveInProgress}}"` + `loading="{{saveInProgress}}"` 双重禁用
+  - 遇到的陷阱: US-012 的旧测试（test_draft_saved_flag / test_draft_info_display）硬编码检查 `draftSaved` 字段名，US-014 改为 `draftPreviewMode` 后需要更新旧测试适配新字段名
+  - 遇到的陷阱: 删除按钮需要二次确认（wx.showModal），用户取消时不执行任何操作，只有确认后才清理草稿并重置确认态
+  - 遇到的陷阱: `onShow` / `onHide` / `_checkInterruptedDraft` 不影响草稿确认态——检测到中断草稿时只显示恢复弹窗，不影响当前草稿确认态的展示
+  - 有用的上下文: 保存并上传触发的 `fragmentId` 生成当前为简化版（YYMMDDTHHMMSS + _temp_ulid），US-015 将替换为完整格式（deviceShortId + 26位ULID）
+  - 有用的上下文: 需要微信开发者工具模拟器或真机验证：录音 5 秒→试听播放/暂停→重录/删除/保存并上传三条分支正常切换→上传列表出现记录— 自动测试只能验证代码结构和语法
 ---
