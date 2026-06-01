@@ -393,3 +393,26 @@
   - 有用的上下文: US-019 是前端最后一个功能 story，完成后小程序前端功能闭环（US-011~US-019，录音→草稿→上传→verify→列表管理）已完整；后续 US-020 是故障注入菜单，US-021+ 是 Worker 后端
   - 有用的上下文: 需要微信开发者工具模拟器或真机验证八种状态中文文案、长录音折叠/展开、离线横幅、chunk 独立重传 — 自动测试只能验证代码结构和语法
 ---
+
+## 2026-06-02 11:30 - US-020
+- 实现了小程序开发者故障注入菜单：dev-injector.js 模块提供运行时可切换的三个故障开关（mock-fc-url-broken / mock-network-offline / mock-verify-fail）
+- 更改的文件:
+  - `apps/miniprogram/utils/dev-injector.js` (new) — 故障注入核心模块：getFlag/setFlag/toggleFlag/getAllFlags/resetAllFlags/isAnyFlagActive，开关状态持久化到 soniscope_dev_flags storage key，getFlag 在 IS_PRODUCTION 时始终返回 false
+  - `apps/miniprogram/pages/dev-menu/dev-menu.{js,json,wxml,wxss}` (new) — 开发者菜单页面：三个 switch 组件实时切换故障注入开关，全部关闭重置按钮，生产环境警告提示
+  - `apps/miniprogram/utils/uploader.js` (modified) — 在 processUploadQueue（mockNetworkOffline）、_fetchSts（mockFcUrlBroken）、_doVerifyUpload（mockFcUrlBroken + mockVerifyFail）三个关键路径集成故障注入检查，VERIFY_FALSE_MOCK_FAILURE / MOCK_FC_FAILURE 归类为 MANUAL_RETRY
+  - `apps/miniprogram/app.json` (modified) — 注册 dev-menu 页面路由
+  - `apps/miniprogram/pages/index/index.js` (modified) — 新增 navigateToDevMenu handler 与 isProduction data 字段
+  - `apps/miniprogram/pages/index/index.wxml` (modified) — 新增"👺 开发者菜单"导航链接（wx:if="{{!isProduction}}"，仅非 production 可见）
+  - `apps/miniprogram/pages/index/index.wxss` (modified) — 新增 .dev-menu-link 橙色链接样式
+  - `Makefile` (modified) — miniprogram-lint 覆盖 dev-injector.js 和 dev-menu.js
+  - `apps/worker/tests/test_us020.py` (new) — 87 个单元测试：dev-injector 模块结构/flag 逻辑/production guard、dev-menu 页面结构/toggle handlers/WXML switch 组件/WXSS 样式、uploader 故障注入集成点、index 入口、app.json 注册、constants IS_PRODUCTION、JS 语法、密钥安全、Makefile 覆盖、页面四文件结构
+- **未来迭代的学习：**
+  - 发现的 patterns: 故障注入模块通过 storage key 持久化开关状态，getFlag 在 IS_PRODUCTION 时直接返回 false 确保生产安全，uploader.js 在关键路径（_fetchSts / _doVerifyUpload / processUploadQueue）的早期 return 前检查开关
+  - 发现的 patterns: 微信小程序 `<switch>` 组件使用 `checked` 绑定状态 + `bindchange` 事件处理切换，适合运行时 toggle 而不是重新编译
+  - 发现的 patterns: MOCK_FC_FAILURE 和 VERIFY_FALSE_MOCK_FAILURE 被归类到 _handleVerifyFailure 的 MANUAL_RETRY 分支，与真实的 OBJECT_NOT_FOUND/SIZE_MISMATCH 行为一致
+  - 遇到的陷阱: uploader.js 中 security-token / access_key_secret 等字段名出现在 OSS PostObject 签名代码的注释和变量名中（US-017 已存在），不是密钥泄漏 — 密钥安全测试只能用 LTAI 模式（阿里云 AK ID 前缀）来扫描
+  - 遇到的陷阱: 编辑 `_doVerifyUpload` 时不小心把 `var data` 的请求 body 覆盖成了 `wx.request` 的参数对象，导致函数结构错误 — 插入代码时要确保不破坏原有变量定义
+  - 有用的上下文: US-020 完成后小程序前端功能全部完成（US-011~US-020），后续 US-021+ 是 Worker 后端实现
+  - 有用的上下文: dev menu 通过 `navigator url="/pages/dev-menu/dev-menu"` 进入，不需要在 app.json 中配置 tabBar（dev menu 不是 tab 页面）
+  - 有用的上下文: 需要微信开发者工具模拟器或真机验证开关切换后上传行为变化（mock-fc-url-broken 录一条 → 3 次重试失败 → 变红手动重传 → 关闭开关 → 重传成功） — 自动测试只能验证代码结构和语法
+---
