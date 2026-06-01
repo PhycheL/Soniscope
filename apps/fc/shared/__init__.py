@@ -28,6 +28,7 @@ from .errors import (
     unauthorized,
 )
 from .logging import get_logger, log_auth_attempt, log_auth_result, log_error, log_request, log_response
+from .oss import HeadObjectResult, head_object
 from .sts import issue_sts_credential
 
 __all__ = [
@@ -59,6 +60,9 @@ __all__ = [
     "log_error",
     "log_request",
     "log_response",
+    # oss
+    "HeadObjectResult",
+    "head_object",
     # sts
     "issue_sts_credential",
 ]
