@@ -37,11 +37,13 @@ def _clean_sys_path() -> None:
 def _clean_env() -> None:
     """Clear FC env vars so tests start from a known state."""
     for var in ("OSS_BUCKET", "OSS_REGION", "OSS_ENDPOINT", "WX_APPID",
-                "WX_APP_SECRET", "OPENID_ALLOWLIST", "MAX_UPLOAD_BYTES"):
+                "WX_APP_SECRET", "OPENID_ALLOWLIST", "MAX_UPLOAD_BYTES",
+                "RAM_ROLE_ARN", "ALIYUN_AK_ID", "ALIYUN_AK_SECRET"):
         os.environ.pop(var, None)
     yield
     for var in ("OSS_BUCKET", "OSS_REGION", "OSS_ENDPOINT", "WX_APPID",
-                "WX_APP_SECRET", "OPENID_ALLOWLIST", "MAX_UPLOAD_BYTES"):
+                "WX_APP_SECRET", "OPENID_ALLOWLIST", "MAX_UPLOAD_BYTES",
+                "RAM_ROLE_ARN", "ALIYUN_AK_ID", "ALIYUN_AK_SECRET"):
         os.environ.pop(var, None)
 
 
@@ -61,6 +63,9 @@ class TestSharedConfig:
         os.environ["OSS_ENDPOINT"] = "oss-cn-beijing.aliyuncs.com"
         os.environ["WX_APPID"] = "wx123"
         os.environ["WX_APP_SECRET"] = "secret456"
+        os.environ["RAM_ROLE_ARN"] = "acs:ram::123:role/test"
+        os.environ["ALIYUN_AK_ID"] = "test-ak"
+        os.environ["ALIYUN_AK_SECRET"] = "test-as"
 
         cfg = read_shared_config()
         assert cfg.oss_bucket == "test-bucket"
@@ -68,14 +73,17 @@ class TestSharedConfig:
         assert cfg.oss_endpoint == "oss-cn-beijing.aliyuncs.com"
         assert cfg.wx_appid == "wx123"
         assert cfg.wx_app_secret == "secret456"
+        assert cfg.ram_role_arn == "acs:ram::123:role/test"
+        assert cfg.aliyun_ak_id == "test-ak"
+        assert cfg.aliyun_ak_secret == "test-as"
 
     def test_missing_vars_raises_with_list(self) -> None:
         from shared.config import _ConfigError, read_shared_config
 
-        # No vars set → all 5 missing
+        # No vars set → all 8 missing (5 from US-006 + 3 from US-007)
         with pytest.raises(_ConfigError) as exc_info:
             read_shared_config()
-        assert len(exc_info.value.missing) == 5
+        assert len(exc_info.value.missing) == 8
 
     def test_partial_missing_lists_correct_names(self) -> None:
         from shared.config import _ConfigError, read_shared_config
@@ -250,6 +258,9 @@ class TestAuthenticate:
         os.environ["OSS_ENDPOINT"] = "oss-cn-beijing.aliyuncs.com"
         os.environ["WX_APPID"] = "wx-test"
         os.environ["WX_APP_SECRET"] = "test-secret"
+        os.environ["RAM_ROLE_ARN"] = "acs:ram::123:role/test-role"
+        os.environ["ALIYUN_AK_ID"] = "ak-test"
+        os.environ["ALIYUN_AK_SECRET"] = "secret-test"
 
     def test_allowlist_accepts_listed_openid(self) -> None:
         from shared.auth import authenticate
@@ -321,6 +332,9 @@ class TestSafeLogging:
         os.environ["OSS_ENDPOINT"] = "x"
         os.environ["WX_APPID"] = "x"
         os.environ["WX_APP_SECRET"] = "x"
+        os.environ["RAM_ROLE_ARN"] = "x"
+        os.environ["ALIYUN_AK_ID"] = "x"
+        os.environ["ALIYUN_AK_SECRET"] = "x"
 
     def test_log_auth_attempt_hashes_openid(self, caplog: pytest.LogCaptureFixture) -> None:
         from shared.logging import log_auth_attempt
@@ -408,6 +422,9 @@ class TestSafeHandler:
         os.environ["WX_APPID"] = "a"
         os.environ["WX_APP_SECRET"] = "s"
         os.environ["OPENID_ALLOWLIST"] = "allowed-openid"
+        os.environ["RAM_ROLE_ARN"] = "arn"
+        os.environ["ALIYUN_AK_ID"] = "ak"
+        os.environ["ALIYUN_AK_SECRET"] = "as"
 
     def test_valid_request_calls_business_logic(self) -> None:
         from shared.auth import safe_handler

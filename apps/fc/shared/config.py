@@ -21,6 +21,9 @@ class SharedConfig(NamedTuple):
     oss_endpoint: str
     wx_appid: str
     wx_app_secret: str
+    ram_role_arn: str
+    aliyun_ak_id: str
+    aliyun_ak_secret: str
 
 
 # ---------------------------------------------------------------------------
@@ -43,6 +46,9 @@ def read_shared_config() -> SharedConfig:
         "OSS_ENDPOINT": os.environ.get("OSS_ENDPOINT", ""),
         "WX_APPID": os.environ.get("WX_APPID", ""),
         "WX_APP_SECRET": os.environ.get("WX_APP_SECRET", ""),
+        "RAM_ROLE_ARN": os.environ.get("RAM_ROLE_ARN", ""),
+        "ALIYUN_AK_ID": os.environ.get("ALIYUN_AK_ID", ""),
+        "ALIYUN_AK_SECRET": os.environ.get("ALIYUN_AK_SECRET", ""),
     }
 
     missing = [name for name, value in required.items() if not value]
@@ -63,6 +69,9 @@ def read_shared_config() -> SharedConfig:
         oss_endpoint=required["OSS_ENDPOINT"],
         wx_appid=required["WX_APPID"],
         wx_app_secret=required["WX_APP_SECRET"],
+        ram_role_arn=required["RAM_ROLE_ARN"],
+        aliyun_ak_id=required["ALIYUN_AK_ID"],
+        aliyun_ak_secret=required["ALIYUN_AK_SECRET"],
     )
 
 

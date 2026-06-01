@@ -124,14 +124,22 @@ def require_fields(data: dict[str, Any], *field_names: str) -> None:
 class AuthError(Exception):
     """Controlled authentication / validation failure.
 
-    Carries an HTTP status code and a stable error string.
+    Carries an HTTP status code, a stable error string, and optional
+    extra fields that are merged into the JSON response body.
     """
 
-    def __init__(self, status_code: int, error_code: str, detail: str = "") -> None:
+    def __init__(
+        self,
+        status_code: int,
+        error_code: str,
+        detail: str = "",
+        extra: dict[str, object] | None = None,
+    ) -> None:
         super().__init__(error_code)
         self.status_code = status_code
         self.error_code = error_code
         self.detail = detail
+        self.extra = extra or {}
 
 
 def auth_error_to_response(exc: AuthError) -> dict:
@@ -139,6 +147,7 @@ def auth_error_to_response(exc: AuthError) -> dict:
     body: dict[str, object] = {"error": exc.error_code}
     if exc.detail:
         body["detail"] = exc.detail
+    body.update(exc.extra)
     return {
         "statusCode": exc.status_code,
         "headers": {"Content-Type": "application/json"},

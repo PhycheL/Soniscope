@@ -302,6 +302,9 @@ class TestFcFunctionStructure:
             "OSS_BUCKET": "test", "OSS_REGION": "cn-beijing",
             "OSS_ENDPOINT": "oss-cn-beijing.aliyuncs.com",
             "WX_APPID": "wx-test", "WX_APP_SECRET": "test-secret",
+            "RAM_ROLE_ARN": "acs:ram::123:role/test",
+            "ALIYUN_AK_ID": "ak-test",
+            "ALIYUN_AK_SECRET": "secret-test",
         })
         try:
             import importlib
@@ -327,7 +330,8 @@ class TestFcFunctionStructure:
         finally:
             sys.path.remove(str(src_dir))
             sys.path.remove(fc_root)
-            for v in ("OSS_BUCKET", "OSS_REGION", "OSS_ENDPOINT", "WX_APPID", "WX_APP_SECRET"):
+            for v in ("OSS_BUCKET", "OSS_REGION", "OSS_ENDPOINT", "WX_APPID", "WX_APP_SECRET",
+                      "RAM_ROLE_ARN", "ALIYUN_AK_ID", "ALIYUN_AK_SECRET"):
                 _os.environ.pop(v, None)
 
     def test_verify_upload_handler_is_importable(self) -> None:
@@ -342,6 +346,9 @@ class TestFcFunctionStructure:
             "OSS_BUCKET": "test", "OSS_REGION": "cn-beijing",
             "OSS_ENDPOINT": "oss-cn-beijing.aliyuncs.com",
             "WX_APPID": "wx-test", "WX_APP_SECRET": "test-secret",
+            "RAM_ROLE_ARN": "acs:ram::123:role/test",
+            "ALIYUN_AK_ID": "ak-test",
+            "ALIYUN_AK_SECRET": "secret-test",
         })
         try:
             import importlib
@@ -367,7 +374,8 @@ class TestFcFunctionStructure:
         finally:
             sys.path.remove(str(src_dir))
             sys.path.remove(fc_root)
-            for v in ("OSS_BUCKET", "OSS_REGION", "OSS_ENDPOINT", "WX_APPID", "WX_APP_SECRET"):
+            for v in ("OSS_BUCKET", "OSS_REGION", "OSS_ENDPOINT", "WX_APPID", "WX_APP_SECRET",
+                      "RAM_ROLE_ARN", "ALIYUN_AK_ID", "ALIYUN_AK_SECRET"):
                 _os.environ.pop(v, None)
 
 

@@ -1,4 +1,4 @@
-"""FC shared module — authentication, validation, and safe logging.
+"""FC shared module — authentication, validation, STS, and safe logging.
 
 Reusable by both ``issue-credential`` and ``verify-upload`` FC functions.
 Does not depend on any FC 2.0 service layer.
@@ -28,6 +28,7 @@ from .errors import (
     unauthorized,
 )
 from .logging import get_logger, log_auth_attempt, log_auth_result, log_error, log_request, log_response
+from .sts import issue_sts_credential
 
 __all__ = [
     # auth
@@ -58,4 +59,6 @@ __all__ = [
     "log_error",
     "log_request",
     "log_response",
+    # sts
+    "issue_sts_credential",
 ]
