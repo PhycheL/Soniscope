@@ -48,3 +48,23 @@
   - 有用的上下文: `SONISCOPE_HOME` env var is the authoritative runtime dir; `~/SoniScope` is fallback
   - 有用的上下文: config.yaml must be `chmod 600`; check-config warns if not but doesn't exit non-zero for permission issues alone
 ---
+
+## 2026-06-02 00:40 - US-005
+- 实现了 FC 3.0 函数工程与部署脚本基线
+- 更改的文件:
+  - `apps/fc/issue_credential/handler.py` (new) — FC issue-credential 函数骨架 handler
+  - `apps/fc/verify_upload/handler.py` (new) — FC verify-upload 函数骨架 handler
+  - `scripts/deploy_fc.py` (new) — deploy / rollback / fc-logs 统一脚本，支持独立打包、base64 编码 zip 上传、备份、curl 存活验证
+  - `apps/worker/pyproject.toml` (modified) — 添加 alibabacloud-fc20230330 dev dependency
+  - `apps/worker/uv.lock` (modified) — lock 文件更新
+  - `Makefile` (modified) — 添加 deploy-fc / rollback-fc / fc-logs 三个 target
+  - `apps/worker/tests/test_us005.py` (new) — 22 个测试覆盖目录约定、打包、部署日志、备份结构、handler 导入、回滚、fc-logs 诊断、env var 校验
+- **未来迭代的学习：**
+  - 发现的 patterns: `scripts/` 下的独立脚本不在 uv workspace 内，但可复用 worker 的 `.venv` 中的 dev 依赖（通过 `uv run --directory apps/worker --extra dev` 访问 FC SDK）
+  - 发现的 patterns: FC 3.0 SDK 使用 `InputCodeLocation(zip_file=base64_string)` 上传代码，`UpdateFunctionRequest(body=UpdateFunctionInput(code=...))` 模式
+  - 发现的 patterns: `FC_SRC_DIR` 使用 snake_case 目录名（`issue_credential`），但 `FUNCTION=` 参数用 kebab-case（`issue-credential`），由 `FUNCTION_DIR_MAP` 映射
+  - 发现的 patterns: `GetFunctionCode` API 返回 presigned OSS URL，可通过 curl 下载备份
+  - 发现的 patterns: FC SDK `get_function(func_name, GetFunctionRequest())` 需要显式传入 request 对象
+  - 有用的上下文: `build/` 目录已在 .gitignore 中，`build/fc/<function_name>/` 存放打包产物，`build/fc/backup/<timestamp>/` 存放备份快照，`build/fc/logs/` 存放部署日志
+  - 有用的上下文: 备份记录环境变量名（不含值），meta.json 格式
+---
