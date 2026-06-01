@@ -290,8 +290,19 @@ class TestFcFunctionStructure:
 
     def test_issue_credential_handler_is_importable(self) -> None:
         """The handler.py can be imported as a Python module."""
+        import json
+        import os as _os
         src_dir = REPO_ROOT / "apps" / "fc" / "issue_credential"
+        # Ensure fc/ root is on sys.path so shared/ can be imported
+        fc_root = str(REPO_ROOT / "apps" / "fc")
+        sys.path.insert(0, fc_root)
         sys.path.insert(0, str(src_dir))
+        # Set required FC env vars for shared config
+        _os.environ.update({
+            "OSS_BUCKET": "test", "OSS_REGION": "cn-beijing",
+            "OSS_ENDPOINT": "oss-cn-beijing.aliyuncs.com",
+            "WX_APPID": "wx-test", "WX_APP_SECRET": "test-secret",
+        })
         try:
             import importlib
             spec = importlib.util.spec_from_file_location(
@@ -301,15 +312,37 @@ class TestFcFunctionStructure:
             mod = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(mod)  # type: ignore[union-attr]
             assert hasattr(mod, "handler")
-            result = mod.handler({}, None)
-            assert result["statusCode"] == 200
+            result = mod.handler(
+                {
+                    "path": "/",
+                    "httpMethod": "POST",
+                    "body": json.dumps({"code": "test", "fragment_id": "f1", "size": 1000}),
+                },
+                None,
+            )
+            # Without valid WeChat code, expect 401 INVALID_CODE
+            assert result["statusCode"] == 401
+            body = json.loads(result["body"])
+            assert body["error"] == "INVALID_CODE"
         finally:
             sys.path.remove(str(src_dir))
+            sys.path.remove(fc_root)
+            for v in ("OSS_BUCKET", "OSS_REGION", "OSS_ENDPOINT", "WX_APPID", "WX_APP_SECRET"):
+                _os.environ.pop(v, None)
 
     def test_verify_upload_handler_is_importable(self) -> None:
         """The handler.py can be imported as a Python module."""
+        import json
+        import os as _os
         src_dir = REPO_ROOT / "apps" / "fc" / "verify_upload"
+        fc_root = str(REPO_ROOT / "apps" / "fc")
+        sys.path.insert(0, fc_root)
         sys.path.insert(0, str(src_dir))
+        _os.environ.update({
+            "OSS_BUCKET": "test", "OSS_REGION": "cn-beijing",
+            "OSS_ENDPOINT": "oss-cn-beijing.aliyuncs.com",
+            "WX_APPID": "wx-test", "WX_APP_SECRET": "test-secret",
+        })
         try:
             import importlib
             spec = importlib.util.spec_from_file_location(
@@ -319,10 +352,23 @@ class TestFcFunctionStructure:
             mod = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(mod)  # type: ignore[union-attr]
             assert hasattr(mod, "handler")
-            result = mod.handler({}, None)
-            assert result["statusCode"] == 200
+            result = mod.handler(
+                {
+                    "path": "/",
+                    "httpMethod": "POST",
+                    "body": json.dumps({"code": "test", "fragment_id": "f1", "expected_size": 1000}),
+                },
+                None,
+            )
+            # Without valid WeChat code, expect 401 INVALID_CODE
+            assert result["statusCode"] == 401
+            body = json.loads(result["body"])
+            assert body["error"] == "INVALID_CODE"
         finally:
             sys.path.remove(str(src_dir))
+            sys.path.remove(fc_root)
+            for v in ("OSS_BUCKET", "OSS_REGION", "OSS_ENDPOINT", "WX_APPID", "WX_APP_SECRET"):
+                _os.environ.pop(v, None)
 
 
 # ---------------------------------------------------------------------------

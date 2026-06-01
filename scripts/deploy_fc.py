@@ -98,29 +98,42 @@ def _snake_dir(function: str) -> str:
 def _package_function(function: str) -> Path:
     """Create a zip archive for *function* and return its path.
 
-    Each function is packaged independently: only its own ``handler.py`` plus
-    any loose files in the src directory go in.  Deployment-time dependencies
-    (alibabacloud-fc20230330) are **not** bundled.
+    Each function is packaged independently: its own handler.py, the shared
+    module from ``apps/fc/shared/``, plus any loose files in the src directory.
+    Deployment-time dependencies (alibabacloud-fc20230330) are **not** bundled.
     """
     src_dir = FC_SRC_DIR / _snake_dir(function)
     if not src_dir.is_dir():
         print(f"ERROR: source directory not found: {src_dir}", file=sys.stderr)
         sys.exit(1)
 
+    shared_dir = FC_SRC_DIR / "shared"
+
     build_func_dir = BUILD_DIR / function
     build_func_dir.mkdir(parents=True, exist_ok=True)
 
     zip_path = build_func_dir / f"{function}.zip"
 
+    # ── Collect source files from the function directory ──
     files: list[Path] = list(src_dir.rglob("*"))
-    # Filter out __pycache__ and .pyc
     files = [f for f in files if "__pycache__" not in f.parts and not f.suffix == ".pyc"]
+
+    # ── Collect shared module files ──
+    if shared_dir.is_dir():
+        shared_files: list[Path] = list(shared_dir.rglob("*"))
+        shared_files = [f for f in shared_files if "__pycache__" not in f.parts and not f.suffix == ".pyc"]
+    else:
+        shared_files = []
 
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
         for fp in files:
             if fp.is_file():
-                # Store relative to src_dir so the zip root contains handler.py etc.
                 arcname = fp.relative_to(src_dir)
+                zf.write(fp, arcname)
+        for fp in shared_files:
+            if fp.is_file():
+                # Store shared module under 'shared/' prefix in the zip
+                arcname = Path("shared") / fp.relative_to(shared_dir)
                 zf.write(fp, arcname)
 
     return zip_path
