@@ -7,6 +7,7 @@
 - ruff for linting (not flake8 or pylint).
 - pytest for testing; tests must exist — pytest exits with code 5 (failure) when no tests are collected.
 - Pydantic v2 `model_validate()` is the canonical way to construct models from raw dicts.
+- In mypy strict mode, untyped `dict`'s `.get()` returns `object` — always annotate dicts used with typed APIs as `dict[str, Any]` and wrap values with explicit type conversions (`float()`, `str()`, etc.)
 - Secret masking: override `__repr__`, `__str__`, and `model_dump()` on Pydantic models; use a recursive `_mask_dict()` helper that knows which field names are sensitive.
 - Config loading: `yaml.safe_load()` → `model_validate()` → catch `ValidationError` to extract and list all missing fields at once.
 - Runtime dir initialization uses `Path.mkdir(parents=True, exist_ok=True)` for idempotent creation.
@@ -152,6 +153,9 @@
 - ffmpeg 转码时必须显式 `-f wav` 指定输出格式——ffmpeg 8.1.1 对 `.wav.tmp` 扩展名可能无法自动选择 WAV muxer
 - Worker 音频三段式协议：passthrough 路径 .part → rename → fragments/<date>/<id>/audio.wav；transcode 路径 .part → ffmpeg → .wav.tmp → rename → audio.wav → unlink .part
 - Worker 所有文件写入遵循原子协议：先临时文件、再原子 rename（同一文件系统）、最后 .done。`Path.rename()` 在同一文件系统上是原子的
+- `recovery_scan` 返回 `dict[str, list[str]]` 格式：`inbox_cleaned` / `tmp_cleaned` / `fragment_actions` 三个键
+- 原子写入使用 `target.with_name(target.name + ".tmp")` 生成临时路径，`atomic_write_json` / `atomic_write_text` 自动创建父目录
+- `.done` marker 是 0 字节文件，通过 `atomics.create_done_marker(dir_path)` 创建，`atomics.is_done(dir_path)` 检查
 - Worker `poll_cycle` summary dict 用 int 值计数状态（downloaded/passthrough/transcoded/transcode_failed/errors），每次扩展字段时需同步更新 `run_poll_loop` 日志格式字符串和 `cli.py` 输出
 - `Path(__file__).parent` 计数：`apps/worker/tests/test_*.py` → repo root = 4 层 parent；→ Makefile = 4 层 parent；→ `src/soniscope_worker/` = 2 层 parent
 - Makefile .PHONY 行用 `\` 续行时，测试中的 `splitlines()` + `startswith('.PHONY:')` 只取到首行——需要合并续行逻辑才能校验完整 target 列表
@@ -466,4 +470,25 @@
   - 有用的上下文: WAV passthrough 路径：audio.sha256 == upload.original_sha256，audio.size_bytes == upload.original_size_bytes（AC5）；非 WAV 转码路径两者不同且均真实计算（AC6）
   - 有用的上下文: process_audio 完成后 .part 文件已删除（passthrough rename 或 transcode unlink），audio.wav 在 fragments/ 就位，供 US-024 manifest 和 US-026 转写使用
   - 有用的上下文: sample-20s.wav ffprobe 实际 duration=24.02s（非文件名暗示的 20s），测试已适配
+
+
+## 2026-06-02 07:00 - US-023 (2nd iteration — Validator 反馈修复)
+- 修复了 Validator 在上次迭代中报告的两个问题：
+  1. poller.py:608 mypy arg-type 错误 — audio_result_dict 为无类型标注普通 dict，
+     .get() 返回 object 类型，而 TranscriptResult.duration 期望 float。
+     修复：为 audio_result_dict 添加 dict[str, Any] 类型标注，duration 用 float() 包装
+  2. poller.py:563 ruff F401 — TranscriptSegment 导入但未使用。修复：移除该导入
+- 更改的文件:
+  - `apps/worker/src/soniscope_worker/poller.py` (modified) — 仅上述两行修复
+  - `scripts/ralph/prd.json` (modified) — US-023 passes=true
+- **未来迭代的学习：**
+  - 遇到的陷阱: 在 mypy strict 模式下，未标注类型的 dict 的 .get() 返回 object 类型，
+    即使提供了默认值（如 0.0），也无法满足 float 类型的参数要求。
+    必须显式标注 dict 类型（如 dict[str, Any]）并用 float() 强制转换
+  - 遇到的陷阱: 局部 lazy import 中的未使用符号也会被 ruff F401 检测到，
+    移除时只移除未使用符号，保留正在使用的其余导入
+  - 有用的上下文: audio_result_dict 中 duration_seconds 键不存在（AudioProcessResult
+    无此字段），.get() 始终返回默认值 0.0 — 这本身是预期行为（占位 transcript
+    不需要真实时长），mypy 的类型问题才是核心
 ---
+
