@@ -3,7 +3,7 @@
 #
 # 所有目标都在顶层运行，用户不需要 cd 到子目录。
 # ─────────────────────────────────────────────────────────────────────────────
-.PHONY: install check-config init-dirs worker-run typecheck lint test
+.PHONY: install check-config init-dirs worker-run verify-prep typecheck lint test
 
 # ── 安装 ────────────────────────────────────────────────────────────────────
 
@@ -27,13 +27,18 @@ init-dirs:
 worker-run:
 	uv run --directory apps/worker python -m soniscope_worker run
 
+# ── 准备校验 ────────────────────────────────────────────────────────────────
+
+verify-prep:
+	uv run --directory apps/worker python -m soniscope_worker verify-prep
+
 # ── 质量门 ──────────────────────────────────────────────────────────────────
 
 typecheck:
-	uv run --directory apps/worker mypy --strict src/
+	uv run --directory apps/worker --extra dev mypy --strict src/
 
 lint:
-	uv run --directory apps/worker ruff check src/
+	uv run --directory apps/worker --extra dev ruff check src/
 
 test:
-	uv run --directory apps/worker pytest -v
+	uv run --directory apps/worker --extra dev pytest -v

@@ -57,5 +57,15 @@ def init_dirs() -> None:
         typer.echo(f"  {d}")
 
 
+@app.command()
+def verify_prep() -> None:
+    """Run all US-001 preparation verification checks (make verify-prep)."""
+    from soniscope_worker.verify_prep import run_verify_prep
+
+    exit_code = run_verify_prep()
+    if exit_code != 0:
+        raise typer.Exit(code=exit_code)
+
+
 if __name__ == "__main__":
     app()

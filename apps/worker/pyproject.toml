@@ -5,6 +5,8 @@ description = "SoniScope Python Worker — OSS polling, audio standardization, c
 requires-python = ">=3.11"
 dependencies = [
     "alibabacloud-oss-v2",
+    "aliyun-python-sdk-core>=2.16.0",
+    "aliyun-python-sdk-sts>=3.1.2",
     "pyyaml",
     "pydantic>=2",
     "typer",
@@ -24,3 +26,9 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/soniscope_worker"]
+
+[tool.mypy]
+strict = true
+[[tool.mypy.overrides]]
+module = ["alibabacloud_oss_v2", "aliyunsdkcore.*", "aliyunsdksts.*"]
+ignore_missing_imports = true
