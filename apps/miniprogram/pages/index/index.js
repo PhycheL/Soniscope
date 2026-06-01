@@ -2,6 +2,8 @@
 
 var logger = require('../../utils/logger.js');
 var constants = require('../../utils/constants.js');
+var idgen = require('../../utils/idgen.js');
+var cryptoUtil = require('../../utils/crypto.js');
 
 var recorderManager = wx.getRecorderManager();
 
@@ -442,68 +444,111 @@ Page({
 
     this.setData({ saveInProgress: true });
 
-    // 冻结草稿并生成 Fragment 记录，加入上传队列
+    // 冻结草稿
     var draft = this._currentDraft;
 
-    // 生成 fragment_id（简单版：日期+随机ULID，US-015 会改进为完整格式）
-    var now = new Date();
-    var yyyyMMdd = '' + now.getFullYear()
-      + String(now.getMonth() + 1).padStart(2, '0')
-      + String(now.getDate()).padStart(2, '0');
-    var HHMMSS = String(now.getHours()).padStart(2, '0')
-      + String(now.getMinutes()).padStart(2, '0')
-      + String(now.getSeconds()).padStart(2, '0');
-    var fragmentId = yyyyMMdd + 'T' + HHMMSS + '_' + '_temp_ulid';
+    // 获取 device_short_id
+    var app = getApp();
+    var deviceShortId = (app.globalData && app.globalData.deviceShortId) || idgen.getOrCreateDeviceShortId();
 
-    // 创建上传记录
-    var uploadRecord = {
-      fragmentId: fragmentId,
-      tempFilePath: draft.tempFilePath,
-      duration: draft.duration_seconds,
-      format: draft.audio.original_format,
-      size: draft.audio.size_bytes,
-      status: constants.UPLOAD_STATUS.QUEUED,
-      recordedAt: draft.recorded_at,
-      audio: draft.audio,
-    };
+    // 生成 fragment_id: <YYYYMMDDTHHMMSS>_<deviceShortId>_<26字符ULID>
+    var fragmentId = idgen.generateFragmentId(deviceShortId);
 
-    // 写入上传列表存储
-    try {
-      var uploadList = wx.getStorageSync('upload_list') || [];
-      uploadList.push(uploadRecord);
-      wx.setStorageSync('upload_list', uploadList);
-      logger.info('[Index] upload record added, total:', uploadList.length);
-    } catch (e) {
-      logger.error('[Index] failed to save upload record:', e);
-      wx.showToast({ title: '保存失败，请重试', icon: 'none', duration: 2000 });
-      this.setData({ saveInProgress: false });
-      return;
-    }
+    // 生成 session_id（与 fragment_id 一对一的独立会话标识；未来长录音分片共享）
+    var sessionId = idgen.generateSessionId();
 
-    // 同时保存到 soniscope_drafts 便于 US-015+ 统一管理
-    this._saveDraft(draft);
+    logger.info('[Index] fragmentId:', fragmentId, 'sessionId:', sessionId);
 
-    // 退出草稿确认态
-    this._currentDraft = null;
-    this.setData({
-      draftPreviewMode: false,
-      draftFormat: '',
-      draftDuration: 0,
-      draftDurationDisplay: '',
-      draftOssKeyPreview: '',
-      draftFileSize: 0,
-      audioPlaying: false,
-      audioPaused: false,
-      saveInProgress: false,
+    // 计算原始音频 SHA-256
+    cryptoUtil.computeFileSha256(draft.tempFilePath).then(function (sha256) {
+      logger.info('[Index] sha256 computed');
+
+      // 构建完整 manifest 草案
+      var manifest = {
+        fragment_id: fragmentId,
+        session_id: sessionId,
+        chunk_seq: 1,
+        chunk_total: 0,       // 0 = 非分片（US-016 引入自动分片后填写实际值）
+        device_id: deviceShortId,
+        recorded_at: draft.recorded_at,
+        duration_seconds: draft.duration_seconds,
+        audio: {
+          original_format: draft.audio.original_format,
+          size_bytes: draft.audio.size_bytes
+        },
+        upload: {
+          original_sha256: sha256
+        }
+      };
+
+      // OSS 用户自定义元数据（对应 x-oss-meta-* 请求头，用于 Worker 读取）
+      var ossMeta = {
+        'x-oss-meta-session-id': sessionId,
+        'x-oss-meta-chunk-seq': '1',
+        'x-oss-meta-chunk-total': '0',
+        'x-oss-meta-recorded-at': draft.recorded_at,
+        'x-oss-meta-duration': String(draft.duration_seconds),
+        'x-oss-meta-original-format': draft.audio.original_format,
+        'x-oss-meta-sha256': sha256
+      };
+
+      // 创建上传记录
+      var uploadRecord = {
+        fragmentId: fragmentId,
+        sessionId: sessionId,
+        tempFilePath: draft.tempFilePath,
+        duration: draft.duration_seconds,
+        format: draft.audio.original_format,
+        size: draft.audio.size_bytes,
+        status: constants.UPLOAD_STATUS.QUEUED,
+        recordedAt: draft.recorded_at,
+        audio: draft.audio,
+        manifest: manifest,
+        ossMeta: ossMeta
+      };
+
+      // 写入上传列表存储
+      try {
+        var uploadList = wx.getStorageSync('upload_list') || [];
+        uploadList.push(uploadRecord);
+        wx.setStorageSync('upload_list', uploadList);
+        logger.info('[Index] upload record added, total:', uploadList.length);
+      } catch (e) {
+        logger.error('[Index] failed to save upload record:', e);
+        wx.showToast({ title: '保存失败，请重试', icon: 'none', duration: 2000 });
+        that.setData({ saveInProgress: false });
+        return;
+      }
+
+      // 同时保存到 soniscope_drafts 便于统一管理
+      that._saveDraft(draft);
+
+      // 退出草稿确认态
+      that._currentDraft = null;
+      that.setData({
+        draftPreviewMode: false,
+        draftFormat: '',
+        draftDuration: 0,
+        draftDurationDisplay: '',
+        draftOssKeyPreview: '',
+        draftFileSize: 0,
+        audioPlaying: false,
+        audioPaused: false,
+        saveInProgress: false,
+      });
+
+      wx.showToast({
+        title: '已加入上传队列',
+        icon: 'success',
+        duration: 1500,
+      });
+
+      logger.info('[Index] fragment queued for upload:', fragmentId);
+    }).catch(function (err) {
+      logger.error('[Index] sha256 computation failed:', err);
+      wx.showToast({ title: 'SHA-256 计算失败，请重试', icon: 'none', duration: 2000 });
+      that.setData({ saveInProgress: false });
     });
-
-    wx.showToast({
-      title: '已加入上传队列',
-      icon: 'success',
-      duration: 1500,
-    });
-
-    logger.info('[Index] fragment queued for upload:', fragmentId);
   },
 
   // ── 格式探测 / 工具 ──────────────────────────────────────────────────────

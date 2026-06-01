@@ -77,5 +77,5 @@ oss-delete-obj:
 
 miniprogram-lint:
 	@echo "==> Miniprogram static check"
-	@cd apps/miniprogram && node -c app.js && node -c utils/constants.js && node -c utils/logger.js && node -c pages/index/index.js && node -c pages/upload-list/upload-list.js
+	@cd apps/miniprogram && node -c app.js && node -c utils/constants.js && node -c utils/logger.js && node -c utils/crypto.js && node -c utils/idgen.js && node -c pages/index/index.js && node -c pages/upload-list/upload-list.js
 	@echo "==> Miniprogram JS syntax OK"

@@ -3,6 +3,7 @@
 // 不做业务鉴权、不保存长期密钥
 
 var logger = require('./utils/logger.js');
+var idgen = require('./utils/idgen.js');
 
 App({
   onLaunch: function () {
@@ -10,10 +11,20 @@ App({
 
     // 初始化本地存储检查
     this._checkStorage();
+
+    // 首次启动生成 device_short_id 并持久化
+    var deviceId = idgen.getOrCreateDeviceShortId();
+    this.globalData.deviceShortId = deviceId;
+    logger.info('[App] device_short_id ensured:', deviceId);
   },
 
   onShow: function () {
     logger.info('[App] onShow');
+    // 确保 device_short_id 在 globalData 中可用(覆盖冷启动后 onLaunch 已完成的情形)
+    if (!this.globalData.deviceShortId) {
+      var idgen = require('./utils/idgen.js');
+      this.globalData.deviceShortId = idgen.getOrCreateDeviceShortId();
+    }
   },
 
   onHide: function () {
@@ -34,6 +45,6 @@ App({
   },
 
   globalData: {
-    // 本期 MVP 全局数据
+    deviceShortId: '' // 首次启动由 onLaunch 初始化
   }
 });
