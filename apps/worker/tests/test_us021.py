@@ -480,7 +480,8 @@ class TestRecoveryScan:
             (inbox / "fid1.part").touch()
             (inbox / "fid2.part").touch()
 
-            removed = poller.recovery_scan(home)
+            result = poller.recovery_scan(home)
+            removed = result["inbox_cleaned"]
             assert len(removed) == 2
             assert not (inbox / "fid1.part").is_file()
             assert not (inbox / "fid2.part").is_file()
@@ -492,7 +493,8 @@ class TestRecoveryScan:
             inbox.mkdir(parents=True)
             (inbox / "fid1.wav.tmp").touch()
 
-            removed = poller.recovery_scan(home)
+            result = poller.recovery_scan(home)
+            removed = result["inbox_cleaned"]
             assert len(removed) == 1
             assert not (inbox / "fid1.wav.tmp").is_file()
 
@@ -505,14 +507,17 @@ class TestRecoveryScan:
             (inbox / "fid2.wav.tmp").touch()
             (inbox / "fid3.part").touch()
 
-            removed = poller.recovery_scan(home)
+            result = poller.recovery_scan(home)
+            removed = result["inbox_cleaned"]
             assert len(removed) == 3
 
     def test_no_inbox_returns_empty(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             home = Path(td)
-            removed = poller.recovery_scan(home)
-            assert removed == []
+            result = poller.recovery_scan(home)
+            assert result["inbox_cleaned"] == []
+            assert result["tmp_cleaned"] == []
+            assert result["fragment_actions"] == []
 
     def test_non_part_files_untouched(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -522,7 +527,8 @@ class TestRecoveryScan:
             (inbox / "notes.txt").touch()
             (inbox / "data.json").touch()
 
-            removed = poller.recovery_scan(home)
+            result = poller.recovery_scan(home)
+            removed = result["inbox_cleaned"]
             assert len(removed) == 0
             assert (inbox / "notes.txt").is_file()
             assert (inbox / "data.json").is_file()
@@ -535,8 +541,8 @@ class TestRecoveryScan:
             (inbox / "fid1.part").touch()
 
             with mock.patch.object(Path, "unlink", side_effect=OSError("mock error")):
-                removed = poller.recovery_scan(home)
-                assert len(removed) == 0
+                result = poller.recovery_scan(home)
+                assert len(result["inbox_cleaned"]) == 0
 
 
 # ---------------------------------------------------------------------------
@@ -810,9 +816,10 @@ class TestRunPollLoop:
              mock.patch.object(poller, "_build_oss_client") as mock_build, \
              mock.patch.object(poller, "poll_cycle") as mock_cycle, \
              mock.patch("time.sleep", side_effect=StopIteration("exit loop")):
-            mock_recovery.return_value = []
+            mock_recovery.return_value = {"inbox_cleaned": [], "tmp_cleaned": [], "fragment_actions": []}
             mock_cycle.return_value = {"total_objects": 0, "skipped_done": 0,
-                                        "downloaded": 0, "sha256_mismatch": 0, "errors": 0}
+                                        "downloaded": 0, "sha256_mismatch": 0, "errors": 0,
+                                        "passthrough": 0, "transcoded": 0, "transcode_failed": 0}
             with pytest.raises(StopIteration):
                 poller.run_poll_loop(config)
 
@@ -826,9 +833,10 @@ class TestRunPollLoop:
              mock.patch.object(poller, "_build_oss_client") as mock_build, \
              mock.patch.object(poller, "poll_cycle") as mock_cycle, \
              mock.patch("time.sleep", side_effect=StopIteration("exit loop")):
-            mock_recovery.return_value = []
+            mock_recovery.return_value = {"inbox_cleaned": [], "tmp_cleaned": [], "fragment_actions": []}
             mock_cycle.return_value = {"total_objects": 0, "skipped_done": 0,
-                                        "downloaded": 0, "sha256_mismatch": 0, "errors": 0}
+                                        "downloaded": 0, "sha256_mismatch": 0, "errors": 0,
+                                        "passthrough": 0, "transcoded": 0, "transcode_failed": 0}
             with pytest.raises(StopIteration):
                 poller.run_poll_loop(config)
 
@@ -843,9 +851,10 @@ class TestRunPollLoop:
              mock.patch.object(poller, "_build_oss_client") as mock_build, \
              mock.patch.object(poller, "poll_cycle") as mock_cycle, \
              mock.patch("time.sleep") as mock_sleep:
-            mock_recovery.return_value = []
+            mock_recovery.return_value = {"inbox_cleaned": [], "tmp_cleaned": [], "fragment_actions": []}
             mock_cycle.return_value = {"total_objects": 0, "skipped_done": 0,
-                                        "downloaded": 0, "sha256_mismatch": 0, "errors": 0}
+                                        "downloaded": 0, "sha256_mismatch": 0, "errors": 0,
+                                        "passthrough": 0, "transcoded": 0, "transcode_failed": 0}
             # Let it run one cycle then stop
             mock_sleep.side_effect = StopIteration("exit loop")
             with pytest.raises(StopIteration):

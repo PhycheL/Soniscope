@@ -7,7 +7,7 @@
         deploy-fc rollback-fc fc-logs test-fc-live test-verify-upload \
         oss-delete-obj miniprogram-lint show-oss-object test-sts-escape \
         test-poll-interval test-wav-passthrough test-audio-transcode-to-wav \
-        test-transcode-fail
+        test-transcode-fail test-crash-recovery simulate-worker-crash
 
 # ── 安装 ────────────────────────────────────────────────────────────────────
 
@@ -115,3 +115,14 @@ test-transcode-fail:
 	@echo "🧪 Transcode failure scenario (corrupt audio → inbox/failed/)"
 	@echo "Running transcode failure tests"
 	@uv run --directory apps/worker --extra dev pytest -v -k "TestTranscodeFail or test_transcode_fail or test_failed" "$(CURDIR)/apps/worker/tests/test_us022.py"
+
+# ── Worker 崩溃恢复测试 ────────────────────────────────────────────
+
+test-crash-recovery:
+	@echo "🧪 Worker crash recovery verification (US-023)"
+	@echo "Running crash recovery unit tests"
+	@uv run --directory apps/worker --extra dev pytest -v -k "TestCrashRecovery or test_crash_recovery or TestRecoveryScan or test_recovery or TestAtomics or test_atomic" "$(CURDIR)/apps/worker/tests/test_us023.py"
+
+simulate-worker-crash:
+	@echo "🧪 Simulate Worker crash scenario"
+	CASE="$(CASE)" FRAGMENT_ID="$(FRAGMENT_ID)" uv run --directory apps/worker --extra dev python "$(CURDIR)/scripts/simulate_worker_crash.py"

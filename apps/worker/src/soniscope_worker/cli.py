@@ -106,10 +106,21 @@ def test_poll_cycle() -> None:
 
     # Run recovery scan
     removed = recovery_scan(home)
-    if removed:
-        typer.echo(f"Cleaned {len(removed)} stale intermediate(s):")
-        for p in removed:
+    inbox_count = len(removed["inbox_cleaned"])
+    tmp_count = len(removed["tmp_cleaned"])
+    frag_count = len(removed["fragment_actions"])
+    if inbox_count > 0:
+        typer.echo(f"Cleaned {inbox_count} stale inbox intermediate(s):")
+        for p in removed["inbox_cleaned"]:
             typer.echo(f"  {p}")
+    if tmp_count > 0:
+        typer.echo(f"Cleaned {tmp_count} stale tmp intermediate(s):")
+        for p in removed["tmp_cleaned"]:
+            typer.echo(f"  {p}")
+    if frag_count > 0:
+        typer.echo(f"Scanned {frag_count} fragment directory(ies):")
+        for action in removed["fragment_actions"]:
+            typer.echo(f"  {action}")
 
     # Build client and run one cycle
     client = _build_oss_client(cfg)

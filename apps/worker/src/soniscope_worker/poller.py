@@ -16,8 +16,10 @@ if TYPE_CHECKING:
 
 from soniscope_worker.config import SoniScopeConfig
 from soniscope_worker.paths import (
+    fragments_dir,
     inbox_dir,
     resolve_home,
+    tmp_dir,
 )
 
 # Chunk size for streaming sha256 computation and download buffer operations.
@@ -349,36 +351,97 @@ def oss_key_to_fragment_id(object_key: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def recovery_scan(home: Path) -> list[str]:
-    """Scan inbox/ for stale intermediate files and clean them up.
+def recovery_scan(home: Path) -> dict[str, list[str]]:
+    """Scan inbox/, tmp/ and fragments/ for stale intermediates on startup.
 
-    Returns a list of removed file paths for logging purposes.
+    Returns a dict with three keys:
 
-    **AC1**: ``<fragment_id>.part`` files → deleted, next poll re-downloads.
+    * ``inbox_cleaned`` — .part and .wav.tmp files removed (AC1, AC2)
+    * ``tmp_cleaned`` — .transcript.json.tmp files removed (AC3)
+    * ``fragment_actions`` — description strings noting fragments/ state (AC4)
+
+    This is the comprehensive startup recovery scan required by US-023.
     """
-    removed: list[str] = []
+    result: dict[str, list[str]] = {
+        "inbox_cleaned": [],
+        "tmp_cleaned": [],
+        "fragment_actions": [],
+    }
+
+    # ── AC1: Clean stale .part files ──────────────────────────────────────
+    # ── AC2: Clean stale .wav.tmp files ───────────────────────────────────
     inbox = inbox_dir(home)
+    if inbox.is_dir():
+        for part_file in sorted(inbox.glob("*.part")):
+            try:
+                part_file.unlink()
+                result["inbox_cleaned"].append(str(part_file))
+            except OSError:
+                pass
 
-    if not inbox.is_dir():
-        return removed
+        for wav_tmp in sorted(inbox.glob("*.wav.tmp")):
+            try:
+                wav_tmp.unlink()
+                result["inbox_cleaned"].append(str(wav_tmp))
+            except OSError:
+                pass
 
-    # Clean stale .part files (download interrupts)
-    for part_file in sorted(inbox.glob("*.part")):
-        try:
-            part_file.unlink()
-            removed.append(str(part_file))
-        except OSError:
-            pass
+    # ── AC3: Clean stale .transcript.json.tmp files in tmp/ ───────────────
+    tmp = tmp_dir(home)
+    if tmp.is_dir():
+        for transcript_tmp in sorted(tmp.glob("*.transcript.json.tmp")):
+            try:
+                transcript_tmp.unlink()
+                result["tmp_cleaned"].append(str(transcript_tmp))
+            except OSError:
+                pass
 
-    # Clean stale .wav.tmp files (transcode interrupts — §3.6)
-    for tmp_file in sorted(inbox.glob("*.wav.tmp")):
-        try:
-            tmp_file.unlink()
-            removed.append(str(tmp_file))
-        except OSError:
-            pass
+    # ── AC4: Scan fragments/ — classify each directory ────────────────────
+    frags = fragments_dir(home)
+    if not frags.is_dir():
+        return result
 
-    return removed
+    from soniscope_worker.atomics import is_done as _is_done
+
+    for date_dir in sorted(frags.iterdir()):
+        if not date_dir.is_dir():
+            continue
+        for frag_dir in sorted(date_dir.iterdir()):
+            if not frag_dir.is_dir():
+                continue
+            audio_wav = frag_dir / "audio.wav"
+            has_audio = audio_wav.is_file()
+            has_done = _is_done(frag_dir)
+
+            if has_done:
+                # AC4: has .done → skip entirely
+                result["fragment_actions"].append(
+                    f"skip {frag_dir.name} (has .done)"
+                )
+            elif has_audio:
+                # AC4: no .done but has audio.wav → needs transcription
+                result["fragment_actions"].append(
+                    f"resume {frag_dir.name} (audio present, needs transcription)"
+                )
+            else:
+                # AC4: no .done, no audio.wav → empty directory, safe to remove
+                try:
+                    # Check if truly empty (no files at all)
+                    if not any(frag_dir.iterdir()):
+                        frag_dir.rmdir()
+                        result["fragment_actions"].append(
+                            f"removed empty dir {frag_dir.name}"
+                        )
+                    else:
+                        result["fragment_actions"].append(
+                            f"ignore {frag_dir.name} (no audio.wav)"
+                        )
+                except OSError:
+                    result["fragment_actions"].append(
+                        f"ignore {frag_dir.name} (cleanup failed)"
+                    )
+
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -533,12 +596,31 @@ def run_poll_loop(config: SoniScopeConfig) -> None:
     # Startup recovery scan
     logger.info("worker_starting home=%s interval=%d", home, interval)
     removed = recovery_scan(home)
-    if removed:
+    inbox_count = len(removed["inbox_cleaned"])
+    tmp_count = len(removed["tmp_cleaned"])
+    frag_count = len(removed["fragment_actions"])
+    if inbox_count > 0 or tmp_count > 0 or frag_count > 0:
         logger.info(
-            "recovery_scan_cleaned count=%d files=%s",
-            len(removed),
-            [Path(p).name for p in removed],
+            "recovery_scan_summary inbox_cleaned=%d tmp_cleaned=%d fragments_scanned=%d",
+            inbox_count,
+            tmp_count,
+            frag_count,
         )
+        if inbox_count > 0:
+            logger.info(
+                "recovery_scan_cleaned_inbox count=%d files=%s",
+                inbox_count,
+                [Path(p).name for p in removed["inbox_cleaned"]],
+            )
+        if tmp_count > 0:
+            logger.info(
+                "recovery_scan_cleaned_tmp count=%d files=%s",
+                tmp_count,
+                [Path(p).name for p in removed["tmp_cleaned"]],
+            )
+        if frag_count > 0:
+            for action in removed["fragment_actions"]:
+                logger.info("recovery_scan_fragment: %s", action)
 
     client = _build_oss_client(config)
 
