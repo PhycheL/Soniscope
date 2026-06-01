@@ -12,6 +12,9 @@
 - Runtime dir initialization uses `Path.mkdir(parents=True, exist_ok=True)` for idempotent creation.
 - `typer.Exit(code=1)` is how CLI commands signal non-zero exit; error messages go to stderr via `err=True` on `typer.echo()`.
 - `typer.testing.CliRunner` is the standard way to test Typer CLI commands in pytest.
+- `scripts/` 下独立脚本不在 uv workspace 内，测试时应 `sys.path.insert(0, ...)` 导入函式，而非 subprocess 调用。
+- ffprobe `-of csv` 输出对含逗号的 format_name 加引号，需 `.strip('"')` 处理。
+- `subprocess.run()` 运行在独立解释器中，patch 模块级常量无效 — 只测函式逻辑。
 
 ## 2026-06-01 23:59 - US-003
 - 实现了测试音频 fixture duration 和 codec 校验功能
