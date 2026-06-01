@@ -708,7 +708,7 @@ export OSS_TOKEN=&lt;tmp security token&gt;</pre>
             <tr><th>触发器（自动创建）</th><td>认证方式 = <b>无身份认证（anonymous）</b>，请求方式 = GET + POST，<b>公网访问 URL = 开启</b>（FC 3.0 默认会同时给一个内网 URL，本期只需公网）</td></tr>
           </table>
         </li>
-        <li>函数创建完成后会自动跳转到「函数详情」。进入 <b>配置 → 触发器</b> 页签，复制 HTTP 触发器的<b>公网访问地址</b>（FC 3.0 格式：<code class="inline">https://&lt;url-id&gt;.cn-beijing.fcapp.run/</code>；<code class="inline">&lt;url-id&gt;</code> 通常形如 <code class="inline">issue-credential-xxxxxxxx</code>，由系统分配，不可自定义）。</li>
+        <li>函数创建完成后会自动跳转到「函数详情」。进入 <b>配置 → 触发器</b> 页签，复制 HTTP 触发器的<b>公网访问地址</b>（FC 3.0 格式：<code class="inline">https://&lt;url-id&gt;.cn-beijing.fcapp.run/</code>；<code class="inline">&lt;url-id&gt;</code> 通常形如 <code class="inline">issue-credential-xxxxxxxx</code>，由系统分配，不可自定义）。<b>⚠️ 注意：本项目实际分配到的 url-id 是 <code class="inline">issue-cedential-ottfirocds</code>（少一个 <code class="inline">r</code>，不是 <code class="inline">credential</code>）——这是系统真实分配值，已核实，<b>勿当 typo 修正</b>，详见 <code class="inline">cloud-setup.md §3.2</code> 的「勿改拼写」说明。</b></li>
         <li>返回函数列表，重复步骤 3-5，创建第 2 个函数 <code class="inline">verify-upload</code>，配置完全相同。复制其公网访问 URL。</li>
         <li>把两条 <code class="inline">.fcapp.run</code> URL 记录到 <code class="inline">docs/runbook/cloud-setup.md §3.2</code>。</li>
       </ol>

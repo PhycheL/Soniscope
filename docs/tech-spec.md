@@ -67,36 +67,22 @@ flowchart TD
 
 ### 2.1 Monorepo 结构
 
-```mermaid
-flowchart TD
-    root["my_soniscope/"]
-    apps["apps/"]
-    miniprogram["miniprogram/<br/>微信小程序前端"]
-    fc["fc/&lt;function&gt;/<br/>阿里云函数计算函数源码"]
-    worker["worker/<br/>Python Worker（包名 soniscope-worker）"]
-    scripts["scripts/<br/>跨组件运维与验证脚本"]
-    audio["tests/audio/<br/>共享测试音频 fixture"]
-    docs["docs/"]
-    prd["PRD_v1.md<br/>产品需求（WHAT + WHY）"]
-    spec["tech-spec.md<br/>本文档：技术设计（HOW）"]
-    runbook["runbook/<br/>人工准备登记表"]
-    pyproject["pyproject.toml<br/>根 uv workspace（不装业务依赖）"]
-    makefile["Makefile<br/>唯一命令入口"]
-    agents["AGENTS.md"]
-
-    root --> apps
-    apps --> miniprogram
-    apps --> fc
-    apps --> worker
-    root --> scripts
-    root --> audio
-    root --> docs
-    docs --> prd
-    docs --> spec
-    docs --> runbook
-    root --> pyproject
-    root --> makefile
-    root --> agents
+```
+my_soniscope/
+├── apps/
+│   ├── miniprogram/            # 微信小程序前端
+│   ├── fc/<function>/          # 阿里云函数计算函数源码
+│   └── worker/                 # Python Worker（包名 soniscope-worker）
+├── scripts/                    # 跨组件运维与验证脚本
+├── tests/
+│   └── audio/                  # 共享测试音频 fixture
+├── docs/
+│   ├── PRD_v1.md               # 产品需求（WHAT + WHY）
+│   ├── tech-spec.md            # 本文档：技术设计（HOW）
+│   └── runbook/                # 人工准备登记表
+├── pyproject.toml              # 根 uv workspace（不装业务依赖）
+├── Makefile                    # 唯一命令入口
+└── AGENTS.md
 ```
 
 **关键约定**：
@@ -111,40 +97,23 @@ flowchart TD
 
 ### 2.2 运行时数据目录
 
-```mermaid
-flowchart TD
-    home["/Volumes/Data/software/SoniScope/<br/>$SONISCOPE_HOME（本项目实际值）"]
-    inbox["inbox/<br/>临时下载区"]
-    part["&lt;fragment_id&gt;.part<br/>下载中"]
-    failed["failed/<br/>转码失败留档（不参与轮询重试）"]
-    failedTmp["&lt;fragment_id&gt;.wav.tmp"]
-    fragments["fragments/"]
-    date["&lt;YYYY-MM-DD&gt;/"]
-    fragment["&lt;fragment_id&gt;/"]
-    audio["audio.wav<br/>标准化 WAV 音频（下载/转码完成后原子写入）"]
-    manifest["manifest.json<br/>元数据（权威）"]
-    transcriptJson["transcript.json<br/>结构化转写结果"]
-    transcriptTxt["transcript.txt<br/>纯文本（从 transcript.json 派生）"]
-    done[".done<br/>完成标记（最后写入）"]
-    tmp["tmp/<br/>转写工作区"]
-    tmpTranscript["&lt;fragment_id&gt;.transcript.json.tmp"]
-    config["config.yaml<br/>脚本配置（轮询周期、模型选择等）"]
-
-    home --> inbox
-    inbox --> part
-    inbox --> failed
-    failed --> failedTmp
-    home --> fragments
-    fragments --> date
-    date --> fragment
-    fragment --> audio
-    fragment --> manifest
-    fragment --> transcriptJson
-    fragment --> transcriptTxt
-    fragment --> done
-    home --> tmp
-    tmp --> tmpTranscript
-    home --> config
+```
+/Volumes/Data/software/SoniScope/        # $SONISCOPE_HOME（本项目实际值）
+├── inbox/                                # 临时下载区
+│   ├── <fragment_id>.part                # 下载中
+│   └── failed/                           # 转码失败留档（不参与轮询重试）
+│       └── <fragment_id>.wav.tmp
+├── fragments/
+│   └── <YYYY-MM-DD>/
+│       └── <fragment_id>/
+│           ├── audio.wav                 # 标准化 WAV 音频（下载/转码完成后原子写入）
+│           ├── manifest.json             # 元数据（权威）
+│           ├── transcript.json           # 结构化转写结果
+│           ├── transcript.txt            # 纯文本（从 transcript.json 派生）
+│           └── .done                     # 完成标记（最后写入）
+├── tmp/                                  # 转写工作区
+│   └── <fragment_id>.transcript.json.tmp
+└── config.yaml                           # 脚本配置（轮询周期、模型选择等）
 ```
 
 ### 2.3 配置 Schema（`config.yaml`）

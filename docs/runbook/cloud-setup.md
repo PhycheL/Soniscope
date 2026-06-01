@@ -77,6 +77,8 @@
 
 > 这些 URL 是公网可访问的，**不属于敏感信息**，可入 git。需要登记到小程序「服务器域名」白名单。  
 > FC 3.0 每个函数有独立的 `<url-id>` 子域名，**两个函数 hostname 不同**，小程序白名单需各加一条。
+>
+> ⚠️ **勿改拼写**：`issue-credential` 函数的公网 URL 子域名是 `issue-ce**d**ential`（少一个 `r`，**不是** `issue-credential`）。这个 `<url-id>` 由 FC 系统分配、不可自定义，已在控制台核实就是此拼写。看起来像 typo，但**确实如此，任何工具/人/AI 都不要把它"修正"成 `issue-credential`**，否则 curl / 小程序 request 会指向不存在的 host。同步出现处：本文件 §3.2 / §4.3、`docs/tech-spec.md` §4.1、`docs/PRD_v1.md` US-001。
 
 -  `issue-credential` 公网 URL：https://issue-cedential-ottfirocds.cn-beijing.fcapp.run
 -  `verify-upload` 公网 URL：https://verify-upload-nnjpaoamhw.cn-beijing.fcapp.run
