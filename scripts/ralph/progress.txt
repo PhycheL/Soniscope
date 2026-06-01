@@ -416,3 +416,25 @@
   - 有用的上下文: dev menu 通过 `navigator url="/pages/dev-menu/dev-menu"` 进入，不需要在 app.json 中配置 tabBar（dev menu 不是 tab 页面）
   - 有用的上下文: 需要微信开发者工具模拟器或真机验证开关切换后上传行为变化（mock-fc-url-broken 录一条 → 3 次重试失败 → 变红手动重传 → 关闭开关 → 重传成功） — 自动测试只能验证代码结构和语法
 ---
+
+## 2026-06-02 05:58 - US-021
+- 实现了 Worker OSS 轮询、HeadObject 元数据读取与安全下载
+- 更改的文件:
+  - `apps/worker/src/soniscope_worker/poller.py` (new) — OSS 轮询核心模块：list_oss_objects（ListObjectsV2 分页扫描）、head_oss_object（HeadObject + x-oss-meta-* 解析为 HeadMetaResult）、download_object（下载到 .part + sha256 校验）、is_fragment_done（.done 标记检查）、oss_key_to_fragment_id（OSS key → fragment_id 解析）、recovery_scan（启动时清理 .part/.wav.tmp 残留）、poll_cycle（单次轮询周期）、run_poll_loop（无限循环轮询 + POLL_INTERVAL_SECONDS_OVERRIDE 环境变量支持）
+  - `apps/worker/src/soniscope_worker/cli.py` (modified) — run 命令从占位符改为真实轮询启动（加载配置 → 初始化目录 → 启动 run_poll_loop）；新增 test-poll-cycle 命令（单次轮询 + 输出汇总）
+  - `Makefile` (modified) — 新增 test-poll-interval target（设置 POLL_INTERVAL_SECONDS_OVERRIDE=30 运行单次轮询验证）
+  - `apps/worker/tests/test_us021.py` (new) — 71 个单元测试覆盖：fragment_id 日期解析/OSS key 生成/反向解析、HeadMetaResult 结构与 manifest 草稿映射、head_oss_object（成功/404/其他错误/metadata 缺失/部分 metadata）、list_oss_objects（单页/分页/空桶/空 contents/key=None 处理）、download_object（无 sha256 校验/sha256 匹配/sha256 不匹配删除 .part/下载错误）、is_fragment_done（.done 存在/不存在/目录存在无 .done）、recovery_scan（清理 .part/.wav.tmp/两者混合/无 inbox/非暂存文件不受影响/OSError 容错）、poll_cycle 完整周期/跳过 .done/sha256 不匹配/HeadObject 错误/下载错误/非规范 key 跳过、sha256 计算、OSS client 构建、run_poll_loop 启动 recovery scan/poll cycle/env override、Worker 源码无 DeleteObject、OSS key 与 FC shared 一致性
+  - `apps/worker/tests/test_skeleton.py` (modified) — test_run_command_exists 从占位符断言改为适配真实 run 命令期望（需要 config.yaml）
+- **未来迭代的学习：**
+  - 发现的 patterns: OSS SDK v2 Client 通过 `StaticCredentialsProvider` + `config.load_default()` 构建，与 fetch_test_fixtures.py 和 verify_prep.py 一致
+  - 发现的 patterns: HeadObjectResult.metadata 字段返回 `x-oss-meta-*` 的 dict（SDK 自动 strip 前缀），`content_length` 为 int、`etag` 含双引号需 strip
+  - 发现的 patterns: ListObjectsV2Request 分页通过 `continuation_token` + `is_truncated` 判断，与 S3 ListObjectsV2 API 一致
+  - 发现的 patterns: Worker 三项式协议在 poller 中部分实现：下载 → .part（阶段 1），sha256 校验通过后交给 US-022 格式检测流程（阶段 2/3 在后续 story）
+  - 发现的 patterns: `TYPE_CHECKING` 导入 + 字符串引用类型注解（`"OSSClient"`）避免运行时依赖 alibabacloud_oss_v2 类型
+  - 遇到的陷阱: `result.etag` 在 OSS SDK 返回时包含双引号（`'"abc123"'`），需要 `.strip('"')` 处理
+  - 遇到的陷阱: 旧的 test_skeleton.py 硬编码检查 `"not yet implemented"` 在 run 命令输出中——替换占位符实现后需要更新测试断言
+  - 遇到的陷阱: `fragments_dir` 导入但未使用会触发 ruff F401 lint 错误——只导入实际需要的 symbols
+  - 有用的上下文: US-021 完成后 OSS 对象可被发现、元数据可读、音频可下载到 .part 且 sha256 可校验——下一 story US-022（格式检测/转码）将在下载完成后集成 ffprobe/ffmpeg 流程
+  - 有用的上下文: `run_poll_loop` 通过 `POLL_INTERVAL_SECONDS_OVERRIDE` 环境变量覆盖轮询间隔，`make test-poll-interval` 利用此机制验证 30 秒间隔
+  - 有用的上下文: recovery_scan 在 startup 时同时清理 `.part` 和 `.wav.tmp` 两种残留（虽然后者在 US-022 才产生），为后续 story 提前做好基础
+---
