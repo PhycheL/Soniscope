@@ -38,6 +38,10 @@
 - OSS PostObject signature 使用 HMAC-SHA1(policy_base64, sts_access_key_secret)，不同于 OSS HMAC-SHA1 v1 header signature（用于 HeadObject/REST API）
 - 小程序上传引擎使用模块级 `_uploadingActive` 互斥标记确保串行上传，`_networkAvailable` 跟踪网络状态，`wx.onNetworkStatusChange` 监听恢复后自动处理队列
 - `scripts/` 下的 Python 运维脚本使用纯 stdlib（HMAC-SHA1 v1 签名 + urllib）调用 OSS REST API，与 FC shared 模块签名模式一致
+- 小程序本地缓存清理模块通过 `wx.getFileSystemManager().access()` + `wx.getFileSystemManager().unlink()` 组合安全删除临时文件，文件不存在时不报错
+- 上传引擎 cleanup 集成点：verify 成功后调用 `cleanup.runAutoCleanup()`（AC5/AC6），app.onLaunch 时也调用一次做启动清理
+- 手动删除未 verify 记录需走 `wx.showModal → wx.showModal` 双重确认（AC7），verified 记录只需单次确认
+- 重新 verify 逻辑：`triggerReVerify` 先设 `PENDING_VERIFY`，调 wx.login 拿 code，再调 `_doVerifyUpload`，失败处理与上传管线一致
 
 ## 2026-06-01 23:59 - US-003
 - 实现了测试音频 fixture duration 和 codec 校验功能
@@ -348,4 +352,25 @@
   - 遇到的陷阱: OSS PostObject 的 content-length-range condition 使用 Python 风格语法（`['content-length-range', 1, 104857600]`），不是 OSS 文档中的另一种写法
   - 有用的上下文: x-oss-meta-* 字段来自 record.ossMeta（US-015/US-016 已构建），_buildOssFormData 中动态读取并加入 PostObject 表单
   - 有用的上下文: 需要微信开发者工具模拟器或真机验证完整上传流程（code → STS → OSS → verify）——自动测试只能验证代码结构和语法
+---
+
+## 2026-06-02 11:15 - US-018
+- 实现了小程序上传后 verify 闭环、48 小时本地缓存保留策略、手动删除（含二次确认）与重新 verify
+- 更改的文件:
+  - `apps/miniprogram/utils/cleanup.js` (new) — 本地缓存自动清理模块：runAutoCleanup 自动清理 verified:true + verified_at >= 48h 的记录；deleteRecordById 手动删除记录并清理本地临时文件；`_tryRemoveFile` 使用 fs.access + fs.unlink 安全删除文件
+  - `apps/miniprogram/utils/uploader.js` (modified) — 新增 triggerReVerify 重新校验已 verify 记录；新增 deleteRecord 公共 API 委托 cleanup；verify 成功回调中加入 cleanup.runAutoCleanup() 触发清理；导入 cleanup 模块
+  - `apps/miniprogram/app.js` (modified) — onLaunch 中导入 cleanup 并调用 runAutoCleanup()，启动时清理 48h+ 过期记录
+  - `apps/miniprogram/pages/upload-list/upload-list.js` (modified) — 新增 onReVerify handler（调 uploader.triggerReVerify）；新增 onDeleteRecord handler（verified 记录单次确认删除，非 verified 记录双重 wx.showModal 确认）；导入 uploader
+  - `apps/miniprogram/pages/upload-list/upload-list.wxml` (modified) — verified 记录行显示"重新校验"+ "删除"按钮；其他状态行显示"删除"按钮
+  - `apps/miniprogram/pages/upload-list/upload-list.wxss` (modified) — 新增 .item-actions/.action-btn/.action-btn-reverify/.action-btn-delete 样式
+  - `Makefile` (modified) — miniprogram-lint 覆盖 cleanup.js
+  - `apps/worker/tests/test_us018.py` (new) — 52 个单元测试覆盖：cleanup 模块结构与导出、runAutoCleanup 逻辑（verified 状态检查/verifiedAt 时间戳/48h 比较/非 verified 保留/空列表提前返回）、deleteRecordById 逻辑（splice 删除/成功结果/未找到处理）、uploader 新导出（triggerReVerify/deleteRecord/cleanup 导入）、uploader 中 cleanup 集成（verify 成功后调用）、app.js 启动清理集成、upload-list re-verify/delete handler、WXML 按钮/条件渲染、WXSS 样式、JS 语法、密钥安全、Makefile 覆盖、状态常量完整性
+- **未来迭代的学习：**
+  - 发现的 patterns: 小程序本地缓存清理通过 `access()` 检查文件存在 → `unlink()` 删除，文件不存在时 `access` 的 fail 回调直接 return（不报错），保证幂等
+  - 发现的 patterns: cleanup 模块与 uploader 模块相互独立，uploader 导入 cleanup 并委托 `deleteRecordById`；cleanup 不依赖 uploader，保持低耦合
+  - 发现的 patterns: `runAutoCleanup` 遍历 upload_list，只对 verified + 有 verifiedAt 时间戳 + 距 now >= 48h 的记录做清理，其余全部放入 kept 数组后写回 storage
+  - 遇到的陷阱: 删除未 verify 记录需要双重 showModal 确认（"尚未成功上传到云端，删除后无法恢复" → "再次确认"），verified 记录只需单次确认（"云端 OSS 对象不会受影响"）
+  - 遇到的陷阱: triggerReVerify 需要走完整 wx.login → verify 流程获取新 code，不能复用旧 code（wx.login code 一次有效）
+  - 有用的上下文: verifiedAt 时间戳在 uploader.js 的 _uploadOne verify 成功路径中写入（`verifiedAt: new Date().toISOString()`），cleanup 模块读取此字段判断 48h
+  - 有用的上下文: US-019（上传列表八种状态）可在 US-018 基础上扩展列表页的状态聚合展示；US-018 已提供 delete/index 的按钮骨架，US-019 可复用 .item-actions 样式
 ---
