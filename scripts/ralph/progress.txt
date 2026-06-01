@@ -123,3 +123,38 @@
   - 有用的上下文: fragment_id 的日期解析从 `<YYYYMMDD>T<HHMMSS>_...` 中拆分，用 `T` 作为分隔符
   - 有用的上下文: issue_credential 的 handler 将 STS 后端错误映射为 502（INTERNAL_ERROR after masking），避免泄露内部错误细节
 ---
+
+- OSS HeadObject 使用 HMAC-SHA1 v1 签名（与 STS 共用相同签名模式），virtual-hosted-style URL (https://bucket.endpoint/key)
+- FC 函数 handler 内 `from shared.oss import head_object` 导入会导致模块级绑定，测试 mock 必须用 `verify_upload.handler.head_object` 而非 `shared.oss.head_object`
+- mock HTTPError 不能用 `mock.MagicMock(spec=HTTPError)` 因为 MagicMock 不是 BaseException 子类；应构造真实异常 `HTTPError("url", 404, "msg", {}, None)`
+- Pytest fixture `_clean_env` 需要在每次测试前清理 FC 函数所需的环境变量，与 US-006/US-007 相同
+- 所有 FC 共享模块（auth/oss/sts/config/errors/logging）统一从 `shared/` 导出，新模块需更新 `__init__.py` 的 `__all__`
+
+## 2026-06-02 02:15 - US-009
+- 实现了 FC verify-upload HeadObject 上传确认接口
+- 更改的文件:
+  - `apps/fc/shared/oss.py` (new) — OSS HeadObject 客户端，使用 HMAC-SHA1 v1 签名，纯 stdlib，返回 HeadObjectResult(found, content_length, etag, last_modified)
+  - `apps/fc/shared/__init__.py` (modified) — 导出 HeadObjectResult、head_object
+  - `apps/fc/verify_upload/handler.py` (rewrite) — 完整 _handle 业务逻辑：fragment_id → OSS key 派生 → HeadObject → 返回 verified/reason/etag/size/last_modified
+  - `apps/worker/tests/test_us009.py` (new) — 27 个单元测试覆盖 HeadObjectResult、head_object（含 404/403/500/网络错误）、handler 全路径、鉴权共用验证、密钥防泄漏
+- **未来迭代的学习：**
+  - 发现的 patterns: OSS REST API HMAC-SHA1 v1 头签名（Authorization: OSS AKID:Signature）而非 STS 的 URL query 签名
+  - 发现的 patterns: HeadObjectResult 使用 NamedTuple 提供不可变结果类型，与 SharedConfig 模式一致
+  - 发现的 patterns: verify-upload handler 复用 `_fragment_oss_key`（来自 sts.py），不重复实现 fragment_id 解析逻辑
+  - 有用的上下文: US-009 完成后 US-010（verify-upload 云端闭环测试）可直接部署 verify-upload 并进行真实验证
+---
+- 实现了 FC issue-credential 云端联调与 STS 安全反例脚本（make test-fc-live）
+- 更改的文件:
+  - `scripts/test_fc_live.py` (new) — 完整的云端联调测试脚本，6 个 block（A-F）覆盖：鉴权测试、STS 凭证签发验证、STS 越权反例、大小校验、FC 日志检查、STS 有效期验证
+  - `apps/worker/tests/test_us008.py` (new) — 45 个单元测试，覆盖常量、数据类、HTTP mock、OSS mock、各 block 逻辑、Makefile target、CLI 参数、颜色辅助函数、运行流程和 STS 字段完整性
+  - `Makefile` (modified) — 添加 test-fc-live target，调用 scripts/test_fc_live.py
+- **未来迭代的学习：**
+  - 发现的 patterns: `scripts/test_fc_live.py` 是独立脚本（不在 uv workspace 内），测试应通过 `sys.path.insert(0, ...)` 导入模块
+  - 发现的 patterns: 测试脚本使用 urllib.request (stdlib) 发送 HTTP POST 到 FC endpoint，减少依赖
+  - 发现的 patterns: A-F block 设计模式 — 每个 block 是独立函数，返回 BlockResult，前一个 block 的结果传递给下游（A→B→C, A→D, B→F）
+  - 发现的 patterns: `_try_oss_op` 使用 alibabacloud_oss_v2 SDK 进行 STS 越权测试，异常消息中匹配 AccessDenied/ExpiredToken 关键词
+  - 遇到的陷阱: Makefile .PHONY 行使用反斜杠续行（`\`），测试不能简单用 splitlines() 检查单行，需要合并续行
+  - 有用的上下文: FC URL 为 https://issue-cedential-ottfirocds.cn-beijing.fcapp.run（注意拼写 issue-cedential 不是 typo）
+  - 有用的上下文: --code 参数可选；不提供时 A/B/C/D 部分测试 mark 为 skipped，提供时运行完整测试套件
+  - 有用的上下文: --wait-expiry 可选标志，用于实际等待 STS 过期后验证 PutObject 被拒
+---
