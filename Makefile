@@ -6,7 +6,8 @@
 .PHONY: install check-config init-dirs worker-run verify-prep typecheck lint test \
         deploy-fc rollback-fc fc-logs test-fc-live test-verify-upload \
         oss-delete-obj miniprogram-lint show-oss-object test-sts-escape \
-        test-poll-interval
+        test-poll-interval test-wav-passthrough test-audio-transcode-to-wav \
+        test-transcode-fail
 
 # ── 安装 ────────────────────────────────────────────────────────────────────
 
@@ -97,3 +98,20 @@ test-poll-interval:
 	@echo "🧪 Worker poll interval verification"
 	@echo "Setting POLL_INTERVAL_SECONDS_OVERRIDE=30 and running one cycle"
 	POLL_INTERVAL_SECONDS_OVERRIDE=30 uv run --directory apps/worker python -m soniscope_worker test-poll-cycle
+
+# ── Worker 音频处理测试 ──────────────────────────────────────────────
+
+test-wav-passthrough:
+	@echo "🧪 WAV passthrough / lossless repackaging test"
+	@echo "Running audio passthrough integration tests (requires ffprobe + tests/audio fixtures)"
+	@uv run --directory apps/worker --extra dev pytest -v -k "TestWavPassthrough or test_wav_passthrough" "$(CURDIR)/apps/worker/tests/test_us022.py"
+
+test-audio-transcode-to-wav:
+	@echo "🧪 m4a → WAV transcode verification"
+	@echo "Running audio transcode integration tests (requires ffmpeg + tests/audio/sample-20s.m4a)"
+	@uv run --directory apps/worker --extra dev pytest -v -k "TestTranscode or test_transcode" "$(CURDIR)/apps/worker/tests/test_us022.py"
+
+test-transcode-fail:
+	@echo "🧪 Transcode failure scenario (corrupt audio → inbox/failed/)"
+	@echo "Running transcode failure tests"
+	@uv run --directory apps/worker --extra dev pytest -v -k "TestTranscodeFail or test_transcode_fail or test_failed" "$(CURDIR)/apps/worker/tests/test_us022.py"

@@ -392,13 +392,17 @@ def poll_cycle(config: SoniScopeConfig, client: "OSSClient") -> dict[str, int]:
     1. List OSS objects under ``recordings/``
     2. For each object not yet processed (no .done), read metadata via HeadObject
     3. Download to .part, verify sha256 against x-oss-meta-sha256
+    4. Probe audio format, passthrough or transcode, and place audio.wav in
+       the fragment directory (US-022).
 
     Returns a summary dict with keys like ``total_objects``, ``skipped_done``,
-    ``downloaded``, ``sha256_mismatch``, ``errors``.
+    ``downloaded``, ``sha256_mismatch``, ``passthrough``, ``transcoded``,
+    ``transcode_failed``, ``errors``.
 
-    The manifest is NOT written to fragments/ in this story — that belongs
-    to US-022 (format detection) and US-024 (manifest schema).
+    Manifest and transcription are handled by later stories (US-024, US-026).
     """
+    from soniscope_worker.audio import process_audio
+
     home = resolve_home()
     bucket = config.oss.bucket
 
@@ -407,6 +411,9 @@ def poll_cycle(config: SoniScopeConfig, client: "OSSClient") -> dict[str, int]:
         "skipped_done": 0,
         "downloaded": 0,
         "sha256_mismatch": 0,
+        "passthrough": 0,
+        "transcoded": 0,
+        "transcode_failed": 0,
         "errors": 0,
     }
 
@@ -454,11 +461,37 @@ def poll_cycle(config: SoniScopeConfig, client: "OSSClient") -> dict[str, int]:
             summary["errors"] += 1
             continue
 
-        if ok:
-            summary["downloaded"] += 1
-        else:
+        if not ok:
             summary["sha256_mismatch"] += 1
-            # .part was already deleted by download_object — next cycle re-downloads
+            continue  # .part was already deleted by download_object — next cycle re-downloads
+
+        summary["downloaded"] += 1
+
+        # ── US-022: audio format detection, passthrough, transcode ──
+        try:
+            fragment_date = _fragment_to_date(fragment_id)
+        except ValueError:
+            summary["errors"] += 1
+            continue
+
+        audio_result = process_audio(
+            part_path=part_path,
+            fragment_id=fragment_id,
+            fragment_date=fragment_date,
+            original_format=meta.original_format or "unknown",
+            original_sha256=meta.sha256 or "",
+            original_size_bytes=meta.content_length or 0,
+            home=home,
+        )
+
+        if not audio_result.ok:
+            summary["transcode_failed"] += 1
+            continue
+
+        if audio_result.mode == "passthrough":
+            summary["passthrough"] += 1
+        elif audio_result.mode == "transcoded":
+            summary["transcoded"] += 1
 
     return summary
 
@@ -518,10 +551,14 @@ def run_poll_loop(config: SoniScopeConfig) -> None:
             elapsed = time_mod.monotonic() - cycle_start
             logger.info(
                 "poll_cycle_complete total=%d skipped_done=%d downloaded=%d "
+                "passthrough=%d transcoded=%d transcode_failed=%d "
                 "mismatch=%d errors=%d elapsed=%.2fs",
                 summary["total_objects"],
                 summary["skipped_done"],
                 summary["downloaded"],
+                summary["passthrough"],
+                summary["transcoded"],
+                summary["transcode_failed"],
                 summary["sha256_mismatch"],
                 summary["errors"],
                 elapsed,
