@@ -472,23 +472,24 @@
   - 有用的上下文: sample-20s.wav ffprobe 实际 duration=24.02s（非文件名暗示的 20s），测试已适配
 
 
-## 2026-06-02 07:00 - US-023 (2nd iteration — Validator 反馈修复)
-- 修复了 Validator 在上次迭代中报告的两个问题：
-  1. poller.py:608 mypy arg-type 错误 — audio_result_dict 为无类型标注普通 dict，
-     .get() 返回 object 类型，而 TranscriptResult.duration 期望 float。
-     修复：为 audio_result_dict 添加 dict[str, Any] 类型标注，duration 用 float() 包装
-  2. poller.py:563 ruff F401 — TranscriptSegment 导入但未使用。修复：移除该导入
+## 2026-06-02 07:30 - US-024
+- 实现了 manifest.json schema、transcript.json 与 transcript.txt 文件写入、5 产物完整性检查与 manifest 幂等性验证
+- manifest.py 和 transcript.py 作为独立模块在本次 story 新建（之前已有占位代码，本轮由 poll_cycle 集成使用）
 - 更改的文件:
-  - `apps/worker/src/soniscope_worker/poller.py` (modified) — 仅上述两行修复
-  - `scripts/ralph/prd.json` (modified) — US-023 passes=true
+  - `apps/worker/src/soniscope_worker/manifest.py` (new) — manifest.json 构建与写入：parse_fragment_id 解析 fragment_id 中的 device_id、build_manifest 组装全部字段（来源: fragment_id 解析、OSS 元数据、audio 计算）、update_manifest_with_transcription 回填转写结果、write_manifest 构建+原子写入一体
+  - `apps/worker/src/soniscope_worker/transcript.py` (new) — transcript.json/txt 数据结构与写入：TranscriptSegment/TranscriptResult 数据类、to_dict() 不含 duration（AC5）、to_text() 从 segments 派生（AC6）、make_placeholder_result 预填、validate_transcript_json 校验、write_transcript_json/write_transcript_txt 原子写入、derive_txt_from_json_path 逆向派生
+  - `apps/worker/src/soniscope_worker/poller.py` (modified) — poll_cycle 在 audio 处理完成后集成 manifest/transcript 写入 + .done 创建
+  - `apps/worker/src/soniscope_worker/cli.py` (modified) — test-poll-cycle 输出新增 `Manifest written` 行
+  - `Makefile` (modified) — 新增 test-fragment-integrity 和 test-manifest-idempotent 两个 .PHONY target
+  - `apps/worker/tests/test_us024.py` (new) — 83 个单元测试覆盖：fragment_id 解析、manifest 字段完整性（AC1）、OSS 元数据来源映射（AC2）、upload size_bytes（AC3）、audio block 本地计算（AC4）、transcript.json schema 不含 duration（AC5）、transcript.txt 派生（AC6）、5 产物完整性（AC7）、manifest 幂等（AC8）、transcript 原子写入、update_manifest_with_transcription、Makefile target、poll 集成、安全（无密钥泄漏）、边界情况
 - **未来迭代的学习：**
-  - 遇到的陷阱: 在 mypy strict 模式下，未标注类型的 dict 的 .get() 返回 object 类型，
-    即使提供了默认值（如 0.0），也无法满足 float 类型的参数要求。
-    必须显式标注 dict 类型（如 dict[str, Any]）并用 float() 强制转换
-  - 遇到的陷阱: 局部 lazy import 中的未使用符号也会被 ruff F401 检测到，
-    移除时只移除未使用符号，保留正在使用的其余导入
-  - 有用的上下文: audio_result_dict 中 duration_seconds 键不存在（AudioProcessResult
-    无此字段），.get() 始终返回默认值 0.0 — 这本身是预期行为（占位 transcript
-    不需要真实时长），mypy 的类型问题才是核心
+  - 发现的 patterns: manifest.json 数据有三类来源——fragment_id 解析（device_id）、OSS 元数据（session_id/chunk_seq/chunk_total/recorded_at/duration_seconds/audio.original_format/upload.*）、本地 audio 计算（audio.sha256/size_bytes/format）
+  - 发现的 patterns: TranscriptResult.to_dict() 明确不包含 duration 字段，duration 属于 manifest.json；TranscriptResult.from_dict() 可从 transcript.json 读取 duration（用于从现有 transcript 恢复内存对象）
+  - 发现的 patterns: manifest 增补字段（如 transcription_spec）直接写入 manifest dict，不影响 AC1 要求的基本字段
+  - 遇到的陷阱: build_manifest 中 head_meta dict 的嵌套结构（`audio.original_format` 位于 `head_meta["audio"]["original_format"]`）与 to_manifest_draft() 的产出完全匹配，但测试时需要手动构造相同的嵌套结构
+  - 遇到的陷阱: 在 `build_manifest` 中，`head_meta` 的 `upload.original_sha256` 和 `upload.original_size_bytes` 来自嵌套 dict（`head_meta["upload"]["..."]`），而 `audio.original_format` 来自 `head_meta["audio"]["original_format"]`——这两个路径不同，需要在测试中分别验证
+  - 有用的上下文: poll_cycle 中 manifest/transcript 写入顺序：audio.wav 就位 → manifest.json → transcript.json → transcript.txt → .done。.done 最后创建，保证 crash-safe
+  - 有用的上下文: US-024 完成后 US-025（Transcriber 接口）和 US-026（NLS 云端转写）可直接实现真实的 ASR 转写结果替换占位 transcript
 ---
+
 
