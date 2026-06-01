@@ -6,23 +6,27 @@
 - mypy strict mode enforced from day one; `--strict` flag in Makefile.
 - ruff for linting (not flake8 or pylint).
 - pytest for testing; tests must exist — pytest exits with code 5 (failure) when no tests are collected.
+- Pydantic v2 `model_validate()` is the canonical way to construct models from raw dicts.
+- Secret masking: override `__repr__`, `__str__`, and `model_dump()` on Pydantic models; use a recursive `_mask_dict()` helper that knows which field names are sensitive.
+- Config loading: `yaml.safe_load()` → `model_validate()` → catch `ValidationError` to extract and list all missing fields at once.
+- Runtime dir initialization uses `Path.mkdir(parents=True, exist_ok=True)` for idempotent creation.
+- `typer.Exit(code=1)` is how CLI commands signal non-zero exit; error messages go to stderr via `err=True` on `typer.echo()`.
+- `typer.testing.CliRunner` is the standard way to test Typer CLI commands in pytest.
 
-## 2026-06-01 20:55 - US-001
-- 建立了 monorepo 与 Python Worker 基础骨架
+## 2026-06-01 21:00 - US-002
+- 实现了完整的配置 schema、脱敏加载器与运行时目录初始化
 - 更改的文件:
-  - `pyproject.toml` (new) — root uv workspace declaring apps/worker
-  - `apps/worker/pyproject.toml` (new) — worker sub-project with deps
-  - `apps/worker/src/soniscope_worker/__init__.py` (new) — package init with __version__
-  - `apps/worker/src/soniscope_worker/__main__.py` (new) — python -m entry point
-  - `apps/worker/src/soniscope_worker/cli.py` (new) — Typer CLI with run/check-config/init-dirs placeholders
-  - `apps/worker/src/soniscope_worker/config.py` (new) — config loader placeholder
-  - `apps/worker/src/soniscope_worker/paths.py` (new) — runtime path resolution placeholder
-  - `apps/worker/tests/test_skeleton.py` (new) — 4 smoke tests
-  - `Makefile` (new) — top-level unified command entry
-  - `apps/worker/uv.lock` (new) — lock file for reproducible installs
+  - `apps/worker/src/soniscope_worker/config.py` (rewrite) — Pydantic v2 SoniScopeConfig, OssConfig, PollConfig, TranscriberConfig, mask_secret(), load_config(), resolve_config_path(), check_file_permissions(), ConfigValidationError
+  - `apps/worker/src/soniscope_worker/paths.py` (rewrite) — resolve_home(), inbox_dir(), fragments_dir(), tmp_dir(), init_runtime_dirs()
+  - `apps/worker/src/soniscope_worker/cli.py` (rewrite) — actual check-config and init-dirs implementations
+  - `apps/worker/pyproject.toml` (added types-pyyaml dev dep)
+  - `apps/worker/tests/test_us002.py` (new) — 33 tests
+  - `apps/worker/uv.lock` (updated)
 - **未来迭代的学习：**
-  - 发现的 patterns: `uv run --directory apps/worker <cmd>` 是项目根目录下调用 Worker 工具的标准方式
-  - 发现的 patterns: Makefile 路径需相对于 `apps/worker/`（因为 `--directory` 改变了 CWD）
-  - 发现的 patterns: mypy strict、ruff、pytest 三者必须全部通过才能提交
-  - 有用的上下文: FC 函数目录结构 `apps/fc/<function>/` 已预留但为空；小程序目录 `apps/miniprogram/` 同理
+  - 发现的 patterns: `mask_secret()` shows first 4 + last 4 chars; values ≤8 chars become all `*`
+  - 发现的 patterns: `_mask_dict()` mutates dict in place — call on `model_dump()` output, not on the model itself
+  - 发现的 patterns: `ConfigValidationError` wraps `ValidationError` and extracts `loc` using `→` as separator
+  - 发现的 patterns: `check_file_permissions` returns `(bool, str)` tuple — True=OK, False=warning message
+  - 有用的上下文: `SONISCOPE_HOME` env var is the authoritative runtime dir; `~/SoniScope` is fallback
+  - 有用的上下文: config.yaml must be `chmod 600`; check-config warns if not but doesn't exit non-zero for permission issues alone
 ---
