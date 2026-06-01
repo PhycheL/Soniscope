@@ -1,0 +1,28 @@
+## Codebase Patterns
+- Monorepo managed by uv workspace at the root — `pyproject.toml` only declares workspace members, no business deps.
+- Worker is an independent uv sub-project under `apps/worker/` with its own `pyproject.toml` and `.venv`.
+- `uv run --directory apps/worker <cmd>` as the standard invocation pattern from the project root.
+- Makefile paths are relative to `apps/worker/` (e.g. `src/` not `apps/worker/src/`) because `uv run --directory apps/worker` changes CWD.
+- mypy strict mode enforced from day one; `--strict` flag in Makefile.
+- ruff for linting (not flake8 or pylint).
+- pytest for testing; tests must exist — pytest exits with code 5 (failure) when no tests are collected.
+
+## 2026-06-01 20:55 - US-001
+- 建立了 monorepo 与 Python Worker 基础骨架
+- 更改的文件:
+  - `pyproject.toml` (new) — root uv workspace declaring apps/worker
+  - `apps/worker/pyproject.toml` (new) — worker sub-project with deps
+  - `apps/worker/src/soniscope_worker/__init__.py` (new) — package init with __version__
+  - `apps/worker/src/soniscope_worker/__main__.py` (new) — python -m entry point
+  - `apps/worker/src/soniscope_worker/cli.py` (new) — Typer CLI with run/check-config/init-dirs placeholders
+  - `apps/worker/src/soniscope_worker/config.py` (new) — config loader placeholder
+  - `apps/worker/src/soniscope_worker/paths.py` (new) — runtime path resolution placeholder
+  - `apps/worker/tests/test_skeleton.py` (new) — 4 smoke tests
+  - `Makefile` (new) — top-level unified command entry
+  - `apps/worker/uv.lock` (new) — lock file for reproducible installs
+- **未来迭代的学习：**
+  - 发现的 patterns: `uv run --directory apps/worker <cmd>` 是项目根目录下调用 Worker 工具的标准方式
+  - 发现的 patterns: Makefile 路径需相对于 `apps/worker/`（因为 `--directory` 改变了 CWD）
+  - 发现的 patterns: mypy strict、ruff、pytest 三者必须全部通过才能提交
+  - 有用的上下文: FC 函数目录结构 `apps/fc/<function>/` 已预留但为空；小程序目录 `apps/miniprogram/` 同理
+---
