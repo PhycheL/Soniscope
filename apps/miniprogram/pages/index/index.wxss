@@ -319,3 +319,8 @@
   color: #07c160;
   font-size: 14px;
 }
+
+.dev-menu-link {
+  color: #fa8c16;
+  font-size: 13px;
+}

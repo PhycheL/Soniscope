@@ -103,4 +103,11 @@
       查看上传列表 →
     </navigator>
   </view>
+
+  <!-- 开发者菜单入口（AC1: 仅非 production 环境可见） -->
+  <view class="nav-section" wx:if="{{!isProduction}}">
+    <navigator url="/pages/dev-menu/dev-menu" class="nav-link dev-menu-link">
+      👺 开发者菜单
+    </navigator>
+  </view>
 </view>

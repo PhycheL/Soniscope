@@ -11,6 +11,7 @@
 var constants = require('./constants.js');
 var logger = require('./logger.js');
 var cleanup = require('./cleanup.js');
+var devInjector = require('./dev-injector.js');
 
 // ── Module-level state ────────────────────────────────────────────
 
@@ -69,6 +70,12 @@ function processUploadQueue() {
 
   if (!_networkAvailable) {
     logger.info('[Uploader] offline, deferring uploads');
+    return;
+  }
+
+  // Fault injection: mock-network-offline simulates offline mode
+  if (devInjector.getFlag('mockNetworkOffline')) {
+    logger.info('[Uploader] 👺 mock-network-offline active, deferring uploads');
     return;
   }
 
@@ -326,6 +333,13 @@ function _wxLogin(callback) {
 // ── FC /issue-credential ──────────────────────────────────────────
 
 function _fetchSts(record, code, callback) {
+  // Fault injection: mock-fc-url-broken forces all FC requests to fail
+  if (devInjector.getFlag('mockFcUrlBroken')) {
+    logger.info('[Uploader] 👺 mock-fc-url-broken: forcing FC /issue-credential failure');
+    callback({ errorCode: 'MOCK_FC_FAILURE', detail: 'Dev injector: mock-fc-url-broken is ON' });
+    return;
+  }
+
   var data = {
     code: code,
     fragment_id: record.fragmentId,
@@ -750,6 +764,20 @@ function _verifyUploadWithRetry(record, code, attempt, callback) {
 }
 
 function _doVerifyUpload(record, code, attempt, callback) {
+  // Fault injection: mock-fc-url-broken forces all FC requests to fail
+  if (devInjector.getFlag('mockFcUrlBroken')) {
+    logger.info('[Uploader] 👺 mock-fc-url-broken: forcing FC /verify-upload failure');
+    callback({ reason: 'MOCK_FC_FAILURE' });
+    return;
+  }
+
+  // Fault injection: mock-verify-fail forces verify to return false
+  if (devInjector.getFlag('mockVerifyFail')) {
+    logger.info('[Uploader] 👺 mock-verify-fail: returning verified:false for', record.fragmentId);
+    callback({ reason: 'VERIFY_FALSE_MOCK_FAILURE' });
+    return;
+  }
+
   var data = {
     code: code,
     fragment_id: record.fragmentId,
@@ -819,9 +847,10 @@ function _handleUploadFailure(list, index, errorCode) {
 function _handleVerifyFailure(list, index, reason) {
   var record = list[index];
 
-  // verified:false (OBJECT_NOT_FOUND / SIZE_MISMATCH) → manual_retry
+  // verified:false / mock failures → manual_retry
   // verify 调用失败 ×3 → manual_verify
-  if (reason === 'VERIFY_FALSE_OBJECT_NOT_FOUND' || reason === 'VERIFY_FALSE_SIZE_MISMATCH') {
+  if (reason === 'VERIFY_FALSE_OBJECT_NOT_FOUND' || reason === 'VERIFY_FALSE_SIZE_MISMATCH' ||
+      reason === 'VERIFY_FALSE_MOCK_FAILURE' || reason === 'MOCK_FC_FAILURE') {
     _updateRecordStatus(list, index, constants.UPLOAD_STATUS.MANUAL_RETRY);
   } else {
     _updateRecordStatus(list, index, constants.UPLOAD_STATUS.MANUAL_VERIFY);

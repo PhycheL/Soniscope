@@ -374,3 +374,22 @@
   - 有用的上下文: verifiedAt 时间戳在 uploader.js 的 _uploadOne verify 成功路径中写入（`verifiedAt: new Date().toISOString()`），cleanup 模块读取此字段判断 48h
   - 有用的上下文: US-019（上传列表八种状态）可在 US-018 基础上扩展列表页的状态聚合展示；US-018 已提供 delete/index 的按钮骨架，US-019 可复用 .item-actions 样式
 ---
+
+## 2026-06-02 12:00 - US-019
+- 实现了上传列表页八种状态中文展示、顶部未上传横幅（AC4）、长录音聚合卡片（AC6/AC7）、session 折叠/展开（AC8）与单个 chunk 独立重传
+- 更改的文件:
+  - `apps/miniprogram/pages/upload-list/upload-list.js` (rewrite) — 完全重写数据加载逻辑：按 sessionId 分组（`sessionMap` → `sessionCards`）、单条记录分离（`individualRecords`）、顶部横幅计算（`pendingCount` + `hoursSinceEarliest`）、session 卡片构造（totalDuration/totalDurationDisplay/allVerified/failedCount/expanded）、新增 onToggleSession（折叠/展开）和 onRetryChunk（单个 chunk 独立重传）两个 handler、保留 onManualRetry/onReVerify/onDeleteRecord 全部旧 handler、新增 `_formatDuration` 工具函数（手动零填充 mm:ss，与 idgen.js 的 `_pad2` 模式一致）
+  - `apps/miniprogram/pages/upload-list/upload-list.wxml` (rewrite) — 新增 pending-banner（⚠️ 未上传 N 条，距离最早录音已 X 小时）、新增 session-card 聚合卡片（session-header 可点击折叠/展开 + session-chunks 展开区）、session 级状态汇总（✅ 已完成 / ⚠️ X/N 失败）、展开后每个 chunk 独立显示（chunk-seq/chunk-status/progress-bar/手动重传/re-verify/删除）、保留 individualRecords 单条记录渲染（复用旧 item 结构）
+  - `apps/miniprogram/pages/upload-list/upload-list.wxss` (rewrite) — 新增 .pending-banner/.pending-icon/.pending-text 横幅样式（红色系 #fff1f0/#f5222d）、新增 .session-card/.session-header/.session-title/.session-meta/.session-status/.session-status-failed/.session-toggle 卡片样式、新增 .session-chunks/.chunk-item/.chunk-main/.chunk-seq/.chunk-status/.chunk-meta/.chunk-duration/.chunk-id chunk 展开列表样式、新增 .chunk-status.draft～.chunk-status.manual_verify 八种状态颜色（复用主状态颜色映射）、保留全部旧样式（.list-item/.item-status/progress-bar/retry-section/.item-actions）
+  - `apps/worker/tests/test_us019.py` (new) — 99 个单元测试覆盖：JS 模块结构（sessionCards/individualRecords/showBanner/pendingCount/hoursSinceEarliest 数据字段）、session 分组逻辑（sessionMap/chunkTotal/sort/sessionCards 构造）、pending banner 计算（6 种待关注状态/pendingCount/hoursSinceEarliest/recordedAt）、onToggleSession handler、onRetryChunk handler（triggerManualRetry/fragmentId）、_formatDuration 手动零填充、完整 handler 注册（6 个 handler）、WXML session-card/session-header/session-chunks/chunk-item/chunk-status 元素、WXML pending-banner 中文文案、WXML individualRecords 保留、WXSS session-card/chunk 全部样式、WXSS pending-banner 红色配色、WXSS chunk-status 八种状态颜色、WXSS 旧样式保留、constants 八种 CN label、JS 语法、密钥安全、Makefile 覆盖、页面四文件结构、WXML 条件渲染、session card 边界情况
+- **未来迭代的学习：**
+  - 发现的 patterns: 长录音聚合卡片通过 `sessionId + chunkTotal > 1` 判断分组，单 chunk 或缺少 sessionId 的记录直接归入 individualRecords
+  - 发现的 patterns: session-card 的折叠/展开通过 `expanded` 布尔字段控制，`onToggleSession` 中 toggle 后通过 `setData({ sessionCards: cards })` 更新 UI
+  - 发现的 patterns: 顶部横幅的 pendingCount 统计 6 种非终态状态（QUEUED/UPLOADING/UPLOAD_FAILED/MANUAL_RETRY/MANUAL_VERIFY/PENDING_VERIFY），hoursSinceEarliest 通过遍历所有记录的 recordedAt 时间戳计算
+  - 发现的 patterns: 单个 chunk 的独立重传使用 `onRetryChunk` handler（绑定 `data-fragment-id`），内部调用 `uploader.triggerManualRetry(fragmentId)`，与 session 级重传完全解耦（AC8: 点击单个 chunk 重传不会重传其他 chunk）
+  - 发现的 patterns: `_formatDuration` 使用手动零填充（`'0' + m` / `'0' + s`），与 `utils/idgen.js` 中 `_pad2()` 的模式一致，不使用 `padStart`（兼容性考虑）
+  - 遇到的陷阱: chunk 在 session-chunks 中渲染时需要独立的状态颜色映射（`.chunk-status.draft` ~ `.chunk-status.manual_verify` 共 8 条规则），不能复用 `.item-status` 的选择器
+  - 遇到的安全注意事项: 旧的 `wx:if` 条件中 `item.status !== 'verified'` 三状态排除写死为字符串比较，新增 session-chunks 中的 chunk 操作按钮需要同样的条件逻辑
+  - 有用的上下文: US-019 是前端最后一个功能 story，完成后小程序前端功能闭环（US-011~US-019，录音→草稿→上传→verify→列表管理）已完整；后续 US-020 是故障注入菜单，US-021+ 是 Worker 后端
+  - 有用的上下文: 需要微信开发者工具模拟器或真机验证八种状态中文文案、长录音折叠/展开、离线横幅、chunk 独立重传 — 自动测试只能验证代码结构和语法
+---

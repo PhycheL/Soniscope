@@ -1,7 +1,8 @@
 {
   "pages": [
     "pages/index/index",
-    "pages/upload-list/upload-list"
+    "pages/upload-list/upload-list",
+    "pages/dev-menu/dev-menu"
   ],
   "window": {
     "navigationBarBackgroundColor": "#ffffff",

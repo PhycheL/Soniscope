@@ -1,0 +1,65 @@
+<!-- 日观声记 · 开发者故障注入菜单 -->
+<view class="container">
+  <view class="header">
+    <text class="page-title">👺 开发者菜单</text>
+    <text class="page-subtitle">故障注入开关 · 仅在非生产环境可用</text>
+  </view>
+
+  <!-- 开关列表 -->
+  <view class="toggle-list">
+    <!-- mock-fc-url-broken -->
+    <view class="toggle-item">
+      <view class="toggle-info">
+        <text class="toggle-label">mock-fc-url-broken</text>
+        <text class="toggle-desc">强制 FC 请求全部失败（/issue-credential 与 /verify-upload）</text>
+        <text class="toggle-hint">用于验证自动重试 3 次后进入待人工重传</text>
+      </view>
+      <switch
+        checked="{{mockFcUrlBroken}}"
+        bindchange="onToggleMockFc"
+        color="#e64340"
+      />
+    </view>
+
+    <!-- mock-network-offline -->
+    <view class="toggle-item">
+      <view class="toggle-info">
+        <text class="toggle-label">mock-network-offline</text>
+        <text class="toggle-desc">模拟离线，即使真实网络可用也让保存并上传进入离线排队</text>
+      </view>
+      <switch
+        checked="{{mockNetworkOffline}}"
+        bindchange="onToggleMockOffline"
+        color="#fa8c16"
+      />
+    </view>
+
+    <!-- mock-verify-fail -->
+    <view class="toggle-item">
+      <view class="toggle-info">
+        <text class="toggle-label">mock-verify-fail</text>
+        <text class="toggle-desc">/verify-upload 永远返回 verified:false</text>
+        <text class="toggle-hint">用于验证待人工 verify 或待人工重传路径</text>
+      </view>
+      <switch
+        checked="{{mockVerifyFail}}"
+        bindchange="onToggleMockVerify"
+        color="#e64340"
+      />
+    </view>
+  </view>
+
+  <!-- 重置按钮 -->
+  <view class="reset-section">
+    <button class="reset-btn" bindtap="onResetAll">全部关闭</button>
+  </view>
+
+  <!-- 环境提示 -->
+  <view class="env-hint" wx:if="{{isProduction}}">
+    <text class="env-warning">⚠️ 当前为生产环境，故障注入开关不会生效</text>
+  </view>
+
+  <view class="env-hint" wx:else>
+    <text class="env-ok">✅ 当前为非生产环境，故障注入开关可用</text>
+  </view>
+</view>

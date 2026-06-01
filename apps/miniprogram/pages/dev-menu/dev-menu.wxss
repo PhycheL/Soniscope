@@ -1,0 +1,117 @@
+/* 日观声记 · 开发者故障注入菜单样式 */
+
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+  padding: 40px 0;
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.page-title {
+  display: block;
+  font-size: 24px;
+  font-weight: 600;
+  color: #333333;
+  margin-bottom: 8px;
+}
+
+.page-subtitle {
+  display: block;
+  font-size: 13px;
+  color: #999999;
+}
+
+/* ── 开关列表 ──────────────────────────────────────────────── */
+
+.toggle-list {
+  width: 340px;
+  margin-bottom: 30px;
+}
+
+.toggle-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background-color: #ffffff;
+  border-radius: 12px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.toggle-info {
+  flex: 1;
+  margin-right: 16px;
+}
+
+.toggle-label {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  color: #333333;
+  font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
+  margin-bottom: 4px;
+}
+
+.toggle-desc {
+  display: block;
+  font-size: 12px;
+  color: #666666;
+  margin-bottom: 2px;
+}
+
+.toggle-hint {
+  display: block;
+  font-size: 11px;
+  color: #999999;
+  font-style: italic;
+}
+
+/* ── 重置按钮 ──────────────────────────────────────────────── */
+
+.reset-section {
+  width: 340px;
+  margin-bottom: 20px;
+}
+
+.reset-btn {
+  width: 100%;
+  height: 44px;
+  line-height: 44px;
+  padding: 0;
+  font-size: 15px;
+  font-weight: 500;
+  background-color: #f5f5f5;
+  color: #333333;
+  border-radius: 8px;
+  border: none;
+}
+
+.reset-btn::after {
+  border: none;
+}
+
+/* ── 环境提示 ──────────────────────────────────────────────── */
+
+.env-hint {
+  width: 340px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.env-warning {
+  font-size: 13px;
+  color: #e64340;
+}
+
+.env-ok {
+  font-size: 13px;
+  color: #07c160;
+}

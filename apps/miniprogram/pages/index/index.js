@@ -29,6 +29,8 @@ Page({
     // 中断恢复提示
     showRecoveryModal: false,
     recoveryDraft: null,
+    // 开发者菜单可见性（AC1: 仅非 production 环境可见）
+    isProduction: constants.IS_PRODUCTION,
   },
 
   timerInterval: null,
@@ -758,5 +760,13 @@ Page({
       clearInterval(this.timerInterval);
       this.timerInterval = null;
     }
+  },
+
+  // ── 开发者菜单导航 ──────────────────────────────────────────────────────────
+
+  navigateToDevMenu: function () {
+    wx.navigateTo({
+      url: '/pages/dev-menu/dev-menu',
+    });
   },
 });
