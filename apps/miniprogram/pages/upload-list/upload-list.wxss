@@ -1,4 +1,4 @@
-/* 日观声记 · 上传列表页样式 */
+/* 日观声记 · 上传列表页样式 (US-019: 横幅 + 长录音卡片 + 聚合展示) */
 
 .container {
   padding: 20px;
@@ -8,8 +8,33 @@
 .page-title {
   font-size: 20px;
   font-weight: 600;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
+
+/* ── AC4: 顶部未上传横幅 ──────────────────────────────────── */
+
+.pending-banner {
+  display: flex;
+  align-items: center;
+  background-color: #fff1f0;
+  border: 1px solid #ffa39e;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
+
+.pending-icon {
+  font-size: 16px;
+  margin-right: 8px;
+}
+
+.pending-text {
+  font-size: 14px;
+  color: #f5222d;
+  font-weight: 500;
+}
+
+/* ── 空列表 ────────────────────────────────────────────────── */
 
 .empty-list {
   display: flex;
@@ -34,6 +59,8 @@
   flex-direction: column;
   gap: 12px;
 }
+
+/* ── 单条记录卡片 ──────────────────────────────────────────── */
 
 .list-item {
   background-color: #ffffff;
@@ -90,6 +117,117 @@
 .nav-link {
   color: #07c160;
   font-size: 14px;
+}
+
+/* ── AC6: 长录音聚合卡片 ───────────────────────────────────── */
+
+.session-card {
+  background-color: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+
+.session-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background-color: #fafafa;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.session-title {
+  font-size: 15px;
+  font-weight: 500;
+  color: #333333;
+}
+
+.session-meta {
+  font-size: 13px;
+  color: #999999;
+}
+
+.session-status {
+  font-size: 13px;
+  color: #52c41a;
+  font-weight: 500;
+}
+
+.session-status-failed {
+  font-size: 13px;
+  color: #f5222d;
+  font-weight: 500;
+}
+
+.session-toggle {
+  font-size: 12px;
+  color: #999999;
+}
+
+/* ── AC8: 展开后的 chunk 列表 ───────────────────────────────── */
+
+.session-chunks {
+  padding: 8px 0;
+}
+
+.chunk-item {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f5f5f5;
+  background-color: #ffffff;
+}
+
+.chunk-item:last-child {
+  border-bottom: none;
+}
+
+.chunk-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.chunk-seq {
+  font-size: 13px;
+  color: #666666;
+  font-weight: 500;
+}
+
+.chunk-status {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background-color: #f0f0f0;
+}
+
+/* chunk 状态颜色（复用主状态颜色映射） */
+.chunk-status.draft { background-color: #f5f5f5; color: #999999; }
+.chunk-status.queued { background-color: #fff7e6; color: #fa8c16; }
+.chunk-status.uploading { background-color: #e6f7ff; color: #1890ff; }
+.chunk-status.pending_verify { background-color: #f6ffed; color: #52c41a; }
+.chunk-status.verified { background-color: #f6ffed; color: #52c41a; }
+.chunk-status.upload_failed { background-color: #fff1f0; color: #f5222d; }
+.chunk-status.manual_retry { background-color: #fff1f0; color: #f5222d; }
+.chunk-status.manual_verify { background-color: #fff7e6; color: #fa8c16; }
+
+.chunk-meta {
+  font-size: 12px;
+  color: #999999;
+  display: flex;
+  justify-content: space-between;
+}
+
+.chunk-duration {
+  margin-right: 16px;
+}
+
+.chunk-id {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
 }
 
 /* 进度条 */

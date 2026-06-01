@@ -1,18 +1,79 @@
-<!-- 日观声记 · 上传列表页 -->
+<!-- 日观声记 · 上传列表页 (US-019: 八种状态 + 离线积压提醒 + 长录音折叠) -->
 <view class="container">
   <view class="page-title">
     <text>上传列表</text>
   </view>
 
+  <!-- AC4: 顶部未上传横幅 -->
+  <view class="pending-banner" wx:if="{{showBanner}}">
+    <text class="pending-icon">⚠️</text>
+    <text class="pending-text">未上传 {{pendingCount}} 条</text>
+    <text class="pending-text" wx:if="{{hoursSinceEarliest !== ''}}">，距离最早录音已 {{hoursSinceEarliest}} 小时</text>
+  </view>
+
   <!-- 空列表 -->
-  <view class="empty-list" wx:if="{{uploadList.length === 0}}">
+  <view class="empty-list" wx:if="{{totalRecords === 0}}">
     <text class="empty-text">暂无上传记录</text>
     <text class="empty-hint">录完音后，点击"保存并上传"即可在此查看</text>
   </view>
 
   <!-- 上传列表 -->
-  <view class="list" wx:if="{{uploadList.length > 0}}">
-    <view class="list-item" wx:for="{{uploadList}}" wx:key="fragmentId">
+  <view class="list" wx:if="{{totalRecords > 0}}">
+
+    <!-- ===== AC6: 长录音聚合卡片 ===== -->
+    <view class="session-card" wx:for="{{sessionCards}}" wx:for-item="session" wx:key="sessionId">
+      <!-- 卡片头部（可点击折叠/展开） -->
+      <view class="session-header" bindtap="onToggleSession" data-session-id="{{session.sessionId}}">
+        <view class="session-info">
+          <text class="session-title">🎙️ 长录音 · {{session.totalDurationDisplay}}</text>
+          <text class="session-meta"> · {{session.chunkCount}} 段</text>
+          <!-- AC7: 聚合状态 -->
+          <text class="session-status" wx:if="{{session.allVerified}}"> · ✅ 已完成</text>
+          <text class="session-status-failed" wx:if="{{!session.allVerified}}"> · ⚠️ {{session.failedCount}} / {{session.chunkCount}} 失败</text>
+        </view>
+        <text class="session-toggle">{{session.expanded ? '▲' : '▼'}}</text>
+      </view>
+
+      <!-- AC8: 展开后的单个 chunk 列表 -->
+      <view class="session-chunks" wx:if="{{session.expanded}}">
+        <view class="chunk-item {{chunk.status}}" wx:for="{{session.chunks}}" wx:for-item="chunk" wx:key="fragmentId">
+          <view class="chunk-main">
+            <text class="chunk-seq">第{{chunk.chunkSeq}}/{{chunk.chunkTotal}}段</text>
+            <text class="chunk-status {{chunk.status}}">{{chunk.statusText}}</text>
+          </view>
+          <view class="chunk-meta">
+            <text class="chunk-duration">时长: {{chunk.duration}}秒</text>
+            <text class="chunk-id">{{chunk.fragmentId || '—'}}</text>
+          </view>
+
+          <!-- 上传进度条 -->
+          <view class="progress-bar" wx:if="{{chunk.status === 'uploading' && chunk.uploadProgress}}">
+            <view class="progress-fill" style="width: {{chunk.uploadProgress}}%"></view>
+            <text class="progress-text">{{chunk.uploadProgress}}%</text>
+          </view>
+
+          <!-- 手动重传按钮（chunk 级别） -->
+          <view class="retry-section" wx:if="{{chunk.status === 'manual_retry' || chunk.status === 'manual_verify'}}">
+            <text class="error-hint">错误: {{chunk.errorCode || chunk.verifyReason || '—'}}</text>
+            <button class="retry-btn" size="mini" bindtap="onRetryChunk" data-fragment-id="{{chunk.fragmentId}}">手动重传</button>
+          </view>
+
+          <!-- 重新 verify + 删除按钮（chunk 级别 verified） -->
+          <view class="item-actions" wx:if="{{chunk.status === 'verified'}}">
+            <button class="action-btn action-btn-reverify" size="mini" bindtap="onReVerify" data-fragment-id="{{chunk.fragmentId}}">重新校验</button>
+            <button class="action-btn action-btn-delete" size="mini" bindtap="onDeleteRecord" data-fragment-id="{{chunk.fragmentId}}" data-status="{{chunk.status}}">删除</button>
+          </view>
+
+          <!-- 删除按钮（非 verified chunk） -->
+          <view class="item-actions" wx:if="{{chunk.status !== 'verified' && chunk.status !== 'manual_retry' && chunk.status !== 'manual_verify' && chunk.status !== 'uploading'}}">
+            <button class="action-btn action-btn-delete" size="mini" bindtap="onDeleteRecord" data-fragment-id="{{chunk.fragmentId}}" data-status="{{chunk.status}}">删除</button>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- ===== 单条记录（非长录音或 chunkTotal ≤ 1） ===== -->
+    <view class="list-item" wx:for="{{individualRecords}}" wx:for-item="item" wx:key="fragmentId">
       <view class="item-main">
         <text class="item-id">{{item.fragmentId || '—'}}</text>
         <text class="item-status {{item.status}}">{{item.statusText}}</text>
@@ -36,7 +97,7 @@
         <button class="action-btn action-btn-reverify" size="mini" bindtap="onReVerify" data-fragment-id="{{item.fragmentId}}">重新校验</button>
         <button class="action-btn action-btn-delete" size="mini" bindtap="onDeleteRecord" data-fragment-id="{{item.fragmentId}}" data-status="{{item.status}}">删除</button>
       </view>
-      <!-- 删除按钮（非 verified 记录） -->
+      <!-- 删除按钮（非 verified 记录，且不在重试/上传中） -->
       <view class="item-actions" wx:if="{{item.status !== 'verified' && item.status !== 'manual_retry' && item.status !== 'manual_verify' && item.status !== 'uploading'}}">
         <button class="action-btn action-btn-delete" size="mini" bindtap="onDeleteRecord" data-fragment-id="{{item.fragmentId}}" data-status="{{item.status}}">删除</button>
       </view>
