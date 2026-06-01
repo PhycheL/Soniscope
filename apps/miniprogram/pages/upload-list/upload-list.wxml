@@ -17,8 +17,19 @@
         <text class="item-id">{{item.fragmentId || '—'}}</text>
         <text class="item-status {{item.status}}">{{item.statusText}}</text>
       </view>
-      <view class="item-meta" wx:if="{{item.duration}}">
-        <text class="item-duration">时长: {{item.duration}}秒</text>
+      <view class="item-meta">
+        <text class="item-duration" wx:if="{{item.duration}}">时长: {{item.duration}}秒</text>
+        <text class="item-chunk" wx:if="{{item.chunkSeq && item.chunkTotal > 1}}"> · 第{{item.chunkSeq}}/{{item.chunkTotal}}段</text>
+      </view>
+      <!-- 上传进度条 -->
+      <view class="progress-bar" wx:if="{{item.status === 'uploading' && item.uploadProgress}}">
+        <view class="progress-fill" style="width: {{item.uploadProgress}}%"></view>
+        <text class="progress-text">{{item.progressText}}</text>
+      </view>
+      <!-- 手动重传按钮 -->
+      <view class="retry-section" wx:if="{{item.status === 'manual_retry' || item.status === 'manual_verify'}}">
+        <text class="error-hint">错误: {{item.errorCode || item.verifyReason || '—'}}</text>
+        <button class="retry-btn" size="mini" bindtap="onManualRetry" data-fragment-id="{{item.fragmentId}}">手动重传</button>
       </view>
     </view>
   </view>

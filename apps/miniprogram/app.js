@@ -4,6 +4,7 @@
 
 var logger = require('./utils/logger.js');
 var idgen = require('./utils/idgen.js');
+var uploader = require('./utils/uploader.js');
 
 App({
   onLaunch: function () {
@@ -16,6 +17,9 @@ App({
     var deviceId = idgen.getOrCreateDeviceShortId();
     this.globalData.deviceShortId = deviceId;
     logger.info('[App] device_short_id ensured:', deviceId);
+
+    // 初始化上传引擎（注册网络状态监听，自动处理离线排队→恢复上传）
+    uploader.initUploader();
   },
 
   onShow: function () {

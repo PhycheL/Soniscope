@@ -5,7 +5,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 .PHONY: install check-config init-dirs worker-run verify-prep typecheck lint test \
         deploy-fc rollback-fc fc-logs test-fc-live test-verify-upload \
-        oss-delete-obj miniprogram-lint
+        oss-delete-obj miniprogram-lint show-oss-object test-sts-escape
 
 # ── 安装 ────────────────────────────────────────────────────────────────────
 
@@ -77,5 +77,15 @@ oss-delete-obj:
 
 miniprogram-lint:
 	@echo "==> Miniprogram static check"
-	@cd apps/miniprogram && node -c app.js && node -c utils/constants.js && node -c utils/logger.js && node -c utils/crypto.js && node -c utils/idgen.js && node -c pages/index/index.js && node -c pages/upload-list/upload-list.js
+	@cd apps/miniprogram && node -c app.js && node -c utils/constants.js && node -c utils/logger.js && node -c utils/crypto.js && node -c utils/idgen.js && node -c utils/uploader.js && node -c pages/index/index.js && node -c pages/upload-list/upload-list.js
 	@echo "==> Miniprogram JS syntax OK"
+
+# ── OSS 运维辅助 ──────────────────────────────────────────────────
+
+show-oss-object:
+	uv run --directory apps/worker --extra dev python "$(CURDIR)/scripts/show_oss_object.py" $(FRAGMENT_ID)
+
+test-sts-escape:
+	@echo "🧪 STS 越权验证"
+	@echo "需要 STS 临时凭证（access_key_id / access_key_secret / security_token / object_key）"
+	uv run --directory apps/worker --extra dev python "$(CURDIR)/scripts/test_sts_escape.py" $(STS_AK_ID) $(STS_AK_SECRET) $(STS_TOKEN) $(STS_OBJECT_KEY)

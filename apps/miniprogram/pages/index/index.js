@@ -4,6 +4,7 @@ var logger = require('../../utils/logger.js');
 var constants = require('../../utils/constants.js');
 var idgen = require('../../utils/idgen.js');
 var cryptoUtil = require('../../utils/crypto.js');
+var uploader = require('../../utils/uploader.js');
 
 var recorderManager = wx.getRecorderManager();
 
@@ -689,6 +690,9 @@ Page({
 
       logger.info('[Index] session saved:', sessionId,
         'chunks:', chunkTotal);
+
+      // Trigger the upload engine to start processing the queue
+      uploader.processUploadQueue();
     }
 
     // 开始处理

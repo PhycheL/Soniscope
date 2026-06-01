@@ -299,3 +299,22 @@
   - 有用的上下文: chunk_seq 默认 1，chunk_total 默认 0（表示非分片），US-016（长录音自动分片）将动态填写
   - 有用的上下文: session_id 当前与 fragment_id 一对一生成，US-016 长录音分片时所有 chunk 共享同一个 session_id
 ---
+
+## 2026-06-02 08:00 - US-016
+- 实现了长录音自动分片与 session 聚合元数据
+- 更改的文件:
+  - `apps/miniprogram/pages/index/index.js` (modified) — 新增长录音自动分片核心逻辑：录音开始时分配 session_id、初始化 _sessionChunks/_chunkSeq/_userStopped；onStop 回调重写为 chunk 收集模式；自动分片路径立即 restart recorder（timer 不清零）；用户手动停止后进入草稿确认态（显示总时长和片段数）；onSaveAndUpload 完整重写为多 chunk 串行 SHA-256 计算 + chunk_total 回填；中断保存包含所有已收集 chunk；删除/重录清理分片状态
+  - `apps/miniprogram/pages/index/index.wxml` (modified) — 草稿确认态新增片段数显示（draftChunkCount > 1 时）；中断恢复弹窗新增片段数显示（recoveryDraft.chunks > 1 时）
+  - `apps/worker/tests/test_us016.py` (new) — 48 个单元测试覆盖：CHUNK_MAX_DURATION_SECONDS 常量、_sessionId/_sessionChunks/_chunkSeq/_userStopped 内部变量声明、session_id 分配（_doStartRecord 中调用 generateSessionId）、chunk 收集（_sessionChunks.push）、auto-split 重启（_chunkSeq 递增/timer 不清零）、_userStopped 标记设置与重置、chunk_seq 从 1 递增（idx+1）、chunk_total 回填（所有 chunk 的 manifest.chunk_total 和 x-oss-meta-chunk-total）、session 兼容性、WXML/WXSS 模板完整性、JS 语法、密钥安全、Makefile 覆盖、状态迁移完整性
+- **未来迭代的学习：**
+  - 发现的 patterns: 长录音自动分片通过 `recorderManager.start({ duration: 600000 })` 触发 onStop，在 onStop 回调中通过 `_userStopped` 标记区分"自动分片"与"用户手动停止"路径
+  - 发现的 patterns: `_sessionChunks` 数组顺序收集所有 chunk，onSaveAndUpload 中通过递归 Promise 链（processNext → computeFileSha256 → push → idx++ → processNext）串行处理 SHA-256 计算，避免微信小程序并发资源限制
+  - 发现的 patterns: chunk_total 回填在 `_finishSave()` 收尾函数中统一执行（遍历 chunkEntries 覆盖 manifest.chunk_total 和 ossMeta['x-oss-meta-chunk-total']），回填后再批量写入 storage
+  - 发现的 patterns: `_sessionId` 在 _doStartRecord 中通过 `idgen.generateSessionId()` 分配，整个 session 生命周期不变；onSaveAndUpload 中读取 `this._sessionId` 复用（带 fallback）
+  - 遇到的陷阱: auto-split 时 `_clearTimer()` 不可调（timer 需要保持运行），只有 user-stop 和 interruption 时才清理计时器
+  - 遇到的陷阱: 中断时 `_sessionChunks` 必须先 push 当前 chunk 再保存到 storage，然后 `_sessionChunks = []` 清理（防止重复），且需记录所有 chunk 的路径供恢复
+  - 遇到的陷阱: onStop 中 `return` 的必要性 — interruption 路径必须提前 `return`，否则后续代码会误入正常/auto-split 路径
+  - 有用的上下文: US-016 完成后单 chunk 录音 chunk_total = 1（不再是 US-015 的 0），US-017（上传队列/STS/直传）读取 uploadRecord 时 chunk_seq 和 chunk_total 已经正确填充
+  - 有用的上下文: 25 分钟长录音会生成 3 条 Fragment（chunk_seq 1/2/3, chunk_total=3），每条独立上传、独立 verify、独立转写；Worker 通过 session_id 在 manifest 中识别同组
+  - 有用的上下文: 需要真机录制 25 分钟长录音验证三个 chunk 共享同一 session_id、chunk_seq 1/2/3、chunk_total=3 — 自动测试只能验证代码结构和语法
+---
