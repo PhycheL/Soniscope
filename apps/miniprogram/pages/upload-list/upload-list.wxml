@@ -1,0 +1,32 @@
+<!-- 日观声记 · 上传列表页 -->
+<view class="container">
+  <view class="page-title">
+    <text>上传列表</text>
+  </view>
+
+  <!-- 空列表 -->
+  <view class="empty-list" wx:if="{{uploadList.length === 0}}">
+    <text class="empty-text">暂无上传记录</text>
+    <text class="empty-hint">录完音后，点击"保存并上传"即可在此查看</text>
+  </view>
+
+  <!-- 上传列表 -->
+  <view class="list" wx:if="{{uploadList.length > 0}}">
+    <view class="list-item" wx:for="{{uploadList}}" wx:key="fragmentId">
+      <view class="item-main">
+        <text class="item-id">{{item.fragmentId || '—'}}</text>
+        <text class="item-status {{item.status}}">{{item.statusText}}</text>
+      </view>
+      <view class="item-meta" wx:if="{{item.duration}}">
+        <text class="item-duration">时长: {{item.duration}}秒</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 返回首页 -->
+  <view class="nav-section">
+    <navigator url="/pages/index/index" class="nav-link">
+      ← 返回首页
+    </navigator>
+  </view>
+</view>

@@ -5,7 +5,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 .PHONY: install check-config init-dirs worker-run verify-prep typecheck lint test \
         deploy-fc rollback-fc fc-logs test-fc-live test-verify-upload \
-        oss-delete-obj
+        oss-delete-obj miniprogram-lint
 
 # ── 安装 ────────────────────────────────────────────────────────────────────
 
@@ -72,3 +72,10 @@ oss-delete-obj:
 	@echo "⚠️  仅测试用 — Worker 业务源码中不存在 DeleteObject 调用"
 	@echo ""
 	uv run --directory apps/worker --extra dev python "$(CURDIR)/scripts/oss_delete_obj.py" $(FRAGMENT_ID)
+
+# ── 小程序代码静态检查 ──────────────────────────────────────────
+
+miniprogram-lint:
+	@echo "==> Miniprogram static check"
+	@cd apps/miniprogram && node -c app.js && node -c utils/constants.js && node -c utils/logger.js && node -c pages/index/index.js && node -c pages/upload-list/upload-list.js
+	@echo "==> Miniprogram JS syntax OK"

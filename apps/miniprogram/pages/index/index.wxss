@@ -1,0 +1,91 @@
+/* 日观声记 · 首页样式 */
+
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 60px;
+}
+
+.app-title {
+  display: block;
+  font-size: 28px;
+  font-weight: 600;
+  color: #333333;
+  margin-bottom: 8px;
+}
+
+.app-subtitle {
+  display: block;
+  font-size: 14px;
+  color: #999999;
+}
+
+.recorder-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.record-button-wrapper {
+  margin-bottom: 20px;
+}
+
+.record-btn {
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  background-color: #07c160;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 4px solid #ffffff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.record-btn.recording {
+  background-color: #e64340;
+  border-color: #fff5f5;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(230, 67, 64, 0.4); }
+  50% { box-shadow: 0 0 0 16px rgba(230, 67, 64, 0); }
+}
+
+.record-btn-hover {
+  opacity: 0.8;
+}
+
+.record-btn-text {
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.record-timer {
+  margin-top: 12px;
+}
+
+.timer-text {
+  font-size: 36px;
+  font-weight: 300;
+  font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
+  color: #333333;
+}
+
+.nav-section {
+  margin-top: 40px;
+}
+
+.nav-link {
+  color: #07c160;
+  font-size: 14px;
+}

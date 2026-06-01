@@ -1,0 +1,7 @@
+{
+  "projectname": "soniscope-dev",
+  "setting": {
+    "compileHotReLoad": true,
+    "urlCheck": false
+  }
+}

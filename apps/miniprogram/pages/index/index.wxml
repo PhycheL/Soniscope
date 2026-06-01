@@ -1,0 +1,29 @@
+<!-- 日观声记 · 首页（录音 + 草稿确认） -->
+<view class="container">
+  <view class="header">
+    <text class="app-title">日观声记</text>
+    <text class="app-subtitle">语音流水账 · 随手记录</text>
+  </view>
+
+  <!-- 录音区域 -->
+  <view class="recorder-section">
+    <view class="record-button-wrapper">
+      <button class="record-btn {{recording ? 'recording' : ''}}"
+              bind:tap="onRecordTap"
+              hover-class="record-btn-hover">
+        <text class="record-btn-text">{{recording ? '停止录音' : '开始录音'}}</text>
+      </button>
+    </view>
+
+    <view class="record-timer" wx:if="{{recording}}">
+      <text class="timer-text">{{timerDisplay}}</text>
+    </view>
+  </view>
+
+  <!-- 导航到上传列表 -->
+  <view class="nav-section">
+    <navigator url="/pages/upload-list/upload-list" class="nav-link">
+      查看上传列表 →
+    </navigator>
+  </view>
+</view>
