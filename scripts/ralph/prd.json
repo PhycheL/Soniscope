@@ -81,8 +81,7 @@
         "Tests pass"
       ],
       "priority": 4,
-      "passes": false,
-      "notes": "",
+      "passes": true,
       "retryCount": 0,
       "blocked": false
     },
