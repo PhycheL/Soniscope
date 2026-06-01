@@ -23,6 +23,10 @@
 - 阿里云云 API（STS 等）HMAC-SHA1 v1 签名使用 `GET&%2F&<percent-encoded-canonical-query>` 模式签名。`SignatureNonce` 用 `uuid.uuid4().hex`。
 - AuthError 支持 `extra` dict 字段，在 auth_error_to_response 中合并到 JSON body — 用于 SIZE_EXCEEDED 等需要额外字段的错误响应。
 - 当 SharedConfig (NamedTuple) 增加字段时，所有测试的 `_set_env` fixture 和 `os.environ.update({...})` 都需要补齐新字段。
+- 微信小程序每个页面必须有 .js/.json/.wxml/.wxss 四个文件；project.config.json 中 urlCheck=true 确保域名校验生效。
+- 小程序常量定义在 utils/constants.js 中集中管理（FC URL、OSS domain、分片阈值、状态枚举），不使用 process.env。
+- 小程序安全日志工具（utils/logger.js）对敏感字段名（access_key_secret/appsecret/token 等）自动脱敏，避免打印明文。
+- `node -c` 用于 Makefile 中的小程序 JS 语法快速检查。
 
 ## 2026-06-01 23:59 - US-003
 - 实现了测试音频 fixture duration 和 codec 校验功能
@@ -157,4 +161,55 @@
   - 有用的上下文: FC URL 为 https://issue-cedential-ottfirocds.cn-beijing.fcapp.run（注意拼写 issue-cedential 不是 typo）
   - 有用的上下文: --code 参数可选；不提供时 A/B/C/D 部分测试 mark 为 skipped，提供时运行完整测试套件
   - 有用的上下文: --wait-expiry 可选标志，用于实际等待 STS 过期后验证 PutObject 被拒
+---
+- FC verify-upload 云端闭环测试使用 A-F block 设计模式（与 test-fc-live 一致），每块独立函数、返回 BlockResult
+- test_verify_upload.py 中的 _delete_test_object 使用 OSS SDK（alibabacloud_oss_v2）并标注"仅测试用"
+- oss_delete_obj.py 独立脚本使用 HMAC-SHA1 v1 签名直接调用 OSS REST API（纯 stdlib），不依赖 OSS SDK
+- 测试中 mock HTTPError 不使用 `mock.MagicMock(spec=HTTPError)`（MagicMock 不是 BaseException 子类），而是构造真实异常
+- `scripts/` 下的独立脚本测试用 `sys.path.insert(0, str(SCRIPTS_DIR))` 导入，遵循 US-008 建立的 pattern
+- Makefile 新增 .PHONY target 时必须同时更新 `.PHONY:` 行和对应的 target 声明
+
+## 2026-06-02 03:30 - US-010
+- 实现了 FC verify-upload 云端闭环测试脚本（make test-verify-upload）与 oss-delete-obj 运维辅助命令
+- 更改的文件:
+  - `scripts/test_verify_upload.py` (new) — 完整的云端闭环测试脚本，6 个 block（A-F）覆盖：部署存活验证、verified:true 成功路径、OBJECT_NOT_FOUND 对象缺失路径、SIZE_MISMATCH 大小不一致路径、鉴权失败测试、P95 性能与日志检查
+  - `scripts/oss_delete_obj.py` (new) — OSS 对象删除脚本（⚠️ 仅测试用），使用 HMAC-SHA1 v1 签名通过 REST API 删除对象，有交互式确认
+  - `Makefile` (modified) — 添加 test-verify-upload 和 oss-delete-obj 两个 target，oss-delete-obj 在帮助文本标注"仅测试用"
+  - `apps/worker/tests/test_us010.py` (new) — 47 个单元测试，覆盖常量、数据类、HTTP mock、OSS ops mock、所有 6 个 block、Makefile target、CLI 参数、颜色辅助函数、运行流程、oss_delete_obj 导入、DeleteObject 在 Worker+FC 源码中的缺席验证
+- **未来迭代的学习：**
+  - 发现的 patterns: test-verify-upload 采用与 test-fc-live 一致的 A-F block 设计模式，每块返回 BlockResult，前一个 block 的结果可传递给下游 block
+  - 发现的 patterns: oss_delete_obj.py 独立脚本使用纯 stdlib（HMAC-SHA1 v1 签名 + urllib），不依赖 OSS SDK，保持与 FC shared 模块相同的签名模式
+  - 发现的 patterns: 测试脚本中 Delete test object 使用 OSS SDK 并在函数名和文档中标注"仅测试用"，与 security 红线要求一致
+  - 遇到的陷阱: 测试 `no_object_info_leaked_on_auth_fail` 时需要构造 "verified" 字段存在且 reason 为 "OBJECT_NOT_FOUND" 的场景来验证信息泄漏检测逻辑
+  - 遇到的陷阱: grep pattern 中使用 `\|` 会产生 SyntaxWarning，应使用 `-E` flag 和 `|` 正则语法
+  - 有用的上下文: test-verify-upload 需要 `--code` 参数才能运行完整测试套件（B/C/D 块），与 test-fc-live 的 `--code` 参数模式一致
+  - 有用的上下文: verify-upload FC URL 为 https://verify-upload-nnjpaoamhw.cn-beijing.fcapp.run
+  - 有用的上下文: oss-delete-obj 的 Makefile target 使用 `$(FRAGMENT_ID)` 参数化，需要在 help 文本中明确标注仅测试用
+---
+
+## 2026-06-02 04:00 - US-011
+- 实现了微信小程序项目骨架与环境配置
+- 更改的文件:
+  - `apps/miniprogram/app.js` (new) — 小程序入口，含生命周期、本地存储检查
+  - `apps/miniprogram/app.json` (new) — 全局配置，注册 index 和 upload-list 两个页面路由
+  - `apps/miniprogram/app.wxss` (new) — 全局样式（通用按钮、文本截断）
+  - `apps/miniprogram/project.config.json` (new) — 项目配置，AppID=wx3f973c7297728b0c，urlCheck=true（强制校验合法域名）
+  - `apps/miniprogram/project.private.config.json` (new) — 开发模式专用配置
+  - `apps/miniprogram/sitemap.json` (new) — 站点地图
+  - `apps/miniprogram/package.json` (new) — Node.js 包元信息
+  - `apps/miniprogram/utils/constants.js` (new) — 全部常量定义：FC URL（保留 issue-cedential 拼写）、OSS upload 域名、分片阈值 600s、8 种上传状态中英文映射
+  - `apps/miniprogram/utils/logger.js` (new) — 安全日志工具：自动脱敏 AK/Secret/Token 等敏感字段
+  - `apps/miniprogram/pages/index/index.{js,json,wxml,wxss}` (new) — 首页（录音按钮 + 计时器 + 导航到上传列表）
+  - `apps/miniprogram/pages/upload-list/upload-list.{js,json,wxml,wxss}` (new) — 上传列表页（8 种状态颜色区分、空列表提示）
+  - `Makefile` (modified) — 新增 miniprogram-lint target（node -c 检查所有 JS 语法）
+  - `apps/worker/tests/test_us011.py` (new) — 41 个单元测试：project.config 校验、app.json 路由、constants.js 值/URL 拼写/状态完整性、logger 安全脱敏、app.js 无硬编码密钥、所有 JS 语法、Makefile target、项目文件结构完整性、密钥泄漏扫描
+- **未来迭代的学习：**
+  - 发现的 patterns: 微信小程序每个页面必须有 .js/.json/.wxml/.wxss 四个文件；页面对应的 .json 可以只声明 `usingComponents: {}`
+  - 发现的 patterns: project.config.json 中 urlCheck=true 确保微信开发者工具在非生产模式也校验 request/uploadFile 合法域名
+  - 发现的 patterns: 小程序配置中 request 合法域名使用 https://issue-cedential-ottfirocds.cn-beijing.fcapp.run 与 https://verify-upload-nnjpaoamhw.cn-beijing.fcapp.run，不把 issue-cedential 拼写修正为 issue-credential
+  - 发现的 patterns: uploadFile 域名为 https://soniscope-audio.oss-cn-beijing.aliyuncs.com
+  - 发现的 patterns: `node -c` 可用于快速检查 JS 文件语法正确性，适合在 Makefile 中作为轻量 lint 替代
+  - 有用的上下文: 后续 US-012（录音开始停止）将在 index 页面上扩展真实的 wx.getRecorderManager 调用
+  - 有用的上下文: 后续 US-019（上传列表八种状态）将在 upload-list 页面扩展完整的状态展示、长录音折叠、离线提醒等功能
+  - 有用的上下文: 本期前端是"极薄前端"——只做采集、草稿、上传、状态展示；不做业务鉴权、不保存长期密钥
 ---
