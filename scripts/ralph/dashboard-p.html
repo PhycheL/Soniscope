@@ -67,9 +67,15 @@
 .game-floor {
   flex: 1; display: grid;
   grid-template-columns: repeat(3, 1fr);
-  grid-template-rows: repeat(3, 1fr);
+  grid-auto-rows: minmax(150px, 1fr);
+  align-content: stretch;
   gap: 8px; min-height: 0;
+  overflow-y: auto; overflow-x: hidden;
+  padding-right: 2px;
 }
+.game-floor::-webkit-scrollbar { width: 6px; }
+.game-floor::-webkit-scrollbar-track { background: transparent; }
+.game-floor::-webkit-scrollbar-thumb { background: #2a2a4e; border-radius: 4px; }
 
 /* Workstation Card */
 .workstation {
@@ -489,7 +495,9 @@ function render() {
   </div>`;
 
   // Main
-  html += '<div class="game-main"><div class="game-floor">';
+  // 列数随 story 数量自适应：保持接近正方形，避免过高或过窄
+  const cols = Math.min(6, Math.max(3, Math.ceil(Math.sqrt(stories.length))));
+  html += `<div class="game-main"><div class="game-floor" style="grid-template-columns:repeat(${cols},1fr)">`;
   stories.forEach((story, i) => {
     const state = getStoryState(story);
     const cs = updateCharacter(story, i);
@@ -578,7 +586,15 @@ function render() {
     <span>${new Date().toLocaleTimeString('zh-CN')}</span>
   </div>`;
 
+  // 记录滚动位置，避免定时 render 时把工作台区域弹回顶部
+  const prevFloor = document.querySelector('.game-floor');
+  const prevFloorScroll = prevFloor ? prevFloor.scrollTop : 0;
+
   document.getElementById('app').innerHTML = html;
+
+  // Restore workstation scroll
+  const floor = document.querySelector('.game-floor');
+  if (floor) floor.scrollTop = prevFloorScroll;
 
   // Auto-scroll log
   const logBody = document.querySelector('.log-body');

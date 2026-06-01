@@ -1,4 +1,4 @@
-// 日观声记 · 首页（录音 + 草稿确认）
+// 日观声记 · 首页（录音 + 草稿确认 + 中断保护）
 
 var logger = require('../../utils/logger.js');
 var constants = require('../../utils/constants.js');
@@ -16,9 +16,13 @@ Page({
     draftDuration: 0,
     draftDurationDisplay: '',
     draftOssKeyPreview: '',
+    // 中断恢复提示
+    showRecoveryModal: false,
+    recoveryDraft: null,
   },
 
   timerInterval: null,
+  _interrupted: false, // 中断标记，防止重复生成草稿
 
   onLoad: function () {
     logger.info('[Index] onLoad');
@@ -27,12 +31,14 @@ Page({
 
   onShow: function () {
     logger.info('[Index] onShow');
+    // 回到前台时检查是否有被中断的草稿需要恢复
+    this._checkInterruptedDraft();
   },
 
   onHide: function () {
     logger.info('[Index] onHide');
     if (this.data.recording) {
-      this._stopRecording();
+      this._handleInterruption('hide');
     }
   },
 
@@ -71,16 +77,24 @@ Page({
         },
         duration_seconds: durationSeconds,
         recorded_at: new Date().toISOString(),
+        interrupted: that._interrupted,
       };
 
-      that._saveDraft(draft);
+      if (that._interrupted) {
+        // 中断保存到独立存储，等待用户确认
+        that._saveInterruptedDraft(draft);
+        that._interrupted = false;
+      } else {
+        // 正常停止：保存到草稿列表
+        that._saveDraft(draft);
+      }
 
       // 生成 OSS key 预览（始终使用 .wav 扩展名，不表示前端已转码）
       var ossKeyPreview = that._buildOssKeyPreview();
 
       that.setData({
         recording: false,
-        draftSaved: true,
+        draftSaved: !that._interrupted,
         draftFormat: format,
         draftDuration: durationSeconds,
         draftDurationDisplay: that._formatDuration(durationSeconds),
@@ -89,7 +103,8 @@ Page({
 
       logger.info('[Index] draft saved, original_format:', format,
         'duration:', durationSeconds + 's',
-        'oss_key_preview:', ossKeyPreview);
+        'oss_key_preview:', ossKeyPreview,
+        'interrupted:', draft.interrupted);
     });
 
     recorderManager.onError(function (err) {
@@ -102,7 +117,117 @@ Page({
         duration: 2000,
       });
     });
+
+    // 注册录音中断回调：锁屏、来电、其他 App 占用等
+    recorderManager.onInterruptionBegin(function () {
+      logger.info('[Index] recorder onInterruptionBegin');
+      if (that.data.recording && !that._interrupted) {
+        that._handleInterruption('interruption');
+      }
+    });
   },
+
+  // ── 中断处理 ──────────────────────────────────────────────────────────────
+
+  _handleInterruption: function (source) {
+    var that = this;
+    logger.info('[Index] handling interruption, source:', source);
+
+    // 设置中断标记，防止 onStop 回调中走正常保存路径
+    // 也防止重复中断（连续两次中断只保留第一次状态）
+    if (this._interrupted) {
+      logger.info('[Index] already interrupted, skip duplicate');
+      return;
+    }
+    this._interrupted = true;
+
+    // 自动停止录音（会触发 onStop 回调，其中根据 _interrupted 走中断保存路径）
+    try {
+      recorderManager.stop();
+    } catch (e) {
+      logger.error('[Index] stop on interruption failed:', e);
+    }
+  },
+
+  _saveInterruptedDraft: function (draft) {
+    try {
+      wx.setStorageSync('soniscope_interrupted_draft', draft);
+      logger.info('[Index] interrupted draft saved, duration:', draft.duration_seconds + 's');
+    } catch (e) {
+      logger.error('[Index] failed to save interrupted draft:', e);
+    }
+  },
+
+  _checkInterruptedDraft: function () {
+    try {
+      var draft = wx.getStorageSync('soniscope_interrupted_draft');
+      if (draft && draft.interrupted && draft.duration_seconds > 0) {
+        logger.info('[Index] found interrupted draft, showing recovery modal');
+        this.setData({
+          showRecoveryModal: true,
+          recoveryDraft: draft,
+        });
+      }
+    } catch (e) {
+      logger.error('[Index] checkInterruptedDraft error:', e);
+    }
+  },
+
+  _clearInterruptedDraft: function () {
+    try {
+      wx.removeStorageSync('soniscope_interrupted_draft');
+    } catch (e) {
+      logger.error('[Index] clearInterruptedDraft error:', e);
+    }
+  },
+
+  // ── 恢复操作按钮 ──────────────────────────────────────────────────────────
+
+  onKeepDraft: function () {
+    logger.info('[Index] user chose to keep interrupted draft');
+    var draft = this.data.recoveryDraft;
+    if (draft) {
+      this._saveDraft(draft);
+    }
+    this._clearInterruptedDraft();
+    this.setData({
+      showRecoveryModal: false,
+      recoveryDraft: null,
+    });
+    wx.showToast({
+      title: '草稿已保留',
+      icon: 'success',
+      duration: 1500,
+    });
+  },
+
+  onDiscardDraft: function () {
+    logger.info('[Index] user chose to discard interrupted draft');
+    this._clearInterruptedDraft();
+    this.setData({
+      showRecoveryModal: false,
+      recoveryDraft: null,
+    });
+    wx.showToast({
+      title: '草稿已丢弃',
+      icon: 'none',
+      duration: 1500,
+    });
+  },
+
+  onContinueNew: function () {
+    logger.info('[Index] user chose to continue with new recording');
+    // 丢弃被中断的草稿
+    this._clearInterruptedDraft();
+    this.setData({
+      showRecoveryModal: false,
+      recoveryDraft: null,
+    });
+    // 开始新的录音
+    this._startRecording();
+  },
+
+  // ── 录音按钮 ──────────────────────────────────────────────────────────────
 
   onRecordTap: function () {
     if (this.data.recording) {
@@ -136,6 +261,7 @@ Page({
   },
 
   _doStartRecord: function () {
+    this._interrupted = false;
     this.setData({
       recording: true,
       seconds: 0,
@@ -145,6 +271,8 @@ Page({
       draftDuration: 0,
       draftDurationDisplay: '',
       draftOssKeyPreview: '',
+      showRecoveryModal: false,
+      recoveryDraft: null,
     });
     this._startTimer();
 

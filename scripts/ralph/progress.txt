@@ -27,6 +27,7 @@
 - 小程序常量定义在 utils/constants.js 中集中管理（FC URL、OSS domain、分片阈值、状态枚举），不使用 process.env。
 - 小程序安全日志工具（utils/logger.js）对敏感字段名（access_key_secret/appsecret/token 等）自动脱敏，避免打印明文。
 - `node -c` 用于 Makefile 中的小程序 JS 语法快速检查。
+- 小程序测试用纯文件内容正则匹配验证代码结构和字段存在性，不模拟 wx API 调用（微信 API 只能在 DevTools/真机环境运行）。
 
 ## 2026-06-01 23:59 - US-003
 - 实现了测试音频 fixture duration 和 codec 校验功能
@@ -212,4 +213,23 @@
   - 有用的上下文: 后续 US-012（录音开始停止）将在 index 页面上扩展真实的 wx.getRecorderManager 调用
   - 有用的上下文: 后续 US-019（上传列表八种状态）将在 upload-list 页面扩展完整的状态展示、长录音折叠、离线提醒等功能
   - 有用的上下文: 本期前端是"极薄前端"——只做采集、草稿、上传、状态展示；不做业务鉴权、不保存长期密钥
+---
+
+## 2026-06-02 05:00 - US-012
+- 实现了小程序首页真实录音开始/停止功能与原始格式记录
+- 更改的文件:
+  - `apps/miniprogram/pages/index/index.js` (rewrite) — 集成 wx.getRecorderManager()：onStart/onStop/onError 回调、scope.record 授权、_detectFormat 探测原始格式（mp3/aac/m4a/wav/amr/silk/ogg/opus，不可靠时回退 unknown）、_buildOssKeyPreview 生成 OSS key 预览（recordings/<date>/<fragment_id>.wav）、_saveDraft 保存草稿到本地存储、onHide 自动停止录音
+  - `apps/miniprogram/pages/index/index.wxml` (modified) — 新增草稿信息展示区：时长、原始格式、OSS Key 预览
+  - `apps/miniprogram/pages/index/index.wxss` (modified) — 新增 .draft-info/.draft-label/.draft-detail/.draft-item 样式
+  - `apps/worker/tests/test_us012.py` (new) — 34 个单元测试覆盖：recorderManager 集成、格式探测（mp3/aac/m4a/wav 全覆盖）、草稿结构字段、OSS key 预览 .wav 扩展名、计时器 mm:ss 格式化、UI 状态切换、WXML 模板、JS 语法、无硬编码密钥、格式探测边界情况
+- **未来迭代的学习：**
+  - 发现的 patterns: 小程序录音使用 `wx.getRecorderManager()` 单例模式，在 onLoad 中注册回调，通过 `onRecordTap` 切换 start/stop
+  - 发现的 patterns: 录音前需要 `wx.authorize({ scope: 'scope.record' })` 授权，失败时引导用户到设置页
+  - 发现的 patterns: `recorderManager.start()` 参数中 format 建议用 'mp3'（模拟器/真机兼容最好），但实际产出的临时文件格式可能与参数不同，需探测 `tempFilePath` 扩展名
+  - 发现的 patterns: OSS key 预览始终使用 `.wav` 扩展名（Worker 标准化目标），不表示前端已转码 — 需要在前端代码和日志中明确标注
+  - 发现的 patterns: 测试用纯文件内容正则匹配验证小程序 JS 代码结构和字段存在性，不模拟 wx API 调用
+  - 遇到的陷阱: `recorderManager.onStop` 回调中的 `res.duration` 单位是毫秒（不是秒），需要 `/1000` 转换
+  - 遇到的陷阱: 微信真机临时音频文件名不一定包含扩展名，需要同时检测扩展名并保留 'unknown' 回退
+  - 有用的上下文: US-012 完成后 US-013（录音中断保护）可直接在此基础上添加 onInterruptionBegin 和 onHide 中断逻辑
+  - 有用的上下文: 需要微信开发者工具模拟器或真机验证录音和 original_format 日志 — 自动测试只能验证代码结构和语法
 ---

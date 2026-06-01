@@ -111,6 +111,95 @@
   word-break: break-all;
 }
 
+/* 中断恢复弹窗 */
+.recovery-modal-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.recovery-modal {
+  width: 320px;
+  background-color: #ffffff;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.recovery-modal-header {
+  padding: 20px 20px 12px;
+  text-align: center;
+}
+
+.recovery-modal-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #333333;
+}
+
+.recovery-modal-body {
+  padding: 0 20px 20px;
+  text-align: center;
+}
+
+.recovery-modal-msg {
+  display: block;
+  font-size: 14px;
+  color: #07c160;
+  margin-bottom: 10px;
+}
+
+.recovery-modal-detail {
+  display: block;
+  font-size: 13px;
+  color: #999999;
+  margin-bottom: 4px;
+}
+
+.recovery-modal-actions {
+  display: flex;
+  border-top: 1px solid #f0f0f0;
+}
+
+.recovery-btn {
+  flex: 1;
+  height: 48px;
+  line-height: 48px;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: 0;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.recovery-btn::after {
+  border: none;
+}
+
+.recovery-btn:not(:last-child) {
+  border-right: 1px solid #f0f0f0;
+}
+
+.recovery-btn-keep {
+  color: #07c160;
+}
+
+.recovery-btn-discard {
+  color: #e64340;
+}
+
+.recovery-btn-new {
+  color: #1677ff;
+}
+
 .nav-section {
   margin-top: 40px;
 }

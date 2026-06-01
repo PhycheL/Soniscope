@@ -1,4 +1,4 @@
-<!-- 日观声记 · 首页（录音 + 草稿确认） -->
+<!-- 日观声记 · 首页（录音 + 草稿确认 + 中断保护） -->
 <view class="container">
   <view class="header">
     <text class="app-title">日观声记</text>
@@ -26,6 +26,25 @@
         <text class="draft-item">时长：{{draftDurationDisplay}}</text>
         <text class="draft-item">原始格式：{{draftFormat}}</text>
         <text class="draft-item">OSS Key：{{draftOssKeyPreview}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 中断恢复提示弹窗 -->
+  <view class="recovery-modal-mask" wx:if="{{showRecoveryModal}}">
+    <view class="recovery-modal">
+      <view class="recovery-modal-header">
+        <text class="recovery-modal-title">上次录音被中断</text>
+      </view>
+      <view class="recovery-modal-body">
+        <text class="recovery-modal-msg">已自动保存草稿</text>
+        <text class="recovery-modal-detail">时长：{{recoveryDraft.duration_seconds}}秒</text>
+        <text class="recovery-modal-detail">格式：{{recoveryDraft.audio.original_format}}</text>
+      </view>
+      <view class="recovery-modal-actions">
+        <button class="recovery-btn recovery-btn-keep" bind:tap="onKeepDraft">保留</button>
+        <button class="recovery-btn recovery-btn-discard" bind:tap="onDiscardDraft">丢弃</button>
+        <button class="recovery-btn recovery-btn-new" bind:tap="onContinueNew">继续新录</button>
       </view>
     </view>
   </view>
