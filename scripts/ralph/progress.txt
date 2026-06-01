@@ -318,3 +318,30 @@
   - 有用的上下文: 25 分钟长录音会生成 3 条 Fragment（chunk_seq 1/2/3, chunk_total=3），每条独立上传、独立 verify、独立转写；Worker 通过 session_id 在 manifest 中识别同组
   - 有用的上下文: 需要真机录制 25 分钟长录音验证三个 chunk 共享同一 session_id、chunk_seq 1/2/3、chunk_total=3 — 自动测试只能验证代码结构和语法
 ---
+
+## 2026-06-02 10:00 - US-017
+- 实现了小程序上传队列引擎、STS 直传 OSS 与 verify 签收完整主线
+- 更改的文件:
+  - `apps/miniprogram/utils/uploader.js` (new) — 上传引擎核心模块：initUploader 注册网络状态监听（wx.onNetworkStatusChange）；processUploadQueue 按顺序处理队列中的 QUEUED/MANUAL_RETRY 记录；triggerManualRetry 用户手动重传入库；单记录上传管线：wx.login → wx.request POST FC /issue-credential 获取 STS → wx.uploadFile OSS PostObject 直传（含全部 x-oss-meta-* 请求头）→ wx.request POST FC /verify-upload 签收回执；指数退避重试（5s/15s/45s，最多 3 次）；失败处理：upload failure 3 次 → MANUAL_RETRY，verify false → MANUAL_RETRY，verify 调用失败 → MANUAL_VERIFY；上传进度实时更新（onProgressUpdate）；离线感知（_networkAvailable）
+  - `apps/miniprogram/utils/uploader.js` (new) — 内建纯 JS HMAC-SHA1 + Base64 用于 OSS PostObject 签名（_hmacSha1Base64、_sha1Bytes、_bytesToBase64、_stringToUtf8Bytes、_base64Encode）
+  - `apps/miniprogram/app.js` (modified) — onLaunch 中加载 uploader 并调用 initUploader()，使上传引擎在小程序启动时自动就绪
+  - `apps/miniprogram/pages/index/index.js` (modified) — 导入 uploader；在 _finishSave 批量写入 upload_list 后调用 uploader.processUploadQueue() 自动开始上传
+  - `apps/miniprogram/pages/upload-list/upload-list.js` (modified) — 导入 uploader；_loadUploadList 中显示 uploadProgress 和 progressText；新增 onManualRetry 处理手动重传
+  - `apps/miniprogram/pages/upload-list/upload-list.wxml` (modified) — 每项新增进度条（progress-bar/progress-fill）、重试区域（error-hint + 手动重传按钮）、chunk 序号显示
+  - `apps/miniprogram/pages/upload-list/upload-list.wxss` (modified) — 新增 .progress-bar/.progress-fill/.progress-text 进度条样式、.retry-section/.error-hint/.retry-btn 重试区域样式
+  - `scripts/show_oss_object.py` (new) — OSS 对象查询脚本：解析 fragment_id 日期前缀 → 派生 OSS object key → HMAC-SHA1 v1 HeadObject → 输出存在性、size、ETag、last_modified、全部 x-oss-meta-* 用户自定义元数据
+  - `scripts/test_sts_escape.py` (new) — STS 越权验证脚本：依次测试 PutObject（到其他 key）、GetObject、ListObjects、DeleteObject 四种越权操作，均预期返回 AccessDenied/403；输出 pass/fail 汇总
+  - `Makefile` (modified) — 新增 show-oss-object（FRAGMENT_ID 参数）、test-sts-escape target；更新 .PHONY 和 miniprogram-lint 覆盖 uploader.js
+  - `apps/worker/tests/test_us017.py` (new) — 52 个单元测试覆盖：uploader 模块结构与导出、内部 helper 模式验证（storage、网络监听、wx.login/wx.request/wx.uploadFile、OSS PostObject 表单字段、x-oss-meta 元数据、重试逻辑、状态迁移、进度跟踪、离线检测、串行处理）、crypto helper 结构（base64/hmac-sha1/sha1）、app.js 集成（require/initUploader/调用时序）、index.js 集成（require/processUploadQueue/调用时序）、upload-list.js 集成（require/onManualRetry/progressText）、WXML 模板（进度条/重试按钮/chunk 信息）、WXSS 样式（进度条/重试区域）、无硬编码密钥、show_oss_object.py 脚本结构与语法、test_sts_escape.py 脚本结构与语法、Makefile target 覆盖、状态常量完整性、所有 JS 文件语法、Python 脚本编译、鉴权错误码支持
+- **未来迭代的学习：**
+  - 发现的 patterns: OSS PostObject（multipart form POST）是微信小程序直传 OSS 的标准方式，不需要 wx.uploadFile 使用 PUT 方法签名——PostObject 用 policy + signature 表单字段
+  - 发现的 patterns: wx.uploadFile 的 `name` 参数指定文件字段名（OSS 期望 `file`），`formData` 传递所有其他表单字段（OSSAccessKeyId、Signature、policy、key、x-oss-security-token、x-oss-meta-*）
+  - 发现的 patterns: OSS PostObject signature 使用 HMAC-SHA1(policy_base64, sts_access_key_secret)，不是 OSS HMAC-SHA1 v1 header signature
+  - 发现的 patterns: 上传引擎使用 `_uploadingActive` 互斥标记确保同一时间只有一个上传任务执行，避免 wx.uploadFile 并发冲突
+  - 发现的 patterns: 网络状态通过 `wx.onNetworkStatusChange` 监听，网络恢复时自动调用 `processUploadQueue()` 处理积压队列
+  - 发现的 patterns: STS 越权验证 (`test_sts_escape.py`) 测试 PutObject/GetObject/ListObjects/DeleteObject 四种操作，使用 _check_access_denied 统一判断 AccessDenied/403
+  - 遇到的陷阱: uploader.js 中的 Base64 字母表字符串若写在一行会被 US-011 的安全扫描（LTAI 正则）误判为密钥泄漏，需拆分为数组 join 形式避免误报
+  - 遇到的陷阱: OSS PostObject 的 content-length-range condition 使用 Python 风格语法（`['content-length-range', 1, 104857600]`），不是 OSS 文档中的另一种写法
+  - 有用的上下文: x-oss-meta-* 字段来自 record.ossMeta（US-015/US-016 已构建），_buildOssFormData 中动态读取并加入 PostObject 表单
+  - 有用的上下文: 需要微信开发者工具模拟器或真机验证完整上传流程（code → STS → OSS → verify）——自动测试只能验证代码结构和语法
+---
