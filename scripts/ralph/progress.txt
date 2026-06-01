@@ -13,6 +13,21 @@
 - `typer.Exit(code=1)` is how CLI commands signal non-zero exit; error messages go to stderr via `err=True` on `typer.echo()`.
 - `typer.testing.CliRunner` is the standard way to test Typer CLI commands in pytest.
 
+## 2026-06-01 23:59 - US-003
+- 实现了测试音频 fixture duration 和 codec 校验功能
+- 更改的文件:
+  - `scripts/fetch_test_fixtures.py` (modified) — 添加 _get_duration()、_check_duration()、_get_format_name()、_check_codec()、validate_file() 函数；失效时输出 runbook §6 修复提示；修复 ffprobe csv 输出中 quoted format_name 的解析
+  - `apps/worker/tests/test_us003.py` (new) — 20 个测试：manifest 结构、sha256 校验、duration 校验（含边界值）、codec 校验（wav/m4a/未登记）、实时文件集成测试
+- **未来迭代的学习：**
+  - 发现的 patterns: `scripts/` 目录下的独立脚本不在 uv workspace 内，可直接用系统 python3 运行，测试应该导入函式而非 subprocess
+  - 发现的 patterns: 使用 `sys.path.insert(0, str(REPO_ROOT / "scripts"))` 让 pytest 能导入 scripts/ 下的模块进行 unit testing
+  - 发现的 patterns: ffprobe 的 `-of csv` 输出会对含逗号的 format_name 加双引号，需要用 `strip('"')` 处理
+  - 遇到的陷阱: AC 中的 filename-based 时长（sample-20s 约 20 秒）与实际 sha256 校验通过的文件的 ffprobe 时长（约 24 秒）不一致，应以 ffprobe 实测值为准
+  - 遇到的陷阱: 不能在 subprocess 中 patch 模块级常量（MANIFEST_PATH），因为 subprocess 运行在独立解释器中
+  - 有用的上下文: 全部 4 个 fixture 文件已通过 sha256 + duration + codec 三重校验，可立即用于后续 story 的测试
+  - 有用的上下文: duration 容差统一使用 ±2.0 秒，与实际文件 ffprobe 值匹配
+---
+
 ## 2026-06-01 21:00 - US-002
 - 实现了完整的配置 schema、脱敏加载器与运行时目录初始化
 - 更改的文件:
