@@ -34,6 +34,10 @@
 - uploadRecord 扩展为包含 `manifest`（完整 Fragment 元数据草案）和 `ossMeta`（全部 7 个 x-oss-meta-* 请求头字段的键值对），为上传流程统一数据契约
 - Crockford Base32 字母表：`0123456789ABCDEFGHJKMNPQRSTVWXYZ`（不含 I/L/O/U 避免混淆），ULID 26 字符 = 10 时间戳 + 16 随机
 - 草稿确认态使用 `draftPreviewMode` 布尔值替代早期 US-012 的 `draftSaved` 字段，两者语义不同：`draftPreviewMode` 表示整页进入确认态（显示试听/重录/删除/保存并上传），`draftSaved` 只是简单标记草稿已保存。后续测试检查草稿确认态应搜索 `draftPreviewMode`。
+- OSS PostObject（multipart form POST）是微信小程序直传 OSS 的标准方式：`wx.uploadFile` 的 `name` 参数指定文件字段名（OSS 期望 `file`），`formData` 传递 OSSAccessKeyId/Signature/policy/key/x-oss-security-token/x-oss-meta-*
+- OSS PostObject signature 使用 HMAC-SHA1(policy_base64, sts_access_key_secret)，不同于 OSS HMAC-SHA1 v1 header signature（用于 HeadObject/REST API）
+- 小程序上传引擎使用模块级 `_uploadingActive` 互斥标记确保串行上传，`_networkAvailable` 跟踪网络状态，`wx.onNetworkStatusChange` 监听恢复后自动处理队列
+- `scripts/` 下的 Python 运维脚本使用纯 stdlib（HMAC-SHA1 v1 签名 + urllib）调用 OSS REST API，与 FC shared 模块签名模式一致
 
 ## 2026-06-01 23:59 - US-003
 - 实现了测试音频 fixture duration 和 codec 校验功能
