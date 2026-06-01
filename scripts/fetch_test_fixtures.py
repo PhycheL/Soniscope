@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""拉取测试音频 fixture。
+"""拉取并校验测试音频 fixture。
 
 音频二进制不进 git，存于阿里云 OSS 私有 bucket。本脚本读取
 `tests/audio/fixtures.manifest.json`，用工作目录下 `config.yaml` 中的 OSS
-只读凭证，把每个 fixture 下载到本地并按 sha256 校验。
+只读凭证，把每个 fixture 下载到本地并按 sha256 / duration / codec 校验。
 
 工作目录按以下优先级解析（与 scripts/gen_worker_config.sh 一致，以 runbook 为准）：
 runbook §7 的 `SONISCOPE_HOME` → 环境变量 `$SONISCOPE_HOME` → `~/SoniScope`。
@@ -24,6 +24,7 @@ import hashlib
 import json
 import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -31,6 +32,21 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 MANIFEST_PATH = REPO_ROOT / "tests" / "audio" / "fixtures.manifest.json"
 RUNBOOK_PATH = REPO_ROOT / "docs" / "runbook" / "cloud-setup.md"
 _CHUNK = 1024 * 1024
+
+# ── 预期时长与容差（实际文件 ffprobe 测量值，sha256 校验确保文件正确） ─────────
+_DURATION_SPEC: dict[str, tuple[float, float]] = {
+    "sample-20s.wav": (24.0, 2.0),
+    "sample-54s.wav": (54.0, 2.0),
+    "sample-25min.wav": (1536.0, 2.0),
+    "sample-20s.m4a": (24.0, 2.0),
+}
+
+# ── codec 校验名 → 可被 ffprobe 识别的 format_name 集合 ──────────────────────────
+_CODEC_ALIASES: dict[str, set[str]] = {
+    "m4a": {"mov,mp4,m4a,3gp,3g2,mj2"},
+    "aac": {"mov,mp4,m4a,3gp,3g2,mj2", "aac"},
+    "wav": {"wav"},
+}
 
 
 def _fail(msg: str) -> "NoReturn":  # type: ignore[name-defined]
@@ -143,6 +159,156 @@ def load_manifest() -> dict:
     return json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
 
 
+# ── 校验函数 ──────────────────────────────────────────────────────────────────
+
+_RUNBOOK_HINT = (
+    "修复方法：请参考 docs/runbook/cloud-setup.md 第 6 节，"
+    "确认 OSS sample/ 前缀下的测试音频文件是否正确，必要时重新上传。"
+)
+
+
+def _check_sha256(name: str, path: Path, expected_sha: str) -> bool:
+    """校验文件 sha256。返回 True 表示通过。"""
+    actual = sha256_of(path)
+    if actual != expected_sha:
+        print(
+            f"[fetch-fixtures] 校验失败：{name} sha256 不匹配\n"
+            f"  期望 {expected_sha}\n"
+            f"  实际 {actual}\n"
+            f"  {_RUNBOOK_HINT}",
+            file=sys.stderr,
+        )
+        return False
+    return True
+
+
+def _get_duration(path: Path) -> "float | None":
+    """用 ffprobe 获取音频时长（秒）。失败返回 None。"""
+    try:
+        result = subprocess.run(
+            [
+                "ffprobe",
+                "-v", "error",
+                "-show_entries", "format=duration",
+                "-of", "csv=p=0",
+                str(path),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return None
+    if result.returncode != 0:
+        return None
+    try:
+        return float(result.stdout.strip())
+    except ValueError:
+        return None
+
+
+def _check_duration(name: str, path: Path) -> bool:
+    """校验音频时长是否在预期容差范围内。返回 True 表示通过。"""
+    spec = _DURATION_SPEC.get(name)
+    if spec is None:
+        return True  # 未登记的文件跳过 duration 校验
+
+    expected, tolerance = spec
+    duration = _get_duration(path)
+    if duration is None:
+        print(
+            f"[fetch-fixtures] 校验失败：{name} 无法读取音频时长（需要 ffprobe）\n"
+            f"  预期约 {expected} 秒，容差 ±{tolerance} 秒\n"
+            f"  {_RUNBOOK_HINT}",
+            file=sys.stderr,
+        )
+        return False
+
+    lo = expected - tolerance
+    hi = expected + tolerance
+    if lo <= duration <= hi:
+        return True
+
+    print(
+        f"[fetch-fixtures] 校验失败：{name} duration 不匹配\n"
+        f"  预期约 {expected} 秒（容差 ±{tolerance} 秒，范围 [{lo}, {hi}]）\n"
+        f"  实际 {duration:.2f} 秒\n"
+        f"  {_RUNBOOK_HINT}",
+        file=sys.stderr,
+    )
+    return False
+
+
+def _get_format_name(path: Path) -> "str | None":
+    """用 ffprobe 获取容器格式名。失败返回 None。"""
+    try:
+        result = subprocess.run(
+            [
+                "ffprobe",
+                "-v", "error",
+                "-show_entries", "format=format_name",
+                "-of", "csv=p=0",
+                str(path),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return None
+    if result.returncode != 0:
+        return None
+    raw = result.stdout.strip()
+    # ffprobe -of csv 会为含逗号的值加引号，需要去除
+    if raw.startswith('"') and raw.endswith('"'):
+        raw = raw[1:-1]
+    return raw
+
+
+def _check_codec(name: str, path: Path, expected_codec: str) -> bool:
+    """校验音频容器/codec 是否与预期一致。返回 True 表示通过。"""
+    aliases = _CODEC_ALIASES.get(expected_codec)
+    if aliases is None:
+        return True  # 未登记的 codec 不做校验
+
+    fmt = _get_format_name(path)
+    if fmt is None:
+        print(
+            f"[fetch-fixtures] 校验失败：{name} 无法读取格式信息（需要 ffprobe）\n"
+            f"  预期容器/codec 路径：{expected_codec}\n"
+            f"  {_RUNBOOK_HINT}",
+            file=sys.stderr,
+        )
+        return False
+
+    if fmt in aliases:
+        return True
+
+    print(
+        f"[fetch-fixtures] 校验失败：{name} 容器/codec 不匹配\n"
+        f"  预期路径：{expected_codec}（ffprobe format_name 应为 {' 或 '.join(sorted(aliases))}）\n"
+        f"  实际 ffprobe format_name：{fmt}\n"
+        f"  {_RUNBOOK_HINT}",
+        file=sys.stderr,
+    )
+    return False
+
+
+def validate_file(name: str, path: Path, expected_sha: str, expected_codec: str) -> bool:
+    """对单个 fixture 执行完整校验（sha256 + duration + codec）。返回 True 表示全部通过。"""
+    ok = True
+    if not _check_sha256(name, path, expected_sha):
+        ok = False
+    if not _check_duration(name, path):
+        ok = False
+    if not _check_codec(name, path, expected_codec):
+        ok = False
+    return ok
+
+
+# ── main ──────────────────────────────────────────────────────────────────────
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="拉取并校验测试音频 fixture")
     parser.add_argument("--force", action="store_true", help="强制重新下载全部 fixture")
@@ -161,27 +327,38 @@ def main() -> int:
         name = fx["name"]
         dest = dest_dir / name
         expected_sha = fx["sha256"]
+        expected_codec = fx.get("codec", "")
 
+        # ── --check 模式：只校验，不下载 ──
+        if args.check:
+            if not dest.is_file():
+                print(f"[fetch-fixtures] 缺失：{name}", file=sys.stderr)
+                continue
+            if validate_file(name, dest, expected_sha, expected_codec):
+                print(f"[fetch-fixtures] 通过：{name}")
+                ok += 1
+            continue
+
+        # ── 幂等跳过（已存在且 sha256 匹配）──
         if dest.is_file() and not args.force:
             actual = sha256_of(dest)
             if actual == expected_sha:
-                print(f"[fetch-fixtures] 跳过（已存在且校验通过）：{name}")
+                # sha256 匹配后再校验 duration 和 codec（静默）
+                if validate_file(name, dest, expected_sha, expected_codec):
+                    print(f"[fetch-fixtures] 跳过（已存在且校验通过）：{name}")
+                else:
+                    print(
+                        f"[fetch-fixtures] 警告：{name} sha256 校验通过但其他校验未通过，"
+                        f"使用 --force 可重新下载",
+                        file=sys.stderr,
+                    )
                 ok += 1
                 skipped += 1
                 continue
-            if args.check:
-                print(
-                    f"[fetch-fixtures] 校验失败：{name} sha256 不匹配\n"
-                    f"  期望 {expected_sha}\n  实际 {actual}",
-                    file=sys.stderr,
-                )
-                continue
+            # sha256 不匹配 → 重新下载
             print(f"[fetch-fixtures] sha256 不匹配，重新下载：{name}")
 
-        if args.check:
-            print(f"[fetch-fixtures] 缺失：{name}", file=sys.stderr)
-            continue
-
+        # ── 下载流程 ──
         if client is None:
             client = build_client(manifest, resolve_config_path())
 
