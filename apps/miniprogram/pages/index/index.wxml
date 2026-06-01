@@ -1,12 +1,12 @@
-<!-- 日观声记 · 首页（录音 + 草稿确认 + 中断保护） -->
+<!-- 日观声记 · 首页（录音 + 草稿确认 + 中断保护 + 草稿确认态） -->
 <view class="container">
   <view class="header">
     <text class="app-title">日观声记</text>
     <text class="app-subtitle">语音流水账 · 随手记录</text>
   </view>
 
-  <!-- 录音区域 -->
-  <view class="recorder-section">
+  <!-- 录音区域（非草稿确认态） -->
+  <view class="recorder-section" wx:if="{{!draftPreviewMode}}">
     <view class="record-button-wrapper">
       <button class="record-btn {{recording ? 'recording' : ''}}"
               bind:tap="onRecordTap"
@@ -18,15 +18,61 @@
     <view class="record-timer" wx:if="{{recording}}">
       <text class="timer-text">{{timerDisplay}}</text>
     </view>
+  </view>
 
-    <!-- 草稿信息（停止录音后显示） -->
-    <view class="draft-info" wx:if="{{draftSaved && !recording}}">
-      <text class="draft-label">草稿已保存</text>
+  <!-- 草稿确认态（停止录音后显示） -->
+  <view class="draft-preview-section" wx:if="{{draftPreviewMode && !recording}}">
+    <text class="draft-preview-title">草稿确认</text>
+
+    <!-- 草稿信息 -->
+    <view class="draft-info">
       <view class="draft-detail">
         <text class="draft-item">时长：{{draftDurationDisplay}}</text>
         <text class="draft-item">原始格式：{{draftFormat}}</text>
+        <text class="draft-item">大小：{{draftFileSize}} 字节</text>
         <text class="draft-item">OSS Key：{{draftOssKeyPreview}}</text>
       </view>
+    </view>
+
+    <!-- 试听区域 -->
+    <view class="audition-section">
+      <text class="audition-label">试听</text>
+      <view class="audition-controls">
+        <button class="audition-btn audition-btn-play"
+                bind:tap="onAudition"
+                wx:if="{{!audioPlaying || audioPaused}}"
+                disabled="{{saveInProgress}}">
+          <text>▶ 播放</text>
+        </button>
+        <button class="audition-btn audition-btn-pause"
+                bind:tap="onPause"
+                wx:if="{{audioPlaying && !audioPaused}}"
+                disabled="{{saveInProgress}}">
+          <text>⏸ 暂停</text>
+        </button>
+        <text class="audition-status" wx:if="{{audioPlaying && !audioPaused}}">播放中...</text>
+        <text class="audition-status" wx:if="{{audioPaused}}">已暂停</text>
+      </view>
+    </view>
+
+    <!-- 操作按钮 -->
+    <view class="draft-actions">
+      <button class="draft-action-btn draft-action-re-record"
+              bind:tap="onReRecord"
+              disabled="{{saveInProgress}}">
+        <text>重录</text>
+      </button>
+      <button class="draft-action-btn draft-action-delete"
+              bind:tap="onDelete"
+              disabled="{{saveInProgress}}">
+        <text>删除</text>
+      </button>
+      <button class="draft-action-btn draft-action-save-upload"
+              bind:tap="onSaveAndUpload"
+              disabled="{{saveInProgress}}"
+              loading="{{saveInProgress}}">
+        <text>{{saveInProgress ? '保存中...' : '保存并上传'}}</text>
+      </button>
     </view>
   </view>
 

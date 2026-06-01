@@ -81,22 +81,32 @@
   color: #333333;
 }
 
-/* 草稿信息（停止录音后显示） */
+/* ── 草稿确认态区域 ────────────────────────────────────── */
+
+.draft-preview-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 320px;
+}
+
+.draft-preview-title {
+  display: block;
+  font-size: 20px;
+  font-weight: 600;
+  color: #333333;
+  margin-bottom: 16px;
+}
+
+/* 草稿信息 */
 .draft-info {
-  margin-top: 24px;
+  width: 100%;
   padding: 20px;
   background-color: #f0f9f0;
   border-radius: 12px;
-  width: 300px;
+  margin-bottom: 16px;
   text-align: left;
-}
-
-.draft-label {
-  display: block;
-  font-size: 16px;
-  font-weight: 600;
-  color: #07c160;
-  margin-bottom: 12px;
+  box-sizing: border-box;
 }
 
 .draft-detail {
@@ -111,7 +121,106 @@
   word-break: break-all;
 }
 
-/* 中断恢复弹窗 */
+/* ── 试听区域 ──────────────────────────────────────────── */
+
+.audition-section {
+  width: 100%;
+  padding: 16px 20px;
+  background-color: #f5f5f5;
+  border-radius: 12px;
+  margin-bottom: 16px;
+  box-sizing: border-box;
+}
+
+.audition-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: #333333;
+  margin-bottom: 10px;
+}
+
+.audition-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.audition-btn {
+  padding: 8px 20px;
+  font-size: 14px;
+  border-radius: 20px;
+  border: none;
+  background-color: #1890ff;
+  color: #ffffff;
+}
+
+.audition-btn::after {
+  border: none;
+}
+
+.audition-btn[disabled] {
+  background-color: #d9d9d9;
+  color: #999999;
+}
+
+.audition-btn-play {
+  background-color: #1890ff;
+}
+
+.audition-btn-pause {
+  background-color: #fa8c16;
+}
+
+.audition-status {
+  font-size: 13px;
+  color: #999999;
+}
+
+/* ── 草稿操作按钮 ──────────────────────────────────────── */
+
+.draft-actions {
+  width: 100%;
+  display: flex;
+  gap: 10px;
+}
+
+.draft-action-btn {
+  flex: 1;
+  height: 44px;
+  line-height: 44px;
+  padding: 0;
+  font-size: 15px;
+  font-weight: 500;
+  border-radius: 8px;
+  border: none;
+}
+
+.draft-action-btn::after {
+  border: none;
+}
+
+.draft-action-btn[disabled] {
+  opacity: 0.5;
+}
+
+.draft-action-re-record {
+  background-color: #e6f7ff;
+  color: #1890ff;
+}
+
+.draft-action-delete {
+  background-color: #fff1f0;
+  color: #e64340;
+}
+
+.draft-action-save-upload {
+  background-color: #07c160;
+  color: #ffffff;
+}
+
+/* ── 中断恢复弹窗 ──────────────────────────────────────── */
+
 .recovery-modal-mask {
   position: fixed;
   top: 0;
@@ -199,6 +308,8 @@
 .recovery-btn-new {
   color: #1677ff;
 }
+
+/* ── 导航 ──────────────────────────────────────────────── */
 
 .nav-section {
   margin-top: 40px;

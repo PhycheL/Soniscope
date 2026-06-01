@@ -1,4 +1,4 @@
-// 日观声记 · 首页（录音 + 草稿确认 + 中断保护）
+// 日观声记 · 首页（录音 + 草稿确认 + 中断保护 + 草稿确认态：试听、重录、删除、保存并上传）
 
 var logger = require('../../utils/logger.js');
 var constants = require('../../utils/constants.js');
@@ -10,12 +10,18 @@ Page({
     recording: false,
     timerDisplay: '00:00',
     seconds: 0,
-    // 草稿信息
-    draftSaved: false,
+    // 草稿确认态
+    draftPreviewMode: false,
     draftFormat: '',
     draftDuration: 0,
     draftDurationDisplay: '',
     draftOssKeyPreview: '',
+    draftFileSize: 0,
+    // 试听状态
+    audioPlaying: false,
+    audioPaused: false,
+    // 保存并上传防重复点击
+    saveInProgress: false,
     // 中断恢复提示
     showRecoveryModal: false,
     recoveryDraft: null,
@@ -23,6 +29,8 @@ Page({
 
   timerInterval: null,
   _interrupted: false, // 中断标记，防止重复生成草稿
+  _currentDraft: null, // 当前草稿确认态中的草稿对象
+  _audioContext: null, // 试听音频上下文
 
   onLoad: function () {
     logger.info('[Index] onLoad');
@@ -40,11 +48,14 @@ Page({
     if (this.data.recording) {
       this._handleInterruption('hide');
     }
+    // 切后台时暂停试听
+    this._stopAudition();
   },
 
   onUnload: function () {
     logger.info('[Index] onUnload');
     this._clearTimer();
+    this._destroyAudio();
   },
 
   _initRecorder: function () {
@@ -68,7 +79,7 @@ Page({
 
       var durationSeconds = Math.round((res.duration || 0) / 1000);
 
-      // 构建草稿
+      // 构建草稿对象
       var draft = {
         tempFilePath: tempPath,
         audio: {
@@ -84,27 +95,30 @@ Page({
         // 中断保存到独立存储，等待用户确认
         that._saveInterruptedDraft(draft);
         that._interrupted = false;
+        that.setData({
+          recording: false,
+        });
       } else {
-        // 正常停止：保存到草稿列表
-        that._saveDraft(draft);
+        // 正常停止：进入草稿确认态
+        that._currentDraft = draft;
+
+        // 生成 OSS key 预览（始终使用 .wav 扩展名，不表示前端已转码）
+        var ossKeyPreview = that._buildOssKeyPreview();
+
+        that.setData({
+          recording: false,
+          draftPreviewMode: true,
+          draftFormat: format,
+          draftDuration: durationSeconds,
+          draftDurationDisplay: that._formatDuration(durationSeconds),
+          draftOssKeyPreview: ossKeyPreview,
+          draftFileSize: res.fileSize || 0,
+        });
+
+        logger.info('[Index] draft preview mode, original_format:', format,
+          'duration:', durationSeconds + 's',
+          'oss_key_preview:', ossKeyPreview);
       }
-
-      // 生成 OSS key 预览（始终使用 .wav 扩展名，不表示前端已转码）
-      var ossKeyPreview = that._buildOssKeyPreview();
-
-      that.setData({
-        recording: false,
-        draftSaved: !that._interrupted,
-        draftFormat: format,
-        draftDuration: durationSeconds,
-        draftDurationDisplay: that._formatDuration(durationSeconds),
-        draftOssKeyPreview: ossKeyPreview,
-      });
-
-      logger.info('[Index] draft saved, original_format:', format,
-        'duration:', durationSeconds + 's',
-        'oss_key_preview:', ossKeyPreview,
-        'interrupted:', draft.interrupted);
     });
 
     recorderManager.onError(function (err) {
@@ -262,15 +276,21 @@ Page({
 
   _doStartRecord: function () {
     this._interrupted = false;
+    // 清理之前的草稿确认态
+    this._currentDraft = null;
     this.setData({
       recording: true,
       seconds: 0,
       timerDisplay: '00:00',
-      draftSaved: false,
+      draftPreviewMode: false,
       draftFormat: '',
       draftDuration: 0,
       draftDurationDisplay: '',
       draftOssKeyPreview: '',
+      draftFileSize: 0,
+      audioPlaying: false,
+      audioPaused: false,
+      saveInProgress: false,
       showRecoveryModal: false,
       recoveryDraft: null,
     });
@@ -291,6 +311,202 @@ Page({
     logger.info('[Index] stopping recording');
     recorderManager.stop();
   },
+
+  // ── 草稿确认态：试听 ──────────────────────────────────────────────────────
+
+  onAudition: function () {
+    logger.info('[Index] onAudition');
+    if (!this._currentDraft || !this._currentDraft.tempFilePath) {
+      wx.showToast({ title: '草稿文件不可用', icon: 'none', duration: 1500 });
+      return;
+    }
+
+    this._ensureAudio();
+
+    var that = this;
+    this._audioContext.src = this._currentDraft.tempFilePath;
+    this._audioContext.play();
+    this.setData({ audioPlaying: true, audioPaused: false });
+
+    this._audioContext.onEnded(function () {
+      that.setData({ audioPlaying: false, audioPaused: false });
+    });
+
+    this._audioContext.onError(function (err) {
+      logger.error('[Index] audio play error:', err);
+      that.setData({ audioPlaying: false, audioPaused: false });
+      wx.showToast({ title: '播放失败', icon: 'none', duration: 1500 });
+    });
+  },
+
+  onPause: function () {
+    logger.info('[Index] onPause');
+    if (this._audioContext) {
+      this._audioContext.pause();
+      this.setData({ audioPlaying: false, audioPaused: true });
+    }
+  },
+
+  _stopAudition: function () {
+    if (this._audioContext) {
+      try {
+        this._audioContext.stop();
+      } catch (e) {
+        // ignore
+      }
+      this.setData({ audioPlaying: false, audioPaused: false });
+    }
+  },
+
+  _ensureAudio: function () {
+    if (!this._audioContext) {
+      this._audioContext = wx.createInnerAudioContext();
+    }
+  },
+
+  _destroyAudio: function () {
+    if (this._audioContext) {
+      try {
+        this._audioContext.destroy();
+      } catch (e) {
+        // ignore
+      }
+      this._audioContext = null;
+    }
+  },
+
+  // ── 草稿确认态：重录 ──────────────────────────────────────────────────────
+
+  onReRecord: function () {
+    logger.info('[Index] onReRecord — clearing draft and restarting');
+    // 清理当前草稿
+    this._clearCurrentDraft();
+    // 回到录音初始态
+    this._startRecording();
+  },
+
+  // ── 草稿确认态：删除 ──────────────────────────────────────────────────────
+
+  onDelete: function () {
+    logger.info('[Index] onDelete — clearing draft');
+    var that = this;
+    wx.showModal({
+      title: '删除草稿',
+      content: '确定删除当前草稿录音吗？删除后无法恢复。',
+      success: function (res) {
+        if (res.confirm) {
+          that._clearCurrentDraft();
+          // 回到录音初始态
+          that.setData({
+            draftPreviewMode: false,
+            draftFormat: '',
+            draftDuration: 0,
+            draftDurationDisplay: '',
+            draftOssKeyPreview: '',
+            draftFileSize: 0,
+            audioPlaying: false,
+            audioPaused: false,
+            saveInProgress: false,
+          });
+          that._currentDraft = null;
+          wx.showToast({ title: '草稿已删除', icon: 'success', duration: 1500 });
+          logger.info('[Index] draft deleted');
+        }
+      },
+    });
+  },
+
+  _clearCurrentDraft: function () {
+    // 停止试听（如有）
+    this._stopAudition();
+    // 清理草稿对象
+    this._currentDraft = null;
+  },
+
+  // ── 草稿确认态：保存并上传 ────────────────────────────────────────────────
+
+  onSaveAndUpload: function () {
+    var that = this;
+    logger.info('[Index] onSaveAndUpload');
+
+    // 防止重复点击
+    if (this.data.saveInProgress) {
+      logger.info('[Index] save already in progress, skip');
+      return;
+    }
+
+    if (!this._currentDraft) {
+      wx.showToast({ title: '草稿不存在，请重新录音', icon: 'none', duration: 2000 });
+      return;
+    }
+
+    this.setData({ saveInProgress: true });
+
+    // 冻结草稿并生成 Fragment 记录，加入上传队列
+    var draft = this._currentDraft;
+
+    // 生成 fragment_id（简单版：日期+随机ULID，US-015 会改进为完整格式）
+    var now = new Date();
+    var yyyyMMdd = '' + now.getFullYear()
+      + String(now.getMonth() + 1).padStart(2, '0')
+      + String(now.getDate()).padStart(2, '0');
+    var HHMMSS = String(now.getHours()).padStart(2, '0')
+      + String(now.getMinutes()).padStart(2, '0')
+      + String(now.getSeconds()).padStart(2, '0');
+    var fragmentId = yyyyMMdd + 'T' + HHMMSS + '_' + '_temp_ulid';
+
+    // 创建上传记录
+    var uploadRecord = {
+      fragmentId: fragmentId,
+      tempFilePath: draft.tempFilePath,
+      duration: draft.duration_seconds,
+      format: draft.audio.original_format,
+      size: draft.audio.size_bytes,
+      status: constants.UPLOAD_STATUS.QUEUED,
+      recordedAt: draft.recorded_at,
+      audio: draft.audio,
+    };
+
+    // 写入上传列表存储
+    try {
+      var uploadList = wx.getStorageSync('upload_list') || [];
+      uploadList.push(uploadRecord);
+      wx.setStorageSync('upload_list', uploadList);
+      logger.info('[Index] upload record added, total:', uploadList.length);
+    } catch (e) {
+      logger.error('[Index] failed to save upload record:', e);
+      wx.showToast({ title: '保存失败，请重试', icon: 'none', duration: 2000 });
+      this.setData({ saveInProgress: false });
+      return;
+    }
+
+    // 同时保存到 soniscope_drafts 便于 US-015+ 统一管理
+    this._saveDraft(draft);
+
+    // 退出草稿确认态
+    this._currentDraft = null;
+    this.setData({
+      draftPreviewMode: false,
+      draftFormat: '',
+      draftDuration: 0,
+      draftDurationDisplay: '',
+      draftOssKeyPreview: '',
+      draftFileSize: 0,
+      audioPlaying: false,
+      audioPaused: false,
+      saveInProgress: false,
+    });
+
+    wx.showToast({
+      title: '已加入上传队列',
+      icon: 'success',
+      duration: 1500,
+    });
+
+    logger.info('[Index] fragment queued for upload:', fragmentId);
+  },
+
+  // ── 格式探测 / 工具 ──────────────────────────────────────────────────────
 
   _detectFormat: function (tempFilePath, res) {
     // 根据临时文件路径扩展名探测原始格式

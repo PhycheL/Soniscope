@@ -265,9 +265,9 @@ class TestUiStateManagement:
         ), "must have recording state flag"
 
     def test_draft_saved_flag(self):
-        """AC: 停止后设置草稿已保存状态"""
+        """AC: 停止后设置草稿状态标识（US-014 升级为 draftPreviewMode）"""
         content = self._get_index()
-        assert "draftSaved" in content, "must set draftSaved flag"
+        assert "draftPreviewMode" in content or "draftSaved" in content, "must set draft saved/confirmation state flag"
 
     def test_lifecycle_stop_recording(self):
         """AC: onHide 时如果录音中则自动停止"""
@@ -297,9 +297,9 @@ class TestWxmlTemplate:
         )
 
     def test_draft_info_display(self):
-        """AC: 停止后显示草稿信息"""
+        """AC: 停止后显示草稿信息（US-014 升级为 draftPreviewMode 草稿确认态）"""
         content = self._get_wxml()
-        assert "draftSaved" in content, (
+        assert "draftPreviewMode" in content or "draftSaved" in content, (
             "wxml must conditionally show draft info"
         )
         assert "draftFormat" in content or "draft_format" in content, (
