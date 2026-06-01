@@ -3,7 +3,8 @@
 #
 # 所有目标都在顶层运行，用户不需要 cd 到子目录。
 # ─────────────────────────────────────────────────────────────────────────────
-.PHONY: install check-config init-dirs worker-run verify-prep typecheck lint test
+.PHONY: install check-config init-dirs worker-run verify-prep typecheck lint test \
+        deploy-fc rollback-fc fc-logs
 
 # ── 安装 ────────────────────────────────────────────────────────────────────
 
@@ -42,3 +43,14 @@ lint:
 
 test:
 	uv run --directory apps/worker --extra dev pytest -v
+
+# ── FC 3.0 部署 ─────────────────────────────────────────────────────────────
+
+deploy-fc:
+	uv run --directory apps/worker --extra dev python "$(CURDIR)/scripts/deploy_fc.py" deploy $(FUNCTION)
+
+rollback-fc:
+	uv run --directory apps/worker --extra dev python "$(CURDIR)/scripts/deploy_fc.py" rollback $(FUNCTION)
+
+fc-logs:
+	uv run --directory apps/worker --extra dev python "$(CURDIR)/scripts/deploy_fc.py" logs $(FUNCTION)

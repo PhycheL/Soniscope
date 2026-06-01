@@ -18,6 +18,7 @@ dev = [
     "ruff",
     "pytest",
     "types-pyyaml",
+    "alibabacloud-fc20230330>=1.0.0",
 ]
 
 [build-system]
