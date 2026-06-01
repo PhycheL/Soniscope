@@ -4,7 +4,8 @@
 # 所有目标都在顶层运行，用户不需要 cd 到子目录。
 # ─────────────────────────────────────────────────────────────────────────────
 .PHONY: install check-config init-dirs worker-run verify-prep typecheck lint test \
-        deploy-fc rollback-fc fc-logs test-fc-live
+        deploy-fc rollback-fc fc-logs test-fc-live test-verify-upload \
+        oss-delete-obj
 
 # ── 安装 ────────────────────────────────────────────────────────────────────
 
@@ -59,3 +60,15 @@ fc-logs:
 
 test-fc-live:
 	uv run --directory apps/worker --extra dev python "$(CURDIR)/scripts/test_fc_live.py"
+
+# ── FC verify-upload 云端闭环测试 ────────────────────────────────────────────
+
+test-verify-upload:
+	uv run --directory apps/worker --extra dev python "$(CURDIR)/scripts/test_verify_upload.py"
+
+# ── OSS 运维辅助（仅测试用）──
+
+oss-delete-obj:
+	@echo "⚠️  仅测试用 — Worker 业务源码中不存在 DeleteObject 调用"
+	@echo ""
+	uv run --directory apps/worker --extra dev python "$(CURDIR)/scripts/oss_delete_obj.py" $(FRAGMENT_ID)
