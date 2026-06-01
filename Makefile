@@ -5,7 +5,8 @@
 # ─────────────────────────────────────────────────────────────────────────────
 .PHONY: install check-config init-dirs worker-run verify-prep typecheck lint test \
         deploy-fc rollback-fc fc-logs test-fc-live test-verify-upload \
-        oss-delete-obj miniprogram-lint show-oss-object test-sts-escape
+        oss-delete-obj miniprogram-lint show-oss-object test-sts-escape \
+        test-poll-interval
 
 # ── 安装 ────────────────────────────────────────────────────────────────────
 
@@ -89,3 +90,10 @@ test-sts-escape:
 	@echo "🧪 STS 越权验证"
 	@echo "需要 STS 临时凭证（access_key_id / access_key_secret / security_token / object_key）"
 	uv run --directory apps/worker --extra dev python "$(CURDIR)/scripts/test_sts_escape.py" $(STS_AK_ID) $(STS_AK_SECRET) $(STS_TOKEN) $(STS_OBJECT_KEY)
+
+# ── Worker 运维 ────────────────────────────────────────────────────
+
+test-poll-interval:
+	@echo "🧪 Worker poll interval verification"
+	@echo "Setting POLL_INTERVAL_SECONDS_OVERRIDE=30 and running one cycle"
+	POLL_INTERVAL_SECONDS_OVERRIDE=30 uv run --directory apps/worker python -m soniscope_worker test-poll-cycle

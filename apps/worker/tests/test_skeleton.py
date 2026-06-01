@@ -28,9 +28,11 @@ def test_run_command_exists() -> None:
 
     runner = CliRunner()
     result = runner.invoke(app, ["run"])
-    # Currently a placeholder; should exit 0 and print the placeholder message.
-    assert result.exit_code == 0
-    assert "not yet implemented" in result.stdout
+    # The run command requires a valid config file to proceed past config loading.
+    # Without it, it exits non-zero with FileNotFoundError.
+    # We just confirm the command is registered (it doesn't print "not yet implemented").
+    assert result.exit_code != 0
+    assert "not yet implemented" not in result.stdout
 
 
 def test_paths_default_home() -> None:

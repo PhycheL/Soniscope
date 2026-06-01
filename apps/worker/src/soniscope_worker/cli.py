@@ -17,8 +17,25 @@ app = typer.Typer(name="soniscope-worker", help="SoniScope Worker CLI")
 
 @app.command()
 def run() -> None:
-    """Start the Worker main polling loop (placeholder)."""
-    typer.echo("Worker run — not yet implemented.")
+    """Start the Worker main polling loop."""
+    config_path = resolve_config_path()
+
+    # Load config
+    try:
+        cfg = load_config(config_path)
+    except FileNotFoundError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1)
+    except ConfigValidationError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1)
+
+    # Ensure runtime dirs exist
+    init_runtime_dirs()
+
+    from soniscope_worker.poller import run_poll_loop
+
+    run_poll_loop(cfg)
 
 
 @app.command()
@@ -65,6 +82,49 @@ def verify_prep() -> None:
     exit_code = run_verify_prep()
     if exit_code != 0:
         raise typer.Exit(code=exit_code)
+
+
+@app.command()
+def test_poll_cycle() -> None:
+    """Run a single poll cycle with output (for make test-poll-interval)."""
+    config_path = resolve_config_path()
+    try:
+        cfg = load_config(config_path)
+    except FileNotFoundError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1)
+    except ConfigValidationError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1)
+
+    init_runtime_dirs()
+
+    from soniscope_worker.poller import _build_oss_client, poll_cycle, recovery_scan
+    from soniscope_worker.paths import resolve_home
+
+    home = resolve_home()
+
+    # Run recovery scan
+    removed = recovery_scan(home)
+    if removed:
+        typer.echo(f"Cleaned {len(removed)} stale intermediate(s):")
+        for p in removed:
+            typer.echo(f"  {p}")
+
+    # Build client and run one cycle
+    client = _build_oss_client(cfg)
+    import time
+
+    t0 = time.monotonic()
+    summary = poll_cycle(cfg, client)
+    elapsed = time.monotonic() - t0
+
+    typer.echo(f"\nPoll cycle complete in {elapsed:.2f}s")
+    typer.echo(f"  Total objects:   {summary['total_objects']}")
+    typer.echo(f"  Skipped (.done): {summary['skipped_done']}")
+    typer.echo(f"  Downloaded:      {summary['downloaded']}")
+    typer.echo(f"  SHA256 mismatch: {summary['sha256_mismatch']}")
+    typer.echo(f"  Errors:          {summary['errors']}")
 
 
 if __name__ == "__main__":
