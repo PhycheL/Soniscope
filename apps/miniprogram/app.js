@@ -5,6 +5,7 @@
 var logger = require('./utils/logger.js');
 var idgen = require('./utils/idgen.js');
 var uploader = require('./utils/uploader.js');
+var cleanup = require('./utils/cleanup.js');
 
 App({
   onLaunch: function () {
@@ -20,6 +21,12 @@ App({
 
     // 初始化上传引擎（注册网络状态监听，自动处理离线排队→恢复上传）
     uploader.initUploader();
+
+    // AC5/AC6: 启动时运行自动清理（清理 48h+ 的已 verify 记录缓存）
+    var cleaned = cleanup.runAutoCleanup();
+    if (cleaned > 0) {
+      logger.info('[App] auto-cleanup on launch removed', cleaned, 'stale record(s)');
+    }
   },
 
   onShow: function () {

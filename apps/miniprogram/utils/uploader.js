@@ -10,6 +10,7 @@
 
 var constants = require('./constants.js');
 var logger = require('./logger.js');
+var cleanup = require('./cleanup.js');
 
 // ── Module-level state ────────────────────────────────────────────
 
@@ -121,6 +122,90 @@ function triggerManualRetry(fragmentId) {
   processUploadQueue();
 }
 
+/**
+ * Re-verify a VERIFIED record (re-check OSS via /verify-upload).
+ *
+ * AC9: User can trigger re-verify on a verified record to confirm
+ * OSS object still exists and matches expected size.
+ *
+ * Sets status to PENDING_VERIFY during check, then updates based on result.
+ *
+ * @param {string} fragmentId
+ */
+function triggerReVerify(fragmentId) {
+  var list = _loadUploadList();
+
+  var targetIndex = -1;
+  for (var i = 0; i < list.length; i++) {
+    if (list[i].fragmentId === fragmentId) {
+      targetIndex = i;
+      break;
+    }
+  }
+
+  if (targetIndex < 0) {
+    logger.warn('[Uploader] triggerReVerify: record not found:', fragmentId);
+    return;
+  }
+
+  var record = list[targetIndex];
+
+  // Mark as pending verify
+  _updateRecordStatus(list, targetIndex, constants.UPLOAD_STATUS.PENDING_VERIFY);
+  _notifyPages(list);
+
+  // Get a fresh code and call verify
+  _wxLogin(function (codeErr, code) {
+    if (codeErr) {
+      logger.error('[Uploader] re-verify wx.login failed:', codeErr);
+      _updateRecordStatus(list, targetIndex, constants.UPLOAD_STATUS.MANUAL_VERIFY);
+      _notifyPages(list);
+      return;
+    }
+
+    _doVerifyUpload(record, code, 0, function (verifyErr) {
+      if (verifyErr) {
+        logger.error('[Uploader] re-verify failed:', verifyErr);
+        if (verifyErr.reason === 'VERIFY_FALSE_OBJECT_NOT_FOUND' ||
+            verifyErr.reason === 'VERIFY_FALSE_SIZE_MISMATCH') {
+          _handleVerifyFailure(list, targetIndex, verifyErr.reason);
+        } else {
+          _updateRecordStatus(list, targetIndex, constants.UPLOAD_STATUS.MANUAL_VERIFY);
+          record.verifyReason = verifyErr.reason;
+          _notifyPages(list);
+        }
+      } else {
+        // Re-verify passed — keep as VERIFIED
+        logger.info('[Uploader] re-verify success for', fragmentId);
+        _updateRecordStatus(list, targetIndex, constants.UPLOAD_STATUS.VERIFIED, {
+          verifiedAt: new Date().toISOString()
+        });
+        _notifyPages(list);
+      }
+    });
+  });
+}
+
+/**
+ * Delete a record from the upload list.
+ *
+ * For non-VERIFIED records, the caller (UI page) should show a double-confirm
+ * dialog before calling this function:
+ *   "该录音尚未成功上传到云端，删除后无法恢复，确定删除？"
+ *
+ * @param {string} fragmentId
+ * @returns {{ success: boolean, wasVerified: boolean }}
+ */
+function deleteRecord(fragmentId) {
+  var result = cleanup.deleteRecordById(fragmentId);
+  if (result.success) {
+    // Notify pages to refresh list
+    var list = _loadUploadList();
+    _notifyPages(list);
+  }
+  return result;
+}
+
 // ── Internal: single-record upload pipeline ───────────────────────
 
 /**
@@ -193,6 +278,10 @@ function _uploadOne(list, index) {
             verifiedAt: new Date().toISOString()
           });
           _notifyPages(list);
+
+          // AC5/AC6: run auto-cleanup to purge 48h+ verified records
+          cleanup.runAutoCleanup();
+
           _continueNext(list, index);
         });
       });
@@ -799,6 +888,8 @@ module.exports = {
   initUploader: initUploader,
   processUploadQueue: processUploadQueue,
   triggerManualRetry: triggerManualRetry,
+  triggerReVerify: triggerReVerify,
+  deleteRecord: deleteRecord,
 
   // Exported for testing
   _loadUploadList: _loadUploadList,

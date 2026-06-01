@@ -141,3 +141,26 @@
   color: #ffffff;
   font-size: 12px;
 }
+
+/* 操作按钮行（re-verify / delete） */
+.item-actions {
+  margin-top: 8px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.action-btn {
+  font-size: 12px;
+  padding: 4px 12px;
+}
+
+.action-btn-reverify {
+  background-color: #1890ff;
+  color: #ffffff;
+}
+
+.action-btn-delete {
+  background-color: #d9d9d9;
+  color: #666666;
+}
