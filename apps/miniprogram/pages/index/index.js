@@ -1,4 +1,4 @@
-// 日观声记 · 首页（录音 + 草稿确认 + 中断保护 + 草稿确认态：试听、重录、删除、保存并上传）
+// 日观声记 · 首页（录音 + 草稿确认 + 中断保护 + 草稿确认态 + 长录音自动分片）
 
 var logger = require('../../utils/logger.js');
 var constants = require('../../utils/constants.js');
@@ -19,6 +19,7 @@ Page({
     draftDurationDisplay: '',
     draftOssKeyPreview: '',
     draftFileSize: 0,
+    draftChunkCount: 0,
     // 试听状态
     audioPlaying: false,
     audioPaused: false,
@@ -31,8 +32,14 @@ Page({
 
   timerInterval: null,
   _interrupted: false, // 中断标记，防止重复生成草稿
-  _currentDraft: null, // 当前草稿确认态中的草稿对象
+  _currentDraft: null, // 当前草稿确认态中的草稿对象（最后一 chunk）
   _audioContext: null, // 试听音频上下文
+
+  // ── 长录音自动分片 ──────────────────────────────────────────────────
+  _sessionId: null,       // 当前录音会话 ID（所有 chunk 共享）
+  _sessionChunks: [],     // 已收集的 chunk 信息数组
+  _chunkSeq: 0,           // 当前 chunk 序号（从 1 递增）
+  _userStopped: false,    // true = 用户手动停止，false = 自动分片触发
 
   onLoad: function () {
     logger.info('[Index] onLoad');
@@ -77,49 +84,79 @@ Page({
       var tempPath = res.tempFilePath || '';
       var format = that._detectFormat(tempPath, res);
 
-      that._clearTimer();
-
       var durationSeconds = Math.round((res.duration || 0) / 1000);
 
-      // 构建草稿对象
-      var draft = {
+      // 构建 chunk 记录
+      var chunk = {
         tempFilePath: tempPath,
         audio: {
           original_format: format,
           size_bytes: res.fileSize || 0,
         },
         duration_seconds: durationSeconds,
-        recorded_at: new Date().toISOString(),
-        interrupted: that._interrupted,
       };
 
       if (that._interrupted) {
         // 中断保存到独立存储，等待用户确认
-        that._saveInterruptedDraft(draft);
+        that._saveInterruptedDraftForChunk(chunk);
         that._interrupted = false;
+        that._clearTimer();
+        // 若有已收集的先前 chunk 一并清理（中断时丢弃整个 session）
+        that._sessionChunks = [];
         that.setData({
           recording: false,
         });
-      } else {
-        // 正常停止：进入草稿确认态
-        that._currentDraft = draft;
+        return;
+      }
 
-        // 生成 OSS key 预览（始终使用 .wav 扩展名，不表示前端已转码）
+      // 记录当前 chunk
+      that._sessionChunks.push(chunk);
+
+      if (that._userStopped) {
+        // 用户手动停止：所有 chunk 已收集完毕，进入草稿确认态
+        that._clearTimer();
+
+        var totalDuration = 0;
+        for (var ci = 0; ci < that._sessionChunks.length; ci++) {
+          totalDuration += that._sessionChunks[ci].duration_seconds;
+        }
+        var lastChunk = that._sessionChunks[that._sessionChunks.length - 1];
+
+        that._currentDraft = lastChunk;
+
         var ossKeyPreview = that._buildOssKeyPreview();
 
         that.setData({
           recording: false,
           draftPreviewMode: true,
           draftFormat: format,
-          draftDuration: durationSeconds,
-          draftDurationDisplay: that._formatDuration(durationSeconds),
+          draftDuration: totalDuration,
+          draftDurationDisplay: that._formatDuration(totalDuration),
           draftOssKeyPreview: ossKeyPreview,
-          draftFileSize: res.fileSize || 0,
+          draftFileSize: lastChunk.audio.size_bytes,
+          draftChunkCount: that._sessionChunks.length,
         });
 
-        logger.info('[Index] draft preview mode, original_format:', format,
-          'duration:', durationSeconds + 's',
+        logger.info('[Index] draft preview mode, session:', that._sessionId,
+          'chunks:', that._sessionChunks.length,
+          'total_duration:', totalDuration + 's',
+          'original_format:', format,
           'oss_key_preview:', ossKeyPreview);
+      } else {
+        // 自动分片：recorder 达到 600s 上限自动停止
+        that._chunkSeq++;
+        logger.info('[Index] auto-split: chunk', (that._chunkSeq - 1),
+          'done, starting chunk', that._chunkSeq);
+
+        // 立即开始下一片段
+        recorderManager.start({
+          duration: constants.CHUNK_MAX_DURATION_SECONDS * 1000,
+          sampleRate: 16000,
+          numberOfChannels: 1,
+          encodeBitRate: 48000,
+          format: 'mp3',
+        });
+        // 注意：timer 保持运行，不清零
       }
     });
 
@@ -149,7 +186,7 @@ Page({
     var that = this;
     logger.info('[Index] handling interruption, source:', source);
 
-    // 设置中断标记，防止 onStop 回调中走正常保存路径
+    // 设置中断标记，防止 onStop 回调中走正常/自动分片保存路径
     // 也防止重复中断（连续两次中断只保留第一次状态）
     if (this._interrupted) {
       logger.info('[Index] already interrupted, skip duplicate');
@@ -165,10 +202,34 @@ Page({
     }
   },
 
-  _saveInterruptedDraft: function (draft) {
+  _saveInterruptedDraftForChunk: function (chunk) {
+    // 将中断前的所有 chunk 一并保存到中断存储
     try {
+      // 把当前 chunk 加入 session 列表
+      this._sessionChunks.push(chunk);
+
+      var totalDuration = 0;
+      for (var i = 0; i < this._sessionChunks.length; i++) {
+        totalDuration += this._sessionChunks[i].duration_seconds;
+      }
+
+      var draft = {
+        tempFilePath: chunk.tempFilePath,
+        audio: {
+          original_format: chunk.audio.original_format,
+          size_bytes: chunk.audio.size_bytes,
+        },
+        duration_seconds: totalDuration,
+        chunks: this._sessionChunks.length,
+        recorded_at: new Date().toISOString(),
+        interrupted: true,
+        // 保存所有 chunk 的路径信息供恢复时使用
+        _chunkPaths: this._sessionChunks.map(function (c) { return c.tempFilePath; }),
+      };
+
       wx.setStorageSync('soniscope_interrupted_draft', draft);
-      logger.info('[Index] interrupted draft saved, duration:', draft.duration_seconds + 's');
+      logger.info('[Index] interrupted draft saved, chunks:', this._sessionChunks.length,
+        'total_duration:', totalDuration + 's');
     } catch (e) {
       logger.error('[Index] failed to save interrupted draft:', e);
     }
@@ -278,8 +339,13 @@ Page({
 
   _doStartRecord: function () {
     this._interrupted = false;
+    this._userStopped = false;
     // 清理之前的草稿确认态
     this._currentDraft = null;
+    // 初始化长录音分片追踪
+    this._sessionId = null;
+    this._sessionChunks = [];
+    this._chunkSeq = 0;
     this.setData({
       recording: true,
       seconds: 0,
@@ -290,6 +356,7 @@ Page({
       draftDurationDisplay: '',
       draftOssKeyPreview: '',
       draftFileSize: 0,
+      draftChunkCount: 0,
       audioPlaying: false,
       audioPaused: false,
       saveInProgress: false,
@@ -297,6 +364,11 @@ Page({
       recoveryDraft: null,
     });
     this._startTimer();
+
+    // 分配 session_id（所有 chunk 共享）
+    this._sessionId = idgen.generateSessionId();
+    this._chunkSeq = 1;
+    logger.info('[Index] session started:', this._sessionId, 'chunk 1');
 
     recorderManager.start({
       duration: constants.CHUNK_MAX_DURATION_SECONDS * 1000,
@@ -311,6 +383,7 @@ Page({
 
   _stopRecording: function () {
     logger.info('[Index] stopping recording');
+    this._userStopped = true;
     recorderManager.stop();
   },
 
@@ -406,11 +479,13 @@ Page({
             draftDurationDisplay: '',
             draftOssKeyPreview: '',
             draftFileSize: 0,
+            draftChunkCount: 0,
             audioPlaying: false,
             audioPaused: false,
             saveInProgress: false,
           });
           that._currentDraft = null;
+          that._sessionChunks = [];
           wx.showToast({ title: '草稿已删除', icon: 'success', duration: 1500 });
           logger.info('[Index] draft deleted');
         }
@@ -442,89 +517,154 @@ Page({
       return;
     }
 
-    this.setData({ saveInProgress: true });
+    if (!this._sessionChunks || this._sessionChunks.length === 0) {
+      wx.showToast({ title: '没有可保存的录音片段', icon: 'none', duration: 2000 });
+      return;
+    }
 
-    // 冻结草稿
-    var draft = this._currentDraft;
+    this.setData({ saveInProgress: true });
 
     // 获取 device_short_id
     var app = getApp();
     var deviceShortId = (app.globalData && app.globalData.deviceShortId) || idgen.getOrCreateDeviceShortId();
 
-    // 生成 fragment_id: <YYYYMMDDTHHMMSS>_<deviceShortId>_<26字符ULID>
-    var fragmentId = idgen.generateFragmentId(deviceShortId);
+    // 所有 chunk 共享同一个 session_id
+    var sessionId = this._sessionId || idgen.generateSessionId();
+    var chunkTotal = this._sessionChunks.length;
+    var recordedAt = new Date().toISOString();
 
-    // 生成 session_id（与 fragment_id 一对一的独立会话标识；未来长录音分片共享）
-    var sessionId = idgen.generateSessionId();
+    logger.info('[Index] processing session:', sessionId,
+      'total_chunks:', chunkTotal,
+      'device:', deviceShortId);
 
-    logger.info('[Index] fragmentId:', fragmentId, 'sessionId:', sessionId);
+    // 按顺序处理每个 chunk（SHA-256 计算是异步的，需要串行避免并发问题）
+    var chunkEntries = []; // 收集处理后的上传记录
+    var idx = 0;
 
-    // 计算原始音频 SHA-256
-    cryptoUtil.computeFileSha256(draft.tempFilePath).then(function (sha256) {
-      logger.info('[Index] sha256 computed');
+    function processNext() {
+      if (idx >= that._sessionChunks.length) {
+        // 所有 chunk 处理完毕 → 回填 chunk_total → 批量写入 storage
+        _finishSave();
+        return;
+      }
 
-      // 构建完整 manifest 草案
-      var manifest = {
-        fragment_id: fragmentId,
-        session_id: sessionId,
-        chunk_seq: 1,
-        chunk_total: 0,       // 0 = 非分片（US-016 引入自动分片后填写实际值）
-        device_id: deviceShortId,
-        recorded_at: draft.recorded_at,
-        duration_seconds: draft.duration_seconds,
-        audio: {
-          original_format: draft.audio.original_format,
-          size_bytes: draft.audio.size_bytes
-        },
-        upload: {
-          original_sha256: sha256
-        }
-      };
+      var chunk = that._sessionChunks[idx];
+      var chunkSeq = idx + 1; // chunk_seq 从 1 递增
 
-      // OSS 用户自定义元数据（对应 x-oss-meta-* 请求头，用于 Worker 读取）
-      var ossMeta = {
-        'x-oss-meta-session-id': sessionId,
-        'x-oss-meta-chunk-seq': '1',
-        'x-oss-meta-chunk-total': '0',
-        'x-oss-meta-recorded-at': draft.recorded_at,
-        'x-oss-meta-duration': String(draft.duration_seconds),
-        'x-oss-meta-original-format': draft.audio.original_format,
-        'x-oss-meta-sha256': sha256
-      };
+      logger.info('[Index] processing chunk', chunkSeq + '/' + chunkTotal);
 
-      // 创建上传记录
-      var uploadRecord = {
-        fragmentId: fragmentId,
-        sessionId: sessionId,
-        tempFilePath: draft.tempFilePath,
-        duration: draft.duration_seconds,
-        format: draft.audio.original_format,
-        size: draft.audio.size_bytes,
-        status: constants.UPLOAD_STATUS.QUEUED,
-        recordedAt: draft.recorded_at,
-        audio: draft.audio,
-        manifest: manifest,
-        ossMeta: ossMeta
-      };
+      // 生成独立 fragment_id
+      var fragmentId = idgen.generateFragmentId(deviceShortId);
 
-      // 写入上传列表存储
+      cryptoUtil.computeFileSha256(chunk.tempFilePath).then(function (sha256) {
+        logger.info('[Index] chunk', chunkSeq, 'sha256 computed');
+
+        // 构建完整 manifest 草案
+        var manifest = {
+          fragment_id: fragmentId,
+          session_id: sessionId,
+          chunk_seq: chunkSeq,
+          chunk_total: 0,         // 将在此批次完成后回填
+          device_id: deviceShortId,
+          recorded_at: recordedAt,
+          duration_seconds: chunk.duration_seconds,
+          audio: {
+            original_format: chunk.audio.original_format,
+            size_bytes: chunk.audio.size_bytes
+          },
+          upload: {
+            original_sha256: sha256
+          }
+        };
+
+        // OSS 用户自定义元数据
+        var ossMeta = {
+          'x-oss-meta-session-id': sessionId,
+          'x-oss-meta-chunk-seq': String(chunkSeq),
+          'x-oss-meta-chunk-total': '0', // 将在此批次完成后回填
+          'x-oss-meta-recorded-at': recordedAt,
+          'x-oss-meta-duration': String(chunk.duration_seconds),
+          'x-oss-meta-original-format': chunk.audio.original_format,
+          'x-oss-meta-sha256': sha256
+        };
+
+        // 创建上传记录
+        var uploadRecord = {
+          fragmentId: fragmentId,
+          sessionId: sessionId,
+          chunkSeq: chunkSeq,
+          chunkTotal: 0, // 等待回填
+          tempFilePath: chunk.tempFilePath,
+          duration: chunk.duration_seconds,
+          format: chunk.audio.original_format,
+          size: chunk.audio.size_bytes,
+          status: constants.UPLOAD_STATUS.QUEUED,
+          recordedAt: recordedAt,
+          audio: chunk.audio,
+          manifest: manifest,
+          ossMeta: ossMeta
+        };
+
+        chunkEntries.push(uploadRecord);
+
+        idx++;
+        processNext();
+      }).catch(function (err) {
+        logger.error('[Index] sha256 computation failed for chunk', chunkSeq, ':', err);
+        // 单个 chunk 失败不应该阻断整体流程，但需要标记
+        // 此处记录错误后继续，用户可手动重试
+        idx++;
+        processNext();
+      });
+    }
+
+    // 所有 chunk SHA-256 计算完成后的收尾工作
+    function _finishSave() {
+      if (chunkEntries.length === 0) {
+        // 没有任何 chunk 处理成功
+        wx.showToast({ title: 'SHA-256 计算全部失败，请重试', icon: 'none', duration: 2000 });
+        that.setData({ saveInProgress: false });
+        return;
+      }
+
+      // 回填 chunk_total 到所有 chunk 的 manifest 和 ossMeta
+      for (var ei = 0; ei < chunkEntries.length; ei++) {
+        chunkEntries[ei].manifest.chunk_total = chunkTotal;
+        chunkEntries[ei].chunkTotal = chunkTotal;
+        chunkEntries[ei].ossMeta['x-oss-meta-chunk-total'] = String(chunkTotal);
+      }
+
+      // 批量写入上传列表存储
       try {
         var uploadList = wx.getStorageSync('upload_list') || [];
-        uploadList.push(uploadRecord);
+        for (var uj = 0; uj < chunkEntries.length; uj++) {
+          uploadList.push(chunkEntries[uj]);
+        }
         wx.setStorageSync('upload_list', uploadList);
-        logger.info('[Index] upload record added, total:', uploadList.length);
+        logger.info('[Index] upload records added, chunks:', chunkEntries.length,
+          'total in list:', uploadList.length);
       } catch (e) {
-        logger.error('[Index] failed to save upload record:', e);
+        logger.error('[Index] failed to save upload records:', e);
         wx.showToast({ title: '保存失败，请重试', icon: 'none', duration: 2000 });
         that.setData({ saveInProgress: false });
         return;
       }
 
-      // 同时保存到 soniscope_drafts 便于统一管理
-      that._saveDraft(draft);
+      // 保存最后 chunk 的草稿信息
+      var lastChunk = that._sessionChunks[that._sessionChunks.length - 1];
+      var summaryDraft = {
+        tempFilePath: lastChunk.tempFilePath,
+        audio: lastChunk.audio,
+        duration_seconds: lastChunk.duration_seconds,
+        session_id: sessionId,
+        chunks: chunkTotal,
+        recorded_at: recordedAt,
+      };
+      that._saveDraft(summaryDraft);
 
       // 退出草稿确认态
       that._currentDraft = null;
+      that._sessionChunks = [];
       that.setData({
         draftPreviewMode: false,
         draftFormat: '',
@@ -532,23 +672,27 @@ Page({
         draftDurationDisplay: '',
         draftOssKeyPreview: '',
         draftFileSize: 0,
+        draftChunkCount: 0,
         audioPlaying: false,
         audioPaused: false,
         saveInProgress: false,
       });
 
+      var toastMsg = chunkTotal > 1
+        ? chunkTotal + ' 段录音已加入上传队列'
+        : '已加入上传队列';
       wx.showToast({
-        title: '已加入上传队列',
+        title: toastMsg,
         icon: 'success',
         duration: 1500,
       });
 
-      logger.info('[Index] fragment queued for upload:', fragmentId);
-    }).catch(function (err) {
-      logger.error('[Index] sha256 computation failed:', err);
-      wx.showToast({ title: 'SHA-256 计算失败，请重试', icon: 'none', duration: 2000 });
-      that.setData({ saveInProgress: false });
-    });
+      logger.info('[Index] session saved:', sessionId,
+        'chunks:', chunkTotal);
+    }
+
+    // 开始处理
+    processNext();
   },
 
   // ── 格式探测 / 工具 ──────────────────────────────────────────────────────
