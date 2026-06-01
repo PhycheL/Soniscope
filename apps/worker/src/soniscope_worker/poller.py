@@ -477,6 +477,7 @@ def poll_cycle(config: SoniScopeConfig, client: "OSSClient") -> dict[str, int]:
         "passthrough": 0,
         "transcoded": 0,
         "transcode_failed": 0,
+        "manifest_written": 0,
         "errors": 0,
     }
 
@@ -556,6 +557,64 @@ def poll_cycle(config: SoniScopeConfig, client: "OSSClient") -> dict[str, int]:
         elif audio_result.mode == "transcoded":
             summary["transcoded"] += 1
 
+        # ── US-024: write manifest.json, transcript.json, transcript.txt, .done ──
+        from soniscope_worker.manifest import write_manifest
+        from soniscope_worker.transcript import (
+            TranscriptResult,
+            write_transcript_json,
+            write_transcript_txt,
+        )
+
+        frag_dir = audio_result.dest_path.parent if audio_result.dest_path else None
+        if frag_dir is None:
+            summary["errors"] += 1
+            continue
+
+        # Build the audio_result dict for manifest builder
+        audio_result_dict: dict[str, Any] = {
+            "audio_format": audio_result.audio_format,
+            "original_format": audio_result.original_format,
+            "audio_sha256": audio_result.audio_sha256,
+            "original_sha256": audio_result.original_sha256,
+            "audio_size_bytes": audio_result.audio_size_bytes,
+            "original_size_bytes": audio_result.original_size_bytes,
+            "mode": audio_result.mode,
+        }
+
+        # Build head_meta dict from the HeadMetaResult
+        head_meta_dict = meta.to_manifest_draft()
+
+        manifest_target = frag_dir / "manifest.json"
+        write_manifest(
+            manifest_target,
+            fragment_id=fragment_id,
+            head_meta=head_meta_dict,
+            audio_result=audio_result_dict,
+            config_model=config.transcriber.model,
+            config_params_version=config.transcriber.params_version,
+            config_provider=config.transcriber.provider,
+            config_transcriber_name=config.transcriber.name,
+            config_upload_mode=config.transcriber.upload_mode,
+        )
+
+        # Write placeholder transcript (real transcription comes from US-025/US-026)
+        placeholder = TranscriptResult(
+            segments=[],
+            language="zh",
+            model=config.transcriber.model,
+            params_version=config.transcriber.params_version,
+            provider=config.transcriber.provider,
+            duration=float(audio_result_dict.get("duration_seconds", 0.0)),
+        )
+        write_transcript_json(frag_dir / "transcript.json", placeholder)
+        write_transcript_txt(frag_dir / "transcript.txt", placeholder)
+
+        # Create .done marker — final step (AC6)
+        from soniscope_worker.atomics import create_done_marker
+
+        create_done_marker(frag_dir)
+        summary["manifest_written"] += 1
+
     return summary
 
 
@@ -634,13 +693,14 @@ def run_poll_loop(config: SoniScopeConfig) -> None:
             logger.info(
                 "poll_cycle_complete total=%d skipped_done=%d downloaded=%d "
                 "passthrough=%d transcoded=%d transcode_failed=%d "
-                "mismatch=%d errors=%d elapsed=%.2fs",
+                "manifest_written=%d mismatch=%d errors=%d elapsed=%.2fs",
                 summary["total_objects"],
                 summary["skipped_done"],
                 summary["downloaded"],
                 summary["passthrough"],
                 summary["transcoded"],
                 summary["transcode_failed"],
+                summary["manifest_written"],
                 summary["sha256_mismatch"],
                 summary["errors"],
                 elapsed,
