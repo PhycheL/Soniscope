@@ -148,6 +148,13 @@
 - mock HTTPError 不能用 `mock.MagicMock(spec=HTTPError)` 因为 MagicMock 不是 BaseException 子类；应构造真实异常 `HTTPError("url", 404, "msg", {}, None)`
 - Pytest fixture `_clean_env` 需要在每次测试前清理 FC 函数所需的环境变量，与 US-006/US-007 相同
 - 所有 FC 共享模块（auth/oss/sts/config/errors/logging）统一从 `shared/` 导出，新模块需更新 `__init__.py` 的 `__all__`
+- ffprobe 输出格式用 `-of json` 比 `default:noprint_wrappers=1:nokey=1` 更可靠：后者的 stream 字段排在 format 字段之前，与 `-show_entries` 参数顺序不一致，会导致字段映射错位
+- ffmpeg 转码时必须显式 `-f wav` 指定输出格式——ffmpeg 8.1.1 对 `.wav.tmp` 扩展名可能无法自动选择 WAV muxer
+- Worker 音频三段式协议：passthrough 路径 .part → rename → fragments/<date>/<id>/audio.wav；transcode 路径 .part → ffmpeg → .wav.tmp → rename → audio.wav → unlink .part
+- Worker 所有文件写入遵循原子协议：先临时文件、再原子 rename（同一文件系统）、最后 .done。`Path.rename()` 在同一文件系统上是原子的
+- Worker `poll_cycle` summary dict 用 int 值计数状态（downloaded/passthrough/transcoded/transcode_failed/errors），每次扩展字段时需同步更新 `run_poll_loop` 日志格式字符串和 `cli.py` 输出
+- `Path(__file__).parent` 计数：`apps/worker/tests/test_*.py` → repo root = 4 层 parent；→ Makefile = 4 层 parent；→ `src/soniscope_worker/` = 2 层 parent
+- Makefile .PHONY 行用 `\` 续行时，测试中的 `splitlines()` + `startswith('.PHONY:')` 只取到首行——需要合并续行逻辑才能校验完整 target 列表
 
 ## 2026-06-02 02:15 - US-009
 - 实现了 FC verify-upload HeadObject 上传确认接口
@@ -437,4 +444,26 @@
   - 有用的上下文: US-021 完成后 OSS 对象可被发现、元数据可读、音频可下载到 .part 且 sha256 可校验——下一 story US-022（格式检测/转码）将在下载完成后集成 ffprobe/ffmpeg 流程
   - 有用的上下文: `run_poll_loop` 通过 `POLL_INTERVAL_SECONDS_OVERRIDE` 环境变量覆盖轮询间隔，`make test-poll-interval` 利用此机制验证 30 秒间隔
   - 有用的上下文: recovery_scan 在 startup 时同时清理 `.part` 和 `.wav.tmp` 两种残留（虽然后者在 US-022 才产生），为后续 story 提前做好基础
+---
+
+## 2026-06-02 06:00 - US-022
+- 实现了 Worker 音频格式检测（ffprobe JSON 输出解析）、WAV 直通/无损重封装路径、非 WAV（m4a/aac/mp3/amr 等）→ WAV 转码（ffmpeg）、转码失败留档到 inbox/failed/
+- 集成到 poll_cycle：下载 sha256 验证成功 → process_audio → 根据 probe 结果走 passthrough 或 transcode → 原子放到 fragments/<date>/<id>/audio.wav
+- **更改的文件:**
+  - `apps/worker/src/soniscope_worker/audio.py` (new) — AudioProbeResult / AudioProcessResult 数据类、_run_ffprobe（JSON 输出）、probe_audio、transcode_to_wav、process_audio（主入口）、_atomic_rename / _atomic_copy_or_rename 原子操作
+  - `apps/worker/src/soniscope_worker/poller.py` (modified) — poll_cycle 在下载成功后调用 process_audio，返回 summary 新增 passthrough/transcoded/transcode_failed 键；run_poll_loop 日志覆盖新字段
+  - `apps/worker/src/soniscope_worker/cli.py` (modified) — test-poll-cycle 输出新增 passthrough/transcoded/transcode_failed 三行
+  - `Makefile` (modified) — 新增 test-wav-passthrough / test-audio-transcode-to-wav / test-transcode-fail 三个 target；更新 .PHONY
+  - `apps/worker/tests/test_us022.py` (new) — 54 个单元测试覆盖：AudioProbeResult WAV/compliant 判定、AudioProcessResult 字段、sha256 计算、原子 rename/copy、_run_ffprobe 集成（wav/m4a fixture）、probe_audio 集成、transcode_to_wav 集成（m4a→wav/无效输入抛异常）、process_audio 集成（wav passthrough AC5/m4a transcode AC6/corrupt→failed AC7/no fragment dir pollution AC7）、process_audio mocked（无效 probe/transcode 失败）、unknown format 回退、poll_cycle 新 summary 键、DeleteObject 缺席、Makefile targets、CLI 输出、模块结构完整性、ffprobe/ffmpeg 可用性、PCM compliant 边界
+- **未来迭代的学习：**
+  - 发现的 patterns: ffprobe 使用 `-of json` 输出比 `default=noprint_wrappers=1:nokey=1` 更可靠，因为后者 stream/format 输出顺序不固定（stream fields 先于 format fields）
+  - 发现的 patterns: ffmpeg 转码需显式 `-f wav` 指定输出格式，否则 ffmpeg 8.1.1 对 `.wav.tmp` 扩展名无法自动选择 muxer
+  - 发现的 patterns: WAV 直通路径用 `_atomic_copy_or_rename` 优先 rename 同文件系统、失败回退 copy+unlink；非 WAV 转码路径用 `_atomic_rename` 从 .wav.tmp 原子移到 fragments/
+  - 发现的 patterns: process_audio 返回 AudioProcessResult 携带所有元数据（audio_sha256/original_sha256/original_format 等），为 US-024 manifest 写入做数据准备
+  - 遇到的陷阱: `-of default:noprint_wrappers=1:nokey=1` 输出 stream fields 排 format fields 之前（ffprobe 按 -show_entries 参数顺序输出，但 stream: 在 format: 前），导致字段映射错位——已全部改为 JSON 解析
+  - 遇到的陷阱: `from parent.parent.parent.parent` 计数易出错（tests/ 在 apps/worker/ 下，到 repo root = 4 层 parent，到 Makefile 也是 4 层）
+  - 遇到的陷阱: Makefile .PHONY 行用 `\` 续行时，`text.splitlines()` 的单行看不到完整列表，需要用合并逻辑拼接
+  - 有用的上下文: WAV passthrough 路径：audio.sha256 == upload.original_sha256，audio.size_bytes == upload.original_size_bytes（AC5）；非 WAV 转码路径两者不同且均真实计算（AC6）
+  - 有用的上下文: process_audio 完成后 .part 文件已删除（passthrough rename 或 transcode unlink），audio.wav 在 fragments/ 就位，供 US-024 manifest 和 US-026 转写使用
+  - 有用的上下文: sample-20s.wav ffprobe 实际 duration=24.02s（非文件名暗示的 20s），测试已适配
 ---
