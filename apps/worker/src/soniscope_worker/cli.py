@@ -137,6 +137,7 @@ def test_poll_cycle() -> None:
     typer.echo(f"  Passthrough:      {summary['passthrough']}")
     typer.echo(f"  Transcoded:       {summary['transcoded']}")
     typer.echo(f"  Transcode failed: {summary['transcode_failed']}")
+    typer.echo(f"  Manifest written: {summary['manifest_written']}")
     typer.echo(f"  SHA256 mismatch:  {summary['sha256_mismatch']}")
     typer.echo(f"  Errors:           {summary['errors']}")
 

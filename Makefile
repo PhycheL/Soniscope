@@ -7,7 +7,8 @@
         deploy-fc rollback-fc fc-logs test-fc-live test-verify-upload \
         oss-delete-obj miniprogram-lint show-oss-object test-sts-escape \
         test-poll-interval test-wav-passthrough test-audio-transcode-to-wav \
-        test-transcode-fail test-crash-recovery simulate-worker-crash
+        test-transcode-fail test-crash-recovery simulate-worker-crash \
+        test-fragment-integrity test-manifest-idempotent
 
 # ── 安装 ────────────────────────────────────────────────────────────────────
 
@@ -126,3 +127,15 @@ test-crash-recovery:
 simulate-worker-crash:
 	@echo "🧪 Simulate Worker crash scenario"
 	CASE="$(CASE)" FRAGMENT_ID="$(FRAGMENT_ID)" uv run --directory apps/worker --extra dev python "$(CURDIR)/scripts/simulate_worker_crash.py"
+
+# ── Worker fragment 完整性测试 ──────────────────────────────────────────
+
+test-fragment-integrity:
+	@echo "🧪 Fragment integrity — 5 products in completed directory"
+	@echo "Running fragment integrity tests"
+	@uv run --directory apps/worker --extra dev pytest -v -k "TestFragmentIntegrity or test_fragment_integrity or TestManifestIntegrity or test_manifest_integrity or test_five_products or test_completed_directory" "$(CURDIR)/apps/worker/tests/test_us024.py"
+
+test-manifest-idempotent:
+	@echo "🧪 Manifest idempotency — same WAV twice → same manifest (except timestamps)"
+	@echo "Running manifest idempotency tests"
+	@uv run --directory apps/worker --extra dev pytest -v -k "TestManifestIdempotent or test_idempotent or test_same_wav_twice" "$(CURDIR)/apps/worker/tests/test_us024.py"
