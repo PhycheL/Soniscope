@@ -532,4 +532,30 @@
   - 有用的上下文: US-027 集成时需要在 poll_cycle 中调用 `create_transcriber(config, oss_client=client, oss_bucket=config.oss.bucket)` 获取转写器实例，然后调用 `transcriber.transcribe()` 替换占位 transcript
 ---
 
+## 2026-06-02 22:30 - US-027
+- 实现了 Worker 完整流水线集成：poll_cycle 发现新 OSS object → 下载 → sha256 校验 → audio.wav 标准化 → manifest 写入 → 真实 ASR 转写 → transcript 写入 → manifest transcription 回填 → .done 创建
+- 新增 `_run_transcription_pipeline()` 统一转录管道：create_transcriber → transcribe → 原子写 transcript.json/txt → 更新 manifest.transcription → 创建 .done
+- 新增 `_resume_incomplete_fragments()` 崩溃恢复：启动时扫描 fragments/ 下有 audio.wav 但无 .done 的目录并补齐转录（无需重新下载）
+- 新增 `_write_minimal_manifest_from_audio()` 辅助函数：崩溃恢复时若 manifest 缺失，从 audio.wav 构建最小 manifest
+- poll_cycle summary 将 `manifest_written` 替换为 `transcribed` / `transcribe_failed`；run_poll_loop 日志和 cli.py 输出同步更新
+- 更改的文件:
+  - `apps/worker/src/soniscope_worker/poller.py` (modified) — 新增 _run_transcription_pipeline、_resume_incomplete_fragments、_write_minimal_manifest_from_audio；poll_cycle 移除占位 transcript，替换为真实 ASR 调用；run_poll_loop 启动时调用 resume 并在日志中包含新字段
+  - `apps/worker/src/soniscope_worker/cli.py` (modified) — test-poll-cycle 输出新增 Transcribed/Transcribe failed 两行替换 Manifest written
+  - `apps/worker/tests/test_us027.py` (new) — 68 个单元测试覆盖：poll_cycle 完整流程（AC1）、失败无 .done（AC2）、幂等跳过（AC3）、crash 恢复（AC4/AC5）、5 产物验证（AC6）、无重复下载（AC7）、模块结构/安全/边界
+  - `apps/worker/tests/test_us024.py` (modified) — 适配 CLI 输出字段名变更（manifest_written → transcribed）
+  - `Makefile` (modified) — 新增 test-transcribe / test-download-interrupt / test-no-redownload 三个 .PHONY target
+  - `scripts/ralph/prd.json` (modified) — US-027 passes 设为 true
+- **未来迭代的学习：**
+  - 发现的 patterns: 转录管线使用 `_run_transcription_pipeline()` 作为统一入口，同时被 poll_cycle（新 OSS 对象）和 `_resume_incomplete_fragments`（崩溃恢复）调用，确保行为一致
+  - 发现的 patterns: `.done` 是 pipeline 的最终关卡——`_run_transcription_pipeline` 内部先 `remove_done_marker` 确保干净起点，ASR 和文件写入全部成功后才 `create_done_marker`
+  - 发现的 patterns: crash recovery 扫描 fragments/ 树时按 `date_dir → frag_dir` 两层遍历，检查 `audio.wav` 存在 + `.done` 缺失 → 触发 resume；缺少 manifest 时用 `_write_minimal_manifest_from_audio` 从 audio.wav 计算 sha256/size 构建最小版本
+  - 发现的 patterns: summary dict 字段是 poll_cycle/run_poll_loop/cli.py 三处的共享契约——新增或重命名字段时需三处同步更新
+  - 遇到的陷阱: `poll_cycle` 内的 `process_audio` 是通过 `from soniscope_worker.audio import process_audio` 在函数内延迟导入的，mock 时需要用 `soniscope_worker.audio.process_audio` 而非 `soniscope_worker.poller.process_audio`
+  - 遇到的陷阱: `write_manifest` 同样在 poll_cycle 函数体内延迟导入（`from soniscope_worker.manifest import write_manifest`），mock 时也要对应到 `soniscope_worker.manifest.write_manifest`
+  - 遇到的陷阱: `create_transcriber` 在 `_run_transcription_pipeline` 中延迟导入，mock 路径为 `soniscope_worker.poller.create_transcriber`（因为函数在 poller.py 中复用此符号）
+  - 有用的上下文: US-027 完成后 Worker 流水线已完整闭环（OSS 发现 → 下载 → 标准化 → 转写 → 落盘），US-028（retranscribe CLI）将在 US-027 基础上增加显式重转/强制重转/模型版本升级重转功能
+  - 有用的上下文: Crash recovery 的 `_resume_incomplete_fragments` 在 `run_poll_loop` 的 `_build_oss_client` 之后、while loop 之前调用，确保 OSS client 已就绪但不会在每轮 poll 中重复执行
+  - 有用的上下文: `_write_minimal_manifest_from_audio` 的 `head_meta` 传空 dict（没有 OSS 元数据可用），audio_result 的 `original_sha256` 为空字符串（无法从 OSS 获取原始哈希）
+---
+
 
