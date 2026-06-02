@@ -14,7 +14,8 @@
         test-transcribe test-download-interrupt test-no-redownload \
         retranscribe test-idempotent-skip test-no-auto-retranscribe \
         test-cli-retranscribe test-cli-upgrade \
-        verify-e2e-integrity verify-e2e-sha256 verify-e2e-fields
+        verify-e2e-integrity verify-e2e-sha256 verify-e2e-fields \
+        test-e2e-crash-recovery test-e2e-retranscribe test-e2e-security
 
 # ── 安装 ────────────────────────────────────────────────────────────────────
 
@@ -223,3 +224,17 @@ verify-e2e-sha256:
 verify-e2e-fields:
 	@echo "🔍 E2E 关键字段完整性校验"
 	uv run --directory apps/worker --extra dev python "$(CURDIR)/scripts/verify_e2e_fields.py"
+
+# ── E2E 崩溃恢复/重转/安全反例 (US-031) ───────────────────────────────
+
+test-e2e-crash-recovery:
+	@echo "🧪 E2E 崩溃恢复验证"
+	uv run --directory apps/worker --extra dev python "$(CURDIR)/scripts/test_e2e_crash_recovery.py" $(ARGS)
+
+test-e2e-retranscribe:
+	@echo "🧪 E2E 重转验证"
+	uv run --directory apps/worker --extra dev python "$(CURDIR)/scripts/test_e2e_retranscribe.py" $(ARGS)
+
+test-e2e-security:
+	@echo "🧪 E2E 安全反例验证"
+	uv run --directory apps/worker --extra dev python "$(CURDIR)/scripts/test_e2e_security.py" $(ARGS)
