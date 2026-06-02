@@ -559,3 +559,18 @@
 ---
 
 
+
+
+## 2026-06-02 23:00 - US-028
+- 实现了 Worker 幂等规则与 retranscribe CLI 完整功能
+- 更改的文件:
+  - `apps/worker/src/soniscope_worker/retranscribe.py` (new) — retranscribe 模块：_differs_from_config、_needs_upgrade、_retranscribe_one、_scan_fragment_dirs、run_retranscribe、os_open_lock fcntl 文件锁
+  - `apps/worker/src/soniscope_worker/cli.py` (modified) — 新增 retranscribe CLI 命令：fragment_id、--all-from / --force / --upgrade 选项
+  - `Makefile` (modified) — 新增 retranscribe、test-idempotent-skip、test-no-auto-retranscribe、test-cli-retranscribe、test-cli-upgrade 五个 target
+  - `apps/worker/tests/test_us028.py` (new) — 50 个单元测试覆盖全部 AC
+- **未来迭代的学习：**
+  - 发现的 patterns: retranscribe 复用 poller._run_transcription_pipeline，与 _resume_incomplete_fragments 共享同一入口
+  - 发现的 patterns: fcntl LOCK_EX | LOCK_NB 非阻塞文件锁，os_open_lock 返回持有锁的 fd 或 None
+  - 遇到的陷阱: mock 延迟导入函数需用源模块路径 (soniscope_worker.poller.*)
+  - 遇到的陷阱: Typer CommandInfo.name 未显式设置时为 None，用 callback.__name__ 匹配
+---
