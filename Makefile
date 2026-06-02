@@ -9,7 +9,8 @@
         test-poll-interval test-wav-passthrough test-audio-transcode-to-wav \
         test-transcode-fail test-crash-recovery simulate-worker-crash \
         test-fragment-integrity test-manifest-idempotent \
-        test-transcribe-oss-url test-transcribe-direct test-transcribe-perf
+        test-transcribe-oss-url test-transcribe-direct test-transcribe-perf \
+        test-transcribe test-download-interrupt test-no-redownload
 
 # ── 安装 ────────────────────────────────────────────────────────────────────
 
@@ -154,3 +155,20 @@ test-transcribe-direct:
 test-transcribe-perf:
 	@echo "🧪 NLS transcription performance baseline"
 	@uv run --directory apps/worker --extra dev pytest -v -k "TestCostLogging or TestRetryLogic or test_cost or test_retry or test_perf or TestPollWith" "$(CURDIR)/apps/worker/tests/test_us026.py"
+
+# ── Worker 转写集成测试（US-027）────────────────────────────────────────
+
+test-transcribe:
+	@echo "🧪 Full Worker transcription pipeline (download → transcribe → .done)"
+	@echo "Running transcription pipeline integration tests"
+	@uv run --directory apps/worker --extra dev pytest -v -k "TestTranscribePipeline or TestPollCycleIntegration or test_poll_cycle or test_transcribe or test_full_pipeline or TestResumeIncomplete or test_resume" "$(CURDIR)/apps/worker/tests/test_us027.py"
+
+test-download-interrupt:
+	@echo "🧪 Download interrupt — kill -9 during download, restart completes"
+	@echo "Running download interrupt recovery tests"
+	@uv run --directory apps/worker --extra dev pytest -v -k "TestDownloadInterrupt or test_download_interrupt or test_restart_completes" "$(CURDIR)/apps/worker/tests/test_us027.py"
+
+test-no-redownload:
+	@echo "🧪 No redownload — .done fragments skipped in poll cycle"
+	@echo "Running idempotency tests (OSS call counting)"
+	@uv run --directory apps/worker --extra dev pytest -v -k "TestNoRedownload or test_no_redownload or test_skip_done or test_idempotent_poll" "$(CURDIR)/apps/worker/tests/test_us027.py"

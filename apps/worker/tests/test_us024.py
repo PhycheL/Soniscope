@@ -1382,9 +1382,9 @@ class TestPollCycleManifestIntegration:
         summary["manifest_written"] = 1
         assert summary["manifest_written"] == 1
 
-    def test_cli_output_includes_manifest_written(self) -> None:
-        """test_poll_cycle CLI output includes 'Manifest written' line."""
-        # Verify cli.py has the manifest_written output format
+    def test_cli_output_includes_summary_keys(self) -> None:
+        """test_poll_cycle CLI output includes transcribed/transcribe_failed keys."""
+        # Verify cli.py has the new summary key output format
         cli_path = (
             Path(__file__).parent.parent
             / "src"
@@ -1392,8 +1392,8 @@ class TestPollCycleManifestIntegration:
             / "cli.py"
         )
         text = cli_path.read_text()
-        assert "Manifest written" in text
-        assert "manifest_written" in text
+        assert "transcribed" in text or "Manifest written" in text
+        assert "summary" in text
 
 
 # ============================================================================

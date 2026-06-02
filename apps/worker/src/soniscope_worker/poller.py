@@ -3,11 +3,17 @@
 Covers US-021: poll OSS recordings/ prefix, read x-oss-meta-* metadata,
 download objects to .part, verify sha256 against x-oss-meta-sha256, and
 clean up stale intermediates on startup.
+
+US-027 adds the full transcription pipeline integration: after audio.wav is
+placed, the Worker calls the real ASR transcriber and atomically writes the
+transcript files and .done marker.
 """
 
 from __future__ import annotations
 
 import hashlib
+import logging
+import time as time_mod
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -21,6 +27,8 @@ from soniscope_worker.paths import (
     resolve_home,
     tmp_dir,
 )
+
+logger = logging.getLogger("soniscope_worker.poller")
 
 # Chunk size for streaming sha256 computation and download buffer operations.
 _READ_CHUNK = 1024 * 1024  # 1 MiB
@@ -449,6 +457,235 @@ def recovery_scan(home: Path) -> dict[str, list[str]]:
 # ---------------------------------------------------------------------------
 
 
+def _resume_incomplete_fragments(
+    home: Path, config: SoniScopeConfig, client: "OSSClient"
+) -> dict[str, int]:
+    """Resume fragments that have audio.wav but no .done (AC4 crash recovery).
+
+    Called once at startup after recovery_scan().  For each fragment directory
+    under ``fragments/`` that has ``audio.wav`` but no ``.done``, run:
+    manifest init → real ASR transcription → transcript write → .done.
+
+    This provides crash-safe resumption per US-023 AC4 / US-027 AC5.
+    """
+    from soniscope_worker.atomics import is_done as _is_done
+
+    result: dict[str, int] = {
+        "resumed": 0,
+        "resume_failed": 0,
+    }
+
+    frags = fragments_dir(home)
+    if not frags.is_dir():
+        return result
+
+    for date_dir in sorted(frags.iterdir()):
+        if not date_dir.is_dir():
+            continue
+        for frag_dir in sorted(date_dir.iterdir()):
+            if not frag_dir.is_dir():
+                continue
+            audio_wav = frag_dir / "audio.wav"
+            if not audio_wav.is_file():
+                continue
+            if _is_done(frag_dir):
+                continue
+
+            fragment_id = frag_dir.name
+            manifest_path = frag_dir / "manifest.json"
+
+            # If manifest.json doesn't exist yet, create a minimal one from
+            # what we can infer (AC2: OSS object key → manifest skeleton)
+            if not manifest_path.is_file():
+                logger.info(
+                    "resume_init_manifest fragment_id=%s (no manifest, building from audio)",
+                    fragment_id,
+                )
+                try:
+                    _write_minimal_manifest_from_audio(
+                        manifest_path,
+                        fragment_id=fragment_id,
+                        audio_wav=audio_wav,
+                        config=config,
+                    )
+                except Exception:
+                    logger.exception(
+                        "resume_manifest_failed fragment_id=%s", fragment_id
+                    )
+                    result["resume_failed"] += 1
+                    continue
+
+            # Run transcription
+            try:
+                _run_transcription_pipeline(
+                    frag_dir=frag_dir,
+                    fragment_id=fragment_id,
+                    audio_wav=audio_wav,
+                    config=config,
+                    client=client,
+                    oss_key=_fragment_oss_key(fragment_id),
+                )
+                result["resumed"] += 1
+            except Exception:
+                logger.exception(
+                    "resume_transcribe_failed fragment_id=%s", fragment_id
+                )
+                result["resume_failed"] += 1
+
+    return result
+
+
+def _write_minimal_manifest_from_audio(
+    manifest_target: Path,
+    *,
+    fragment_id: str,
+    audio_wav: Path,
+    config: SoniScopeConfig,
+) -> None:
+    """Build and write a minimal manifest.json when OSS metadata is unavailable.
+
+    Used during crash recovery when the manifest was never written before
+    the crash (we only have audio.wav on disk).
+    """
+    from soniscope_worker.manifest import write_manifest
+
+    audio_sha256 = _sha256_hex(audio_wav)
+    audio_size = audio_wav.stat().st_size
+
+    head_meta: dict[str, Any] = {}
+    audio_result: dict[str, Any] = {
+        "audio_format": "wav",
+        "original_format": "wav",
+        "audio_sha256": audio_sha256,
+        "original_sha256": "",
+        "audio_size_bytes": audio_size,
+        "original_size_bytes": 0,
+        "mode": "passthrough",
+    }
+
+    write_manifest(
+        manifest_target,
+        fragment_id=fragment_id,
+        head_meta=head_meta,
+        audio_result=audio_result,
+        config_model=config.transcriber.model,
+        config_params_version=config.transcriber.params_version,
+        config_provider=config.transcriber.provider,
+        config_transcriber_name=config.transcriber.name,
+        config_upload_mode=config.transcriber.upload_mode,
+    )
+
+
+def _run_transcription_pipeline(
+    *,
+    frag_dir: Path,
+    fragment_id: str,
+    audio_wav: Path,
+    config: SoniScopeConfig,
+    client: "OSSClient",
+    oss_key: str,
+) -> None:
+    """Run the real ASR transcription and atomically write the outputs.
+
+    Steps:
+    1. Create transcriber via factory and call ``transcribe()``.
+    2. Write ``transcript.json`` and ``transcript.txt`` atomically.
+    3. Update ``manifest.json``'s ``transcription`` block.
+    4. Create ``.done`` marker.
+
+    This is the unified transcription pipeline used by both poll_cycle
+    (new OSS objects) and _resume_incomplete_fragments (crash recovery).
+    """
+    import datetime as dt_mod
+
+    from soniscope_worker.atomics import create_done_marker, remove_done_marker
+    from soniscope_worker.manifest import update_manifest_with_transcription
+    from soniscope_worker.atomics import atomic_write_json
+    from soniscope_worker.transcriber import create_transcriber
+    from soniscope_worker.transcript import (
+        write_transcript_json,
+        write_transcript_txt,
+    )
+
+    # Remove stale .done if it somehow exists (shouldn't, but be safe)
+    remove_done_marker(frag_dir)
+
+    # ── 1. ASR call ──
+    transcriber = create_transcriber(
+        config,
+        oss_client=client,
+        oss_bucket=config.oss.bucket,
+    )
+
+    t_start = time_mod.monotonic()
+    try:
+        transcript_result = transcriber.transcribe(
+            fragment_id=fragment_id,
+            audio_path=audio_wav,
+            oss_key=oss_key,
+        )
+    except Exception:
+        logger.exception(
+            "transcription_failed fragment_id=%s", fragment_id
+        )
+        raise
+
+    elapsed = time_mod.monotonic() - t_start
+
+    # ── 2. Write transcript files ──
+    write_transcript_json(frag_dir / "transcript.json", transcript_result)
+    write_transcript_txt(frag_dir / "transcript.txt", transcript_result)
+
+    # ── 3. Update manifest.json with transcription block ──
+    manifest_path = frag_dir / "manifest.json"
+    if manifest_path.is_file():
+        import json as _json
+
+        manifest = _json.loads(manifest_path.read_text(encoding="utf-8"))
+    else:
+        manifest = {}
+
+    now = dt_mod.datetime.now(dt_mod.UTC).isoformat()
+    if now.endswith("+00:00"):
+        now = now[:-6] + "Z"
+
+    update_manifest_with_transcription(
+        manifest,
+        started_at=now if manifest.get("upload", {}).get("uploaded_at") else (
+            manifest.get("upload", {}).get("uploaded_at") or now
+        ),
+        completed_at=now,
+        elapsed_seconds=round(elapsed, 2),
+        transcriber=config.transcriber.name,
+        model=config.transcriber.model,
+        params_version=config.transcriber.params_version,
+        provider=config.transcriber.provider,
+        upload_mode=config.transcriber.upload_mode,
+    )
+
+    # Fill in started_at correctly by using the uploaded_at as a proxy when unavailable
+    if "transcription" in manifest and manifest["transcription"] is not None:
+        started = manifest["transcription"].get("started_at")
+        if not started or started == now:
+            # Use uploaded_at as approximate started_at
+            uploaded = manifest.get("upload", {}).get("uploaded_at")
+            if uploaded:
+                manifest["transcription"]["started_at"] = uploaded
+        manifest["transcription"]["started_at"] = manifest["transcription"].get("started_at", now)
+        manifest["transcription"]["completed_at"] = now
+
+    atomic_write_json(manifest_path, manifest)
+
+    # ── 4. Create .done marker — last step (crash-safe) ──
+    create_done_marker(frag_dir)
+    logger.info(
+        "transcription_complete fragment_id=%s segments=%d elapsed=%.2fs",
+        fragment_id,
+        len(transcript_result.segments),
+        elapsed,
+    )
+
+
 def poll_cycle(config: SoniScopeConfig, client: "OSSClient") -> dict[str, int]:
     """Execute a single poll cycle.
 
@@ -457,12 +694,17 @@ def poll_cycle(config: SoniScopeConfig, client: "OSSClient") -> dict[str, int]:
     3. Download to .part, verify sha256 against x-oss-meta-sha256
     4. Probe audio format, passthrough or transcode, and place audio.wav in
        the fragment directory (US-022).
+    5. Write manifest.json (US-024).
+    6. Call the real ASR transcriber and write transcript files (US-027).
+    7. Create .done marker.
 
-    Returns a summary dict with keys like ``total_objects``, ``skipped_done``,
+    Returns a summary dict with keys ``total_objects``, ``skipped_done``,
     ``downloaded``, ``sha256_mismatch``, ``passthrough``, ``transcoded``,
-    ``transcode_failed``, ``errors``.
+    ``transcode_failed``, ``transcribed``, ``transcribe_failed``,
+    ``errors``.
 
-    Manifest and transcription are handled by later stories (US-024, US-026).
+    Any step failure before .done prevents the marker from being created,
+    so the fragment will be retried on the next poll cycle (AC2).
     """
     from soniscope_worker.audio import process_audio
 
@@ -477,7 +719,8 @@ def poll_cycle(config: SoniScopeConfig, client: "OSSClient") -> dict[str, int]:
         "passthrough": 0,
         "transcoded": 0,
         "transcode_failed": 0,
-        "manifest_written": 0,
+        "transcribed": 0,
+        "transcribe_failed": 0,
         "errors": 0,
     }
 
@@ -557,13 +800,8 @@ def poll_cycle(config: SoniScopeConfig, client: "OSSClient") -> dict[str, int]:
         elif audio_result.mode == "transcoded":
             summary["transcoded"] += 1
 
-        # ── US-024: write manifest.json, transcript.json, transcript.txt, .done ──
+        # ── US-024: write manifest.json ──
         from soniscope_worker.manifest import write_manifest
-        from soniscope_worker.transcript import (
-            TranscriptResult,
-            write_transcript_json,
-            write_transcript_txt,
-        )
 
         frag_dir = audio_result.dest_path.parent if audio_result.dest_path else None
         if frag_dir is None:
@@ -597,23 +835,24 @@ def poll_cycle(config: SoniScopeConfig, client: "OSSClient") -> dict[str, int]:
             config_upload_mode=config.transcriber.upload_mode,
         )
 
-        # Write placeholder transcript (real transcription comes from US-025/US-026)
-        placeholder = TranscriptResult(
-            segments=[],
-            language="zh",
-            model=config.transcriber.model,
-            params_version=config.transcriber.params_version,
-            provider=config.transcriber.provider,
-            duration=float(audio_result_dict.get("duration_seconds", 0.0)),
-        )
-        write_transcript_json(frag_dir / "transcript.json", placeholder)
-        write_transcript_txt(frag_dir / "transcript.txt", placeholder)
-
-        # Create .done marker — final step (AC6)
-        from soniscope_worker.atomics import create_done_marker
-
-        create_done_marker(frag_dir)
-        summary["manifest_written"] += 1
+        # ── US-027: real ASR transcription ──
+        audio_wav = frag_dir / "audio.wav"
+        try:
+            _run_transcription_pipeline(
+                frag_dir=frag_dir,
+                fragment_id=fragment_id,
+                audio_wav=audio_wav,
+                config=config,
+                client=client,
+                oss_key=obj_key,
+            )
+            summary["transcribed"] += 1
+        except Exception:
+            logger.exception(
+                "poll_cycle.transcription_failed fragment_id=%s", fragment_id
+            )
+            summary["transcribe_failed"] += 1
+            # .done is NOT created — fragment will be retried next cycle
 
     return summary
 
@@ -683,6 +922,15 @@ def run_poll_loop(config: SoniScopeConfig) -> None:
 
     client = _build_oss_client(config)
 
+    # ── US-027 AC4/AC5: resume incomplete fragments from crash ──
+    resume_result = _resume_incomplete_fragments(home, config, client)
+    if resume_result["resumed"] > 0 or resume_result["resume_failed"] > 0:
+        logger.info(
+            "resume_summary resumed=%d failed=%d",
+            resume_result["resumed"],
+            resume_result["resume_failed"],
+        )
+
     while True:
         cycle_start = time_mod.monotonic()
         logger.debug("poll_cycle_start")
@@ -693,14 +941,16 @@ def run_poll_loop(config: SoniScopeConfig) -> None:
             logger.info(
                 "poll_cycle_complete total=%d skipped_done=%d downloaded=%d "
                 "passthrough=%d transcoded=%d transcode_failed=%d "
-                "manifest_written=%d mismatch=%d errors=%d elapsed=%.2fs",
+                "transcribed=%d transcribe_failed=%d "
+                "mismatch=%d errors=%d elapsed=%.2fs",
                 summary["total_objects"],
                 summary["skipped_done"],
                 summary["downloaded"],
                 summary["passthrough"],
                 summary["transcoded"],
                 summary["transcode_failed"],
-                summary["manifest_written"],
+                summary["transcribed"],
+                summary["transcribe_failed"],
                 summary["sha256_mismatch"],
                 summary["errors"],
                 elapsed,

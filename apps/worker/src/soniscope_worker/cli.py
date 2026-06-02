@@ -131,15 +131,16 @@ def test_poll_cycle() -> None:
     elapsed = time.monotonic() - t0
 
     typer.echo(f"\nPoll cycle complete in {elapsed:.2f}s")
-    typer.echo(f"  Total objects:    {summary['total_objects']}")
-    typer.echo(f"  Skipped (.done):  {summary['skipped_done']}")
-    typer.echo(f"  Downloaded:       {summary['downloaded']}")
-    typer.echo(f"  Passthrough:      {summary['passthrough']}")
-    typer.echo(f"  Transcoded:       {summary['transcoded']}")
-    typer.echo(f"  Transcode failed: {summary['transcode_failed']}")
-    typer.echo(f"  Manifest written: {summary['manifest_written']}")
-    typer.echo(f"  SHA256 mismatch:  {summary['sha256_mismatch']}")
-    typer.echo(f"  Errors:           {summary['errors']}")
+    typer.echo(f"  Total objects:      {summary['total_objects']}")
+    typer.echo(f"  Skipped (.done):    {summary['skipped_done']}")
+    typer.echo(f"  Downloaded:         {summary['downloaded']}")
+    typer.echo(f"  Passthrough:        {summary['passthrough']}")
+    typer.echo(f"  Transcoded:         {summary['transcoded']}")
+    typer.echo(f"  Transcode failed:   {summary['transcode_failed']}")
+    typer.echo(f"  Transcribed:        {summary['transcribed']}")
+    typer.echo(f"  Transcribe failed:  {summary['transcribe_failed']}")
+    typer.echo(f"  SHA256 mismatch:    {summary['sha256_mismatch']}")
+    typer.echo(f"  Errors:             {summary['errors']}")
 
 
 if __name__ == "__main__":
