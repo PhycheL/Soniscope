@@ -6,6 +6,7 @@
 .PHONY: install check-config init-dirs worker-run verify-prep typecheck lint test \
         deploy-fc rollback-fc fc-logs test-fc-live test-verify-upload \
         oss-delete-obj miniprogram-lint show-oss-object test-sts-escape \
+        list-oss-objects verify-no-stale verify-oss-retention \
         test-poll-interval test-wav-passthrough test-audio-transcode-to-wav \
         test-transcode-fail test-crash-recovery simulate-worker-crash \
         test-fragment-integrity test-manifest-idempotent \
@@ -96,6 +97,15 @@ test-sts-escape:
 	@echo "🧪 STS 越权验证"
 	@echo "需要 STS 临时凭证（access_key_id / access_key_secret / security_token / object_key）"
 	uv run --directory apps/worker --extra dev python "$(CURDIR)/scripts/test_sts_escape.py" $(STS_AK_ID) $(STS_AK_SECRET) $(STS_TOKEN) $(STS_OBJECT_KEY)
+
+list-oss-objects:
+	uv run --directory apps/worker --extra dev python "$(CURDIR)/scripts/list_oss_objects.py" $(DATE)
+
+verify-no-stale:
+	uv run --directory apps/worker --extra dev python "$(CURDIR)/scripts/verify_no_stale.py"
+
+verify-oss-retention:
+	uv run --directory apps/worker --extra dev python "$(CURDIR)/scripts/verify_oss_retention.py"
 
 # ── Worker 运维 ────────────────────────────────────────────────────
 
