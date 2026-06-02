@@ -596,3 +596,51 @@
   - 有用的上下文: verify-no-stale 只检查文件系统（无云依赖），verify-oss-retention 需要 OSS 凭证（可选——凭证不可用时跳过 OSS 比较）
   - 有用的上下文: US-029 完成后 US-030（E2E 完整性校验脚本）和 US-031（E2E 崩溃恢复/重转/安全反例）仍需实现，US-032（MVP 最终验收 runbook）是文档撰写
 ---
+
+## 2026-06-02 23:59 - US-030
+- 实现了 E2E 完整性、sha256 与字段校验三组自动化脚本
+- 更改的文件:
+  - `scripts/verify_e2e_integrity.py` (new) — Fragment 目录完整性校验：扫描 fragments/<DATE>/ 下所有目录，验证每个目录包含 audio.wav / manifest.json / transcript.json / transcript.txt / .done 五个文件
+  - `scripts/verify_e2e_sha256.py` (new) — SHA-256 一致性校验：WAV 直通路径要求 audio.sha256 == upload.original_sha256；非 WAV 转码路径要求两者均为合法 sha256
+  - `scripts/verify_e2e_fields.py` (new) — Manifest 关键字段校验：upload.verified_at 与 transcription.completed_at 非空
+  - `Makefile` (modified) — 新增 verify-e2e-integrity / verify-e2e-sha256 / verify-e2e-fields 三个 target
+  - `apps/worker/tests/test_us030.py` (new) — 72 个单元测试覆盖全部 AC
+- **未来迭代的学习：**
+  - 发现的 patterns: E2E 校验脚本是纯只读工具——只读取本地文件系统，不调用云 API（与 verify_no_stale.py 模式一致）
+  - 发现的 patterns: scripts/ 下校验脚本统一通过 SONISCOPE_HOME + DATE 环境变量传递参数
+  - 发现的 patterns: WAV 直通判定 logic — audio.format == "wav" 且 original_format 为 wav/空 → 要求 sha256 匹配
+  - 有用的上下文: US-031（崩溃恢复/重转/安全反例）和 US-032（MVP 验收 runbook）仍需实现
+---
+
+## 2026-06-02 14:30 - US-031
+- 实现了 E2E 崩溃恢复、重转与安全反例三组自动化脚本
+- 更改的文件:
+  - `scripts/test_e2e_crash_recovery.py` (new) — 崩溃恢复验证脚本（A/B/C 三块）：A 块检查 inbox/tmp 无残留中间态文件；B 块检查 fragments/ 下所有目录的 5 产物完整性和可恢复状态；C 块支持指定 fragment_id 验证单条 Fragment 的恢复场景（模拟 .done 删除后的恢复路径）
+  - `scripts/test_e2e_retranscribe.py` (new) — 重转验证脚本（A/B/C/D 四块）：A 块扫描 fragments/ 并按 manifest 中的 model/params_version 分类识别可升级 Fragment；B 块验证 --upgrade 仅选择旧版本 Fragment；C 块验证已完成 (.done) Fragment 在正常轮询中不会被自动重转；D 块验证 config.yaml 可用性和复现命令
+  - `scripts/test_e2e_security.py` (new) — 安全反例验证脚本（A/B/C/D 四块）：A 块测试伪造 code→401 INVALID_CODE、STS 字段泄漏检测、真实 code 鉴权；B 块测试合法 STS 凭证 PutObject 到其他 key→AccessDenied、GetObject→AccessDenied；C 块测试 verify-upload 端点鉴权；D 块输出安全测试覆盖汇总和复现命令
+  - `Makefile` (modified) — 新增 test-e2e-crash-recovery / test-e2e-retranscribe / test-e2e-security 三个 target，支持 ARGS 参数透传
+  - `apps/worker/tests/test_us031.py` (new) — 87 个单元测试覆盖全部 AC
+- **未来迭代的学习：**
+  - 发现的 patterns: E2E 验证脚本采用与 test-fc-live/test-verify-upload 一致的 A-F block 设计模式：每个 block 独立函数返回 BlockResult，通过 BlockResult._custom_attr 在 block 间传递数据，汇总遍历 blocks 列表计算 pass/fail/skip
+  - 发现的 patterns: 安全脚本复用 test-fc-live 的 _post_fc 模式（urllib.request + HTTPError 解析）和 _try_oss_op 模式（alibabacloud_oss_v2 SDK + 异常关键词匹配），保持与已有脚本的一致性
+  - 发现的 patterns: E2E 脚本在无 --code 参数时标记为 skipped（通过 CheckResult.skipped=True），不返回 failure——这允许不依赖真实微信 code 也能跑通基本测试
+  - 发现的 patterns: 崩溃恢复脚本使用纯文件系统操作（不依赖云 API），通过检查 .part/.wav.tmp/.transcript.json.tmp 残留和 fragments/ 目录 .done 状态来判断恢复能力
+  - 遇到的陷阱: mock.patch('urllib.request.urlopen') 在通过 sys.path.insert + importlib 导入的脚本模块中可能不生效——需要确认 mock 路径与模块中实际使用的引用一致
+  - 有用的上下文: US-031 是倒数第二个 story，完成后仅剩 US-032（MVP 最终验收 runbook 与真机闭环清单——纯文档撰写）
+  - 有用的上下文: 三个 E2E 脚本均设计为无需打开阿里云/微信控制台即可运行（AC7），其中崩溃恢复和重转脚本完全基于本地文件系统检查，安全脚本的核心鉴权测试（伪造 code→401）无需任何 credentials
+  - 有用的上下文: 需要真机或 Worker 实际运行时才能运行完整的 --orchestrate 崩溃恢复模式（含 kill -9），自动测试覆盖了代码结构和逻辑验证
+---
+
+## 2026-06-02 23:59 - US-032
+- 实现了 MVP 最终验收 runbook 与真机闭环清单（纯文档）
+- 更改的文件:
+  - `docs/runbook/mvp-acceptance-checklist.md` (new) — MVP 最终验收执行手册：Part 0 验收前提检查（运行环境/云资源/测试音频/代码质量/真机准备）、Part 1 100 条真机录音 E2E（5 节自动验证命令 make list-oss-objects/verify-e2e-integrity/verify-e2e-sha256/verify-e2e-fields/verify-no-stale）、Part 2 异常路径·脚本崩溃恢复（kill -9 后重启自动补齐）、Part 3 异常路径·显式重转（--upgrade/--force 行为 + 正常轮询不自动重转）、Part 4 安全反例·鉴权与越权（伪造 code→401、未授权 openid→403、STS 越权→AccessDenied）、Part 5 真机交互异常闭环（中断保护/长录音分片/失败重试手动重传）、Part 6 长期保留验证（48h 本地缓存自动清理 + 1 周后 OSS 保留验证）、Part 7 最终验收汇总（自动验证表 + 真机操作表）、附录 A 常见问题与修复指引、附录 B 验收签字
+  - `scripts/ralph/prd.json` (modified) — US-032 passes 设为 true
+- **未来迭代的学习：**
+  - 发现的 patterns: MVP 验收文档需要同时覆盖自动验证（make 命令一键跑完）和真机手动操作（交给用户的 checklist），两者缺一不可
+  - 发现的 patterns: runbook 文档放在 `docs/runbook/` 下，与 cloud-setup.md 和 us-001-manual.html 并列，保持文档结构统一
+  - 有用的上下文: 本 story 是纯文档撰写，不涉及代码修改——typecheck/lint/test 全部跳过（无代码变更），但不能跳过 commit 和 PRD 更新
+  - 有用的上下文: US-032 是 MVP 最后一个 story（优先级 32），完成后所有 32 个 stories 的 passes 均为 true
+  - 有用的上下文: 真机闭环清单（Part 5）中的故障注入入口是「开发者菜单」→ `mock-fc-url-broken` 开关——该功能在前置 story US-020 已实现
+  - 有用的上下文: 48 小时 + 1 小时是验证自动清理的下限（不是上限）——本地缓存在 verified_at >= 48h 后才会被清理，49h 时必然已清理
+---
