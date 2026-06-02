@@ -22,8 +22,10 @@ import pytest
 import yaml
 
 from soniscope_worker.config import SoniScopeConfig, load_config
-from soniscope_worker.transcriber import (
+from soniscope_worker.nls_transcriber import (
     CloudSpeechTranscriber,
+)
+from soniscope_worker.transcriber import (
     Transcriber,
     WhisperLocalTranscriber,
     create_transcriber,
@@ -143,10 +145,14 @@ class TestFactory:
     """Verify create_transcriber() factory behaviour (AC3, AC4, AC5, AC6)."""
 
     def test_factory_returns_cloud_speech(self) -> None:
-        """transcriber.name=cloud-speech → CloudSpeechTranscriber."""
+        """transcriber.name=cloud-speech → CloudSpeechTranscriber (from nls_transcriber)."""
+        from soniscope_worker.nls_transcriber import (
+            CloudSpeechTranscriber as NlsCloudSpeechTranscriber,
+        )
+
         config = _make_config(name="cloud-speech")
         t = create_transcriber(config)
-        assert isinstance(t, CloudSpeechTranscriber)
+        assert isinstance(t, NlsCloudSpeechTranscriber)
         assert isinstance(t, Transcriber)
 
     def test_factory_returns_whisper_local(self) -> None:
@@ -178,12 +184,18 @@ class TestFactory:
 
 
 # ============================================================================
-# AC4: CloudSpeechTranscriber behaviour
+# AC4: CloudSpeechTranscriber structure (real impl in nls_transcriber.py)
 # ============================================================================
 
 
 class TestCloudSpeechTranscriber:
-    """Verify CloudSpeechTranscriber (AC4)."""
+    """Verify CloudSpeechTranscriber structure (AC4).
+
+    The real transcribe() implementation calls the NLS API and is tested
+    in test_us026.py with proper mocking.  Here we verify structural
+    properties: importability, provider accessor, Transcriber Protocol
+    compatibility, and constructor signature.
+    """
 
     def test_creates_instance_with_config(self) -> None:
         """CloudSpeechTranscriber accepts a TranscriberConfig."""
@@ -199,48 +211,19 @@ class TestCloudSpeechTranscriber:
         t = CloudSpeechTranscriber(cfg)
         assert t.provider == "aliyun-nls"
 
-    def test_transcribe_returns_transcript_result(self) -> None:
-        """transcribe() returns a TranscriptResult."""
+    def test_transcribe_exists(self) -> None:
+        """transcribe method is callable."""
         cfg = _make_transcriber_config(name="cloud-speech")
         t = CloudSpeechTranscriber(cfg)
-        result = t.transcribe(
-            fragment_id="20260602T120000_abc123_01JXQ",
-            audio_path=Path("/tmp/audio.wav"),
-            oss_key="recordings/2026-06-02/test.wav",
-        )
-        assert isinstance(result, TranscriptResult)
+        assert callable(t.transcribe)
 
-    def test_transcribe_returns_placeholder_with_config_values(self) -> None:
-        """Placeholder transcript carries model/params_version/provider from config."""
-        cfg = _make_transcriber_config(
-            name="cloud-speech",
-            model="test-model-v2",
-            params_version="v3",
-            provider="aliyun-nls",
-        )
-        t = CloudSpeechTranscriber(cfg)
-        result = t.transcribe(
-            fragment_id="test",
-            audio_path=Path("."),
-            oss_key="key",
-        )
-        assert result.language == "zh"
-        assert result.model == "test-model-v2"
-        assert result.params_version == "v3"
-        assert result.provider == "aliyun-nls"
-        assert result.segments == []
-        assert result.duration == 0.0  # placeholder — no real ASR duration yet
-
-    def test_transcribe_accepts_various_fragment_ids(self) -> None:
-        """transcribe works for different fragment_id formats."""
+    def test_transcribe_accepts_oss_client_kwargs(self) -> None:
+        """Constructor accepts optional oss_client and oss_bucket kwargs."""
         cfg = _make_transcriber_config(name="cloud-speech")
-        t = CloudSpeechTranscriber(cfg)
-        for fid in [
-            "20260602T120000_abc_01ABCDEFGHJKMNPQRSTVWXYZ",
-            "20260101T000000_xyz123_01AAAAAAAAAAAAAAAAAAAA",
-        ]:
-            result = t.transcribe(fid, Path("."), "k")
-            assert isinstance(result, TranscriptResult)
+        t = CloudSpeechTranscriber(
+            cfg, oss_client=None, oss_bucket="test-bucket"
+        )
+        assert isinstance(t, CloudSpeechTranscriber)
 
 
 # ============================================================================
@@ -297,9 +280,10 @@ class TestInterfaceBasedUsage:
         def pipeline(transcriber: Transcriber, fid: str) -> TranscriptResult:
             return transcriber.transcribe(fid, Path("audio.wav"), "key")
 
-        cloud = CloudSpeechTranscriber(_make_transcriber_config())
-        result = pipeline(cloud, "test-id")
-        assert isinstance(result, TranscriptResult)
+        # CloudSpeechTranscriber real impl needs NLS API access — test via factory
+        config = _make_config(name="cloud-speech")
+        cloud = create_transcriber(config)
+        assert isinstance(cloud, Transcriber)
 
         local = WhisperLocalTranscriber()
         with pytest.raises(NotImplementedError):
@@ -312,8 +296,7 @@ class TestInterfaceBasedUsage:
 
         config = _make_config(name="cloud-speech")
         transcriber = factory(config)
-        result = transcriber.transcribe("id", Path("."), "key")
-        assert isinstance(result, TranscriptResult)
+        assert isinstance(transcriber, Transcriber)
 
 
 # ============================================================================
@@ -455,24 +438,20 @@ transcriber:
 class TestEdgeCases:
     """Transcriber edge-case coverage."""
 
-    def test_cloud_speech_placeholder_is_idempotent(self) -> None:
-        """Calling transcribe twice returns structurally equivalent results."""
+    def test_cloud_speech_instance_is_importable(self) -> None:
+        """CloudSpeechTranscriber can be instantiated (real impl in nls_transcriber)."""
         cfg = _make_transcriber_config()
         t = CloudSpeechTranscriber(cfg)
-        r1 = t.transcribe("fid1", Path("a.wav"), "key1")
-        r2 = t.transcribe("fid1", Path("a.wav"), "key1")
-        assert r1.to_dict() == r2.to_dict()
+        assert t.provider == "aliyun-nls"
+        assert callable(t.transcribe)
 
-    def test_cloud_speech_ignores_audio_path_and_oss_key(self) -> None:
-        """Placeholder ignores audio_path / oss_key (just returns config values)."""
+    def test_cloud_speech_accepts_oss_client(self) -> None:
+        """CloudSpeechTranscriber stores oss_client and oss_bucket kwargs."""
         cfg = _make_transcriber_config(model="m", params_version="p", provider="pr")
-        t = CloudSpeechTranscriber(cfg)
-
-        # Different audio paths / keys → same result skeleton
-        r1 = t.transcribe("f1", Path("/nonexistent/a.wav"), "k1")
-        r2 = t.transcribe("f2", Path("/other/b.wav"), "k2")
-        assert r1.model == r2.model == "m"
-        assert r1.to_dict() == r2.to_dict()
+        t = CloudSpeechTranscriber(
+            cfg, oss_client=None, oss_bucket="test-bucket"
+        )
+        assert t.provider == "pr"
 
     def test_multiple_factories_produce_independent_instances(self) -> None:
         """Each factory call returns a new instance."""
@@ -490,7 +469,11 @@ class TestEdgeCases:
 
     def test_transcriber_can_be_stored_in_variable_of_protocol_type(self) -> None:
         """Static analysis: a Transcriber-typed variable accepts both implementations."""
-        t1: Transcriber = CloudSpeechTranscriber(_make_transcriber_config())
+        from soniscope_worker.nls_transcriber import (
+            CloudSpeechTranscriber as NlsCs,
+        )
+
+        t1: Transcriber = NlsCs(_make_transcriber_config())
         t2: Transcriber = WhisperLocalTranscriber()
         assert isinstance(t1, Transcriber)
         assert isinstance(t2, Transcriber)
@@ -515,12 +498,12 @@ class TestModuleStructure:
         assert callable(create_transcriber)
 
     def test_transcriber_module_exports_cloud_speech(self) -> None:
-        """CloudSpeechTranscriber is importable."""
-        from soniscope_worker.transcriber import CloudSpeechTranscriber
+        """CloudSpeechTranscriber is importable from nls_transcriber (US-026)."""
+        from soniscope_worker.nls_transcriber import CloudSpeechTranscriber
         assert CloudSpeechTranscriber is not None
 
     def test_transcriber_module_exports_whisper_local(self) -> None:
-        """WhisperLocalTranscriber is importable."""
+        """WhisperLocalTranscriber is importable from transcriber."""
         from soniscope_worker.transcriber import WhisperLocalTranscriber
         assert WhisperLocalTranscriber is not None
 
@@ -541,6 +524,19 @@ class TestModuleStructure:
         assert "CloudSpeechTranscriber" not in source
         assert "WhisperLocalTranscriber" not in source
 
+    def test_nls_transcriber_module_is_importable(self) -> None:
+        """nls_transcriber.py (US-026) is a valid Python module."""
+        from soniscope_worker.nls_transcriber import (
+            CloudSpeechTranscriber,
+            _REGION_DOMAINS,
+            _COST_PER_HOUR_YUAN,
+            _RETRY_INTERVALS,
+        )
+        assert CloudSpeechTranscriber is not None
+        assert _REGION_DOMAINS is not None
+        assert _COST_PER_HOUR_YUAN == 2.5
+        assert _RETRY_INTERVALS == (5, 15, 45)
+
 
 # ============================================================================
 # Security — no keys in source
@@ -548,7 +544,7 @@ class TestModuleStructure:
 
 
 class TestSecurity:
-    """No hard-coded credentials in the transcriber module."""
+    """No hard-coded credentials in transcriber-related modules."""
 
     def test_no_hardcoded_keys_in_transcriber_source(self) -> None:
         """transcriber.py contains no AK / Secret patterns."""
@@ -564,6 +560,22 @@ class TestSecurity:
         ).read_text(encoding="utf-8")
 
         # Check for LTAI pattern (Alibaba Cloud AK ID prefix)
+        ltai_matches = re.findall(r"LTAI[a-zA-Z0-9]{10,}", source)
+        assert ltai_matches == [], f"Found suspected AK IDs: {ltai_matches}"
+
+    def test_no_hardcoded_keys_in_nls_transcriber_source(self) -> None:
+        """nls_transcriber.py contains no AK / Secret patterns."""
+        import re
+
+        source = (
+            REPO_ROOT
+            / "apps"
+            / "worker"
+            / "src"
+            / "soniscope_worker"
+            / "nls_transcriber.py"
+        ).read_text(encoding="utf-8")
+
         ltai_matches = re.findall(r"LTAI[a-zA-Z0-9]{10,}", source)
         assert ltai_matches == [], f"Found suspected AK IDs: {ltai_matches}"
 

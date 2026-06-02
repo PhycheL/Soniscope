@@ -8,7 +8,8 @@
         oss-delete-obj miniprogram-lint show-oss-object test-sts-escape \
         test-poll-interval test-wav-passthrough test-audio-transcode-to-wav \
         test-transcode-fail test-crash-recovery simulate-worker-crash \
-        test-fragment-integrity test-manifest-idempotent
+        test-fragment-integrity test-manifest-idempotent \
+        test-transcribe-oss-url test-transcribe-direct test-transcribe-perf
 
 # ── 安装 ────────────────────────────────────────────────────────────────────
 
@@ -139,3 +140,17 @@ test-manifest-idempotent:
 	@echo "🧪 Manifest idempotency — same WAV twice → same manifest (except timestamps)"
 	@echo "Running manifest idempotency tests"
 	@uv run --directory apps/worker --extra dev pytest -v -k "TestManifestIdempotent or test_idempotent or test_same_wav_twice" "$(CURDIR)/apps/worker/tests/test_us024.py"
+
+# ── Worker 转写测试 ────────────────────────────────────────────────────
+
+test-transcribe-oss-url:
+	@echo "🧪 NLS oss-url mode — transcribe via OSS presigned URL"
+	@uv run --directory apps/worker --extra dev pytest -v -k "TestPresignedUrlGeneration or TestUploadModeDispatch or TestNlsToTranscriptResult or test_oss_url" "$(CURDIR)/apps/worker/tests/test_us026.py"
+
+test-transcribe-direct:
+	@echo "🧪 NLS direct mode — transcribe via direct file upload"
+	@uv run --directory apps/worker --extra dev pytest -v -k "TestDirectMode or TestUploadModeDispatch or TestNlsToTranscriptResult or test_direct" "$(CURDIR)/apps/worker/tests/test_us026.py"
+
+test-transcribe-perf:
+	@echo "🧪 NLS transcription performance baseline"
+	@uv run --directory apps/worker --extra dev pytest -v -k "TestCostLogging or TestRetryLogic or test_cost or test_retry or test_perf or TestPollWith" "$(CURDIR)/apps/worker/tests/test_us026.py"

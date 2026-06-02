@@ -21,10 +21,13 @@ Usage::
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
-from soniscope_worker.config import SoniScopeConfig, TranscriberConfig
-from soniscope_worker.transcript import TranscriptResult, make_placeholder_result
+if TYPE_CHECKING:
+    from alibabacloud_oss_v2 import Client as OSSClient
+
+from soniscope_worker.config import SoniScopeConfig
+from soniscope_worker.transcript import TranscriptResult
 
 
 # ---------------------------------------------------------------------------
@@ -62,42 +65,6 @@ class Transcriber(Protocol):
 
 
 # ---------------------------------------------------------------------------
-# Cloud speech transcriber — skeleton (AC4, US-026 fills in the real logic)
-# ---------------------------------------------------------------------------
-
-
-class CloudSpeechTranscriber:
-    """Cloud ASR transcriber using Alibaba Cloud NLS (AC4).
-
-    In US-025 this returns a placeholder result so the interface,
-    factory, and pipeline shape are testable.  US-026 replaces the body
-    with the real NLS create-task / poll / fetch-result flow.
-    """
-
-    def __init__(self, config: TranscriberConfig) -> None:
-        self._config = config
-
-    @property
-    def provider(self) -> str:
-        """Expose the configured provider name (for logging / manifest)."""
-        return self._config.provider
-
-    def transcribe(
-        self,
-        fragment_id: str,
-        audio_path: Path,
-        oss_key: str,
-    ) -> TranscriptResult:
-        """Return a placeholder transcript (real ASR in US-026)."""
-        return make_placeholder_result(
-            language="zh",
-            model=self._config.model,
-            params_version=self._config.params_version,
-            provider=self._config.provider,
-        )
-
-
-# ---------------------------------------------------------------------------
 # Local whisper placeholder — raises NotImplementedError (AC5)
 # ---------------------------------------------------------------------------
 
@@ -127,7 +94,12 @@ class WhisperLocalTranscriber:
 # ---------------------------------------------------------------------------
 
 
-def create_transcriber(config: SoniScopeConfig) -> Transcriber:
+def create_transcriber(
+    config: SoniScopeConfig,
+    *,
+    oss_client: "OSSClient | None" = None,
+    oss_bucket: str = "",
+) -> Transcriber:
     """Create a :class:`Transcriber` instance based on *config* (AC3).
 
     ``transcriber.name`` values and the returned class (AC4/AC5):
@@ -135,9 +107,13 @@ def create_transcriber(config: SoniScopeConfig) -> Transcriber:
     =================== ================================================
     transcriber.name     Class
     =================== ================================================
-    ``cloud-speech``    :class:`CloudSpeechTranscriber`
+    ``cloud-speech``    :class:`~nls_transcriber.CloudSpeechTranscriber`
     ``whisper-local``   :class:`WhisperLocalTranscriber`
     =================== ================================================
+
+    When ``transcriber.name`` is ``cloud-speech`` and *oss_client* is
+    provided the instance is ready for oss-url mode; without it, direct
+    mode can still be used.
 
     Raises:
         ValueError: *transcriber.name* is not a supported value (AC6).
@@ -145,7 +121,19 @@ def create_transcriber(config: SoniScopeConfig) -> Transcriber:
     name = config.transcriber.name
 
     if name == "cloud-speech":
-        return CloudSpeechTranscriber(config.transcriber)
+        # Delegate to the real NLS implementation (US-026).
+        # We delay the import so the nls_transcriber module is only loaded
+        # when the user actually chooses cloud-speech — this keeps
+        # whisper-local runs free of the aliyunsdkcore dependency.
+        from soniscope_worker.nls_transcriber import (  # noqa: PLC0415
+            CloudSpeechTranscriber as NlsCloudSpeechTranscriber,
+        )
+
+        return NlsCloudSpeechTranscriber(
+            config.transcriber,
+            oss_client=oss_client,
+            oss_bucket=oss_bucket,
+        )
 
     if name == "whisper-local":
         return WhisperLocalTranscriber()
