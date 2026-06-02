@@ -13,7 +13,8 @@
         test-transcribe-oss-url test-transcribe-direct test-transcribe-perf \
         test-transcribe test-download-interrupt test-no-redownload \
         retranscribe test-idempotent-skip test-no-auto-retranscribe \
-        test-cli-retranscribe test-cli-upgrade
+        test-cli-retranscribe test-cli-upgrade \
+        verify-e2e-integrity verify-e2e-sha256 verify-e2e-fields
 
 # ── 安装 ────────────────────────────────────────────────────────────────────
 
@@ -209,7 +210,16 @@ test-download-interrupt:
 	@echo "Running download interrupt recovery tests"
 	@uv run --directory apps/worker --extra dev pytest -v -k "TestDownloadInterrupt or test_download_interrupt or test_restart_completes" "$(CURDIR)/apps/worker/tests/test_us027.py"
 
-test-no-redownload:
-	@echo "🧪 No redownload — .done fragments skipped in poll cycle"
-	@echo "Running idempotency tests (OSS call counting)"
-	@uv run --directory apps/worker --extra dev pytest -v -k "TestNoRedownload or test_no_redownload or test_skip_done or test_idempotent_poll" "$(CURDIR)/apps/worker/tests/test_us027.py"
+# ── E2E 完整性校验（US-030）────────────────────────────────────────
+
+verify-e2e-integrity:
+	@echo "🔍 E2E Fragment 目录完整性校验"
+	uv run --directory apps/worker --extra dev python "$(CURDIR)/scripts/verify_e2e_integrity.py"
+
+verify-e2e-sha256:
+	@echo "🔍 E2E SHA-256 一致性校验"
+	uv run --directory apps/worker --extra dev python "$(CURDIR)/scripts/verify_e2e_sha256.py"
+
+verify-e2e-fields:
+	@echo "🔍 E2E 关键字段完整性校验"
+	uv run --directory apps/worker --extra dev python "$(CURDIR)/scripts/verify_e2e_fields.py"
