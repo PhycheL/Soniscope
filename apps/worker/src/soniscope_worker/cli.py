@@ -85,6 +85,74 @@ def verify_prep() -> None:
 
 
 @app.command()
+def retranscribe(
+    fragment_id: str = typer.Argument(
+        None, help="Fragment ID to retranscribe"
+    ),
+    all_from: str = typer.Option(
+        None,
+        "--all-from",
+        help="Batch retranscribe fragments on or after this date (YYYY-MM-DD)",
+    ),
+    force: bool = typer.Option(
+        False, "--force", help="Force retranscribe even if .done exists"
+    ),
+    upgrade: bool = typer.Option(
+        False,
+        "--upgrade",
+        help="Only retranscribe fragments whose model or params_version differs from config",
+    ),
+) -> None:
+    """Retranscribe one or more fragments.
+
+    Single fragment:
+        python -m soniscope_worker retranscribe <fragment_id> [--force] [--upgrade]
+
+    Batch mode:
+        python -m soniscope_worker retranscribe --all-from <YYYY-MM-DD> [--upgrade]
+    """
+    if fragment_id is None and all_from is None:
+        typer.echo(
+            "ERROR: Provide either a fragment_id or --all-from <YYYY-MM-DD>.",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    config_path = resolve_config_path()
+    try:
+        cfg = load_config(config_path)
+    except FileNotFoundError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1)
+    except ConfigValidationError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1)
+
+    from soniscope_worker.retranscribe import run_retranscribe
+
+    summary = run_retranscribe(
+        fragment_id=fragment_id,
+        all_from=all_from,
+        force=force,
+        upgrade=upgrade,
+        config=cfg,
+    )
+
+    # Print summary
+    typer.echo("")
+    typer.echo("Retranscribe summary:")
+    typer.echo(f"  Transcribed:        {summary['transcribed']}")
+    typer.echo(f"  Skipped (.done):    {summary['skipped_done']}")
+    typer.echo(f"  Skipped (upgrade):  {summary['skipped_upgrade']}")
+    typer.echo(f"  Locked (busy):      {summary['locked']}")
+    typer.echo(f"  Failed:             {summary['failed']}")
+
+    total = summary["failed"]
+    if total > 0:
+        raise typer.Exit(code=1)
+
+
+@app.command()
 def test_poll_cycle() -> None:
     """Run a single poll cycle with output (for make test-poll-interval)."""
     config_path = resolve_config_path()

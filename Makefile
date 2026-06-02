@@ -10,7 +10,9 @@
         test-transcode-fail test-crash-recovery simulate-worker-crash \
         test-fragment-integrity test-manifest-idempotent \
         test-transcribe-oss-url test-transcribe-direct test-transcribe-perf \
-        test-transcribe test-download-interrupt test-no-redownload
+        test-transcribe test-download-interrupt test-no-redownload \
+        retranscribe test-idempotent-skip test-no-auto-retranscribe \
+        test-cli-retranscribe test-cli-upgrade
 
 # ── 安装 ────────────────────────────────────────────────────────────────────
 
@@ -155,6 +157,35 @@ test-transcribe-direct:
 test-transcribe-perf:
 	@echo "🧪 NLS transcription performance baseline"
 	@uv run --directory apps/worker --extra dev pytest -v -k "TestCostLogging or TestRetryLogic or test_cost or test_retry or test_perf or TestPollWith" "$(CURDIR)/apps/worker/tests/test_us026.py"
+
+# ── Worker 转写重转 (US-028) ──────────────────────────────────────────────
+
+retranscribe:
+	uv run --directory apps/worker python -m soniscope_worker retranscribe $(ARGS) $(FRAGMENT_ID)
+
+# 幂等跳过测试
+test-idempotent-skip:
+	@echo "🧪 Idempotent skip — .done fragment skipped in normal polling"
+	@echo "Running idempotent skip tests"
+	@uv run --directory apps/worker --extra dev pytest -v -k "TestIdempotentSkip or test_idempotent_skip or test_done_skip or test_poll_skip_done" "$(CURDIR)/apps/worker/tests/test_us028.py"
+
+# 非自动重转测试
+test-no-auto-retranscribe:
+	@echo "🧪 No auto retranscribe — config changes do not trigger re-transcription in normal poll"
+	@echo "Running no-auto-retranscribe tests"
+	@uv run --directory apps/worker --extra dev pytest -v -k "TestNoAutoRetranscribe or test_no_auto or test_config_change_no_retrigger" "$(CURDIR)/apps/worker/tests/test_us028.py"
+
+# CLI retranscribe 测试
+test-cli-retranscribe:
+	@echo "🧪 CLI retranscribe — single fragment force retranscribe"
+	@echo "Running CLI retranscribe tests"
+	@uv run --directory apps/worker --extra dev pytest -v -k "TestCliRetranscribe or test_cli_retranscribe or test_force_retranscribe or test_single_retranscribe" "$(CURDIR)/apps/worker/tests/test_us028.py"
+
+# CLI upgrade 批量测试
+test-cli-upgrade:
+	@echo "🧪 CLI upgrade — batch retranscribe with --upgrade flag"
+	@echo "Running CLI upgrade tests"
+	@uv run --directory apps/worker --extra dev pytest -v -k "TestCliUpgrade or test_cli_upgrade or test_upgrade_retranscribe or test_batch_retranscribe or test_all_from" "$(CURDIR)/apps/worker/tests/test_us028.py"
 
 # ── Worker 转写集成测试（US-027）────────────────────────────────────────
 
