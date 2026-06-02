@@ -510,4 +510,26 @@
   - 有用的上下文: US-024 完成后 US-025（Transcriber 接口）和 US-026（NLS 云端转写）可直接实现真实的 ASR 转写结果替换占位 transcript
 ---
 
+## 2026-06-02 08:19 - US-026
+- 实现了阿里云 NLS 云端转写器（CloudSpeechTranscriber）完整功能，支持 oss-url 与 direct 两种上传模式
+- 更改的文件:
+  - `apps/worker/src/soniscope_worker/nls_transcriber.py` (new) — CloudSpeechTranscriber 完整实现：OSS presigned URL 生成、SubmitTask/GetTaskResult NLS API 调用、异步轮询（含 50 分钟 re-sign AC3）、direct 模式 base64 编码上传、指数退避重试（5s/15s/45s AC5）、NLS 响应→TranscriptResult 映射（AC6）、结构化成本日志（AC7）、累计计数器日切
+  - `apps/worker/src/soniscope_worker/transcriber.py` (modified) — 工厂 create_transcriber 从占位 CloudSpeechTranscriber 改为延迟导入 nls_transcriber.CloudSpeechTranscriber；新增 oss_client/oss_bucket 可选参数透传；文档更新
+  - `apps/worker/tests/test_us025.py` (modified) — 适配 CloudSpeechTranscriber 迁移至 nls_transcriber 模块：更新 import 路径、更新 factory 测试使用 NlsCloudSpeechTranscriber、结构测试替代旧 placeholder transcribe 测试、新增 nls_transcriber 模块导入和常量检查、新增 nls_transcriber 安全扫描
+  - `apps/worker/tests/test_us026.py` (new) — 52 个单元测试覆盖：配置读取(AC1)、presigned URL 生成(AC2)、retry 逻辑(AC5)、上传模式分发(AC2/AC4)、NLS→TranscriptResult 映射(AC6)、成本日志(AC7)、Makefile target 存在性(AC8/AC9/AC10)、poll with renew(AC3)、SubmitTask helper、direct 模式、累计计数器日切、模块结构、安全、工厂集成
+  - `Makefile` (modified) — 新增 test-transcribe-oss-url / test-transcribe-direct / test-transcribe-perf 三个 target；.PHONY 行添加新 target
+- **未来迭代的学习：**
+  - 发现的 patterns: NLS 录音文件识别 API 使用阿里云 POP（RPC）endpoint：SubmitTask(POST) + GetTaskResult(GET)，通过 aliyunsdkcore CommonRequest 调用，Region domain 从 `_REGION_DOMAINS` dict 查找
+  - 发现的 patterns: OSS presigned URL 通过 `client.presign(GetObjectRequest(...), expires=timedelta)` 生成，默认 1 小时有效期；NLS 轮询超过 50 分钟自动 re-sign
+  - 发现的 patterns: `_retry_on_network_error` 包裹 NLS 调用，4xx/InvalidAppKey/InvalidParameter/Unauthorized/Forbidden 立即失败；其他异常按 (5, 15, 45) 秒指数退避重试 max 3 次
+  - 发现的 patterns: NLS Result.Sentences 中 BeginTime/EndTime 单位为毫秒，_nls_to_transcript_result 除以 1000 转换为秒；BizDuration 也以毫秒为单位
+  - 发现的 patterns: 成本日志 event=asr_call_completed 包含 estimated_cost_yuan = (duration/3600) * 2.5，累计计数器按天（本地日期）自动重置
+  - 发现的 patterns: factory 延迟导入模式 → `from soniscope_worker.nls_transcriber import CloudSpeechTranscriber` 放在 if 分支内，避免 whisper-local 用户强制依赖 aliyunsdkcore
+  - 遇到的陷阱: `CloudSpeechTranscriber` 从 `transcriber.py` 迁移到 `nls_transcriber.py` 后，test_us025.py 的 import 和所有直接调用 `CloudSpeechTranscriber(cfg).transcribe()` 的测试（原 placeholder）都需要更新——结构测试取代了行为测试
+  - 遇到的陷阱: `_poll_with_renew` 是 CloudSpeechTranscriber 的实例方法，不是模块级函数；测试需要用 `t._poll_with_renew()` 调用
+  - 遇到的安全注意事项: create_transcriber 工厂接收整个 SoniScopeConfig，内部只传递 config.transcriber（TranscriberConfig）给 NLS 实现——OSS 凭证（config.oss）不泄漏到转写模块
+  - 有用的上下文: US-026 完成后 CloudSpeechTranscriber 已可实现真实 NLS 转写，但 poll_cycle 中仍使用 placeholder transcript——US-027（集成完整流水线）将在 poll_cycle 中通过 create_transcriber 注入真实转写器
+  - 有用的上下文: US-027 集成时需要在 poll_cycle 中调用 `create_transcriber(config, oss_client=client, oss_bucket=config.oss.bucket)` 获取转写器实例，然后调用 `transcriber.transcribe()` 替换占位 transcript
+---
+
 
