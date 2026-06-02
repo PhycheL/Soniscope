@@ -1,3 +1,6 @@
+- OSS ListObjects REST API: GET with query params (prefix/marker/max-keys), canonicalized_resource is /<bucket>/ (no query params); XML response parsed via xml.etree.ElementTree; IsTruncated=true → NextMarker → pagination loop
+- Scripts under `scripts/` follow HMAC-SHA1 v1 signing pattern (same as FC shared.oss/scripts/): load AK from ALIYUN_AK_ID/ALIYUN_AK_SECRET or ALIYUN_DEPLOY_AK_ID/ALIYUN_DEPLOY_AK_SECRET env vars; test via sys.path.insert + mock
+
 ## Codebase Patterns
 - Monorepo managed by uv workspace at the root — `pyproject.toml` only declares workspace members, no business deps.
 - Worker is an independent uv sub-project under `apps/worker/` with its own `pyproject.toml` and `.venv`.
@@ -573,4 +576,23 @@
   - 发现的 patterns: fcntl LOCK_EX | LOCK_NB 非阻塞文件锁，os_open_lock 返回持有锁的 fd 或 None
   - 遇到的陷阱: mock 延迟导入函数需用源模块路径 (soniscope_worker.poller.*)
   - 遇到的陷阱: Typer CommandInfo.name 未显式设置时为 None，用 callback.__name__ 匹配
+---
+
+## 2026-06-02 13:00 - US-029
+- 实现了 OSS 与 E2E 运维辅助 make 命令：list-oss-objects（新）、verify-no-stale（新）、verify-oss-retention（新）；复用已有的 show-oss-object（US-017）和 oss-delete-obj（US-010）
+- 更改的文件:
+  - `scripts/list_oss_objects.py` (new) — OSS 对象列表脚本：按 DATE→recordings/<date>/ 前缀 ListObjects（HMAC-SHA1 v1 签名），XML 解析，分页支持，.wav 过滤，总数输出
+  - `scripts/verify_no_stale.py` (new) — 残留中间态检查脚本：扫描 inbox/*.part / inbox/*.wav.tmp / tmp/*.transcript.json.tmp，输出具体路径，修复指引
+  - `scripts/verify_oss_retention.py` (new) — OSS 保留策略验证脚本：OSS 对象数 vs 本地 fragment 目录数对比，Worker 源码 DeleteObject 扫描，scripts/ 中未标注仅测试用的 DeleteObject 扫描
+  - `Makefile` (modified) — 新增 list-oss-objects（DATE 参数）、verify-no-stale、verify-oss-retention 三个 target，更新 .PHONY 行
+  - `apps/worker/tests/test_us029.py` (new) — 74 个单元测试覆盖：show-oss-object 复用验证（元数据输出）、list-oss-objects 脚本结构与逻辑、oss-delete-obj 复用验证（仅测试用标注）、verify-no-stale 脚本结构与逻辑、verify-oss-retention 脚本结构与逻辑、无 AK Secret 泄漏、Makefile 集成、.PHONY 行去重
+- **未来迭代的学习：**
+  - 发现的 patterns: `scripts/` 下独立脚本统一使用 HMAC-SHA1 v1 签名调用 OSS REST API（与 FC shared 模块一致），通过 `ALIYUN_AK_ID/ALIYUN_AK_SECRET` 或 `ALIYUN_DEPLOY_*` 环境变量加载凭证
+  - 发现的 patterns: OSS ListObjects REST API GET 请求参数（prefix/marker/max-keys）放在 URL query string，canoicalized_resource 仍为 `/<bucket>/`（不含 query params）
+  - 发现的 patterns: OSS ListObjectsResult XML 解析用 `xml.etree.ElementTree.fromstring`，`IsTruncated=true` 时通过 `NextMarker` 或 last key 继续下一页
+  - 发现的 patterns: 运维脚本的 `main()` 在测试中通过 mock `resolve_home` 控制 SONISCOPE_HOME，使用 `pytest.raises(SystemExit)` 验证退出码
+  - 遇到的陷阱: `Path.touch()` 要求父目录已存在，测试中创建临时文件前必须先 `mkdir(parents=True)` 确保父目录存在
+  - 遇到的陷阱: `sys.path.insert(0, ...)` 导入 scripts/ 下模块后，多次导入同一模块可能被缓存（同名文件），测试函数间相互独立需确保导入顺序
+  - 有用的上下文: verify-no-stale 只检查文件系统（无云依赖），verify-oss-retention 需要 OSS 凭证（可选——凭证不可用时跳过 OSS 比较）
+  - 有用的上下文: US-029 完成后 US-030（E2E 完整性校验脚本）和 US-031（E2E 崩溃恢复/重转/安全反例）仍需实现，US-032（MVP 最终验收 runbook）是文档撰写
 ---
