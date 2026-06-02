@@ -25,10 +25,10 @@
 
 ### 0.1 运行环境
 
-- [ ] Worker 主机已就绪（Mac Studio M4 Max / macOS 26.5 / Python 3.13.2）
-- [ ] `$SONISCOPE_HOME=/Volumes/Data/software/SoniScope` 已设置
-- [ ] `$SONISCOPE_HOME/config.yaml` 配置完整且权限为 `chmod 600`
-- [ ] `ffmpeg` 与 `ffprobe` 可执行
+- [x] Worker 主机已就绪（Mac Studio M4 Max / macOS 26.5 / Python 3.13.2）
+- [x] `$SONISCOPE_HOME=/Volumes/Data/software/SoniScope` 已设置
+- [x] `$SONISCOPE_HOME/config.yaml` 配置完整且权限为 `chmod 600`
+- [x] `ffmpeg` 与 `ffprobe` 可执行
 
 **验证命令**：
 
