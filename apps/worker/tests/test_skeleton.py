@@ -1,5 +1,7 @@
 """Basic smoke tests for the Worker skeleton."""
 
+from pathlib import Path
+
 
 def test_import_succeeds() -> None:
     """The soniscope_worker package can be imported."""
@@ -20,18 +22,19 @@ def test_cli_help() -> None:
     assert "soniscope-worker" in result.stdout
 
 
-def test_run_command_exists() -> None:
+def test_run_command_exists(tmp_path: Path) -> None:
     """The 'run' subcommand is registered."""
     from typer.testing import CliRunner
 
     from soniscope_worker.cli import app
 
     runner = CliRunner()
-    result = runner.invoke(app, ["run"])
+    result = runner.invoke(app, ["run"], env={"SONISCOPE_HOME": str(tmp_path)})
     # The run command requires a valid config file to proceed past config loading.
     # Without it, it exits non-zero with FileNotFoundError.
     # We just confirm the command is registered (it doesn't print "not yet implemented").
     assert result.exit_code != 0
+    assert "Config file not found" in result.stderr
     assert "not yet implemented" not in result.stdout
 
 

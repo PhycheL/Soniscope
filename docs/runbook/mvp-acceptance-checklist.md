@@ -57,7 +57,7 @@ make verify-prep
 
 ### 0.3 测试音频
 
-- [ ] `tests/audio/` 下 4 个测试音频文件存在且 sha256 / duration / codec 校验通过
+- [x] `tests/audio/` 下 4 个测试音频文件存在且 sha256 / duration / codec 校验通过
 
 **验证命令**：
 

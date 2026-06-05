@@ -322,7 +322,7 @@ def check_block_d(home: Path) -> BlockResult:
     result = BlockResult("D", "retranscribe CLI 可用性验证")
 
     # Check config.yaml exists
-    config_path = _resolve_home() / "config.yaml"
+    config_path = home / "config.yaml"
     has_config = config_path.is_file()
 
     result.checks.append(
