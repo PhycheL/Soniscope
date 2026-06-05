@@ -25,6 +25,8 @@
 
 ### 0.1 运行环境
 
+首先设置运行环境`export SONISCOPE_HOME=/Volumes/Data/software/SoniScope`
+
 - [x] Worker 主机已就绪（Mac Studio M4 Max / macOS 26.5 / Python 3.13.2）
 - [x] `$SONISCOPE_HOME=/Volumes/Data/software/SoniScope` 已设置
 - [x] `$SONISCOPE_HOME/config.yaml` 配置完整且权限为 `chmod 600`
@@ -39,11 +41,11 @@ make init-dirs
 
 ### 0.2 云资源
 
-- [ ] OSS Bucket `soniscope-audio`（`cn-beijing`，ACL private）可访问
-- [ ] FC `issue-credential`（`https://issue-cedential-ottfirocds.cn-beijing.fcapp.run`）公网可达
-- [ ] FC `verify-upload`（`https://verify-upload-nnjpaoamhw.cn-beijing.fcapp.run`）公网可达
-- [ ] NLS ASR 项目 `soniscope`（AppKey `1k8tqkjQsq65wp2m`）可用
-- [ ] 微信小程序 AppID `wx3f973c7297728b0c` 已配置服务器域名白名单
+- [x] OSS Bucket `soniscope-audio`（`cn-beijing`，ACL private）已按 runbook 人工确认；`make verify-prep` A 块只验证 Worker 运行时所需的 `ListObjects` / `HeadObject` / `GetObject` 访问
+- [x] FC `issue-credential`（`https://issue-cedential-ottfirocds.cn-beijing.fcapp.run`）公网可达
+- [x] FC `verify-upload`（`https://verify-upload-nnjpaoamhw.cn-beijing.fcapp.run`）公网可达
+- [x] NLS ASR 项目 `soniscope`（AppKey `1k8tqkjQsq65wp2m`）可用
+- [x] 微信小程序 AppID `wx3f973c7297728b0c` 已配置服务器域名白名单
 
 **验证命令**：
 

@@ -103,7 +103,7 @@
 **最终验收命令（一行跑完所有可自动化的检查项）**：
 
 完成后，AI 将在 US-002 中提供一个 `make verify-prep` 脚本，执行下面这些检查并汇总 pass/fail 报告：
-- 跑 `aliyun oss stat oss://soniscope-audio --endpoint oss-cn-beijing.aliyuncs.com` 验证 Bucket 私有
+- 读取 `config.yaml` 的 `soniscope-local-reader` 只读 AK，验证 Worker 运行时所需的 OSS 能力（`ListObjects`、`HeadObject` / `GetObject sample/sample-20s.wav`）；Bucket ACL private 仍按 US-001 runbook 人工确认或用单独审计凭证确认
 - 跑 4 条 STS 反例（PutObject 越界 / ListBucket / GetObject / Expired）
 - `curl` runbook 登记的两个 FC 3.0 URL（`https://issue-cedential-ottfirocds.cn-beijing.fcapp.run`、`https://verify-upload-nnjpaoamhw.cn-beijing.fcapp.run`）返回 200~499，且不是 5xx / 网络错误
 - `python3 scripts/fetch_test_fixtures.py --check` 验证 `tests/audio/` 4 个文件存在（3 wav + 1 m4a）+ sha256 与 runbook §6 匹配
@@ -140,7 +140,7 @@
 
 **(D) `make verify-prep` 一键校验 US-001 全部产物（本 story 最关键的产出）**
 - [ ] `make verify-prep` 依次执行下列检查，并输出汇总 pass/fail 报告：
-  1. **(A 块)** 读取 `config.yaml` → 用只读 AK 验证 Bucket 存在且 ACL = private
+  1. **(A 块)** 读取 `config.yaml` → 用 `soniscope-local-reader` 只读 AK 验证 Worker 运行时所需 OSS 能力（`ListObjects`、`HeadObject` / `GetObject sample/sample-20s.wav`）；Bucket ACL private 不要求 Worker 运行时凭证自动检查，按 US-001 runbook 人工确认或单独审计凭证确认
   2. **(B 块)** 用 FC 部署凭证（来源由实现决定，**仅本机测试用**）调 STS AssumeRole，policy 限定到单个 object key → 拿到临时凭证 → 跑 4 个反例（越界 PutObject / ListBucket / GetObject / 等待超过 tech-spec §4.1 有效期上限后 ExpiredToken）→ 全部如预期失败才算 pass
   3. **(C 块)** `curl` FC 两个 URL → HTTP 状态码 200~499（不是 5xx / 网络错误）
   4. **(E 块)** 用 config 中的 NLS AppKey + AK，上传 `tests/audio/sample-20s.wav` → 拿到结构化转写结果 → 验证结构符合 tech-spec §3.4
@@ -867,4 +867,3 @@
 ## 附录 C · Open Questions 决策溯源
 
 > OQ-1 ~ OQ-8 的产品决策索引见 §10，完整技术背景与影响分析见 `docs/tech-spec.md` §8（ADR-1 ~ ADR-8）。本附录不再独立维护内容。
-

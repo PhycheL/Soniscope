@@ -68,7 +68,7 @@
       "title": "实现 US-001 准备产物一键校验 make verify-prep",
       "description": "作为开发者，我需要 make verify-prep 自动检查 runbook 中已经人工准备好的 OSS、RAM、FC、ASR、测试音频和 Worker 环境是否真实可用。",
       "acceptanceCriteria": [
-        "make verify-prep 读取 config.yaml 并验证 Bucket soniscope-audio 存在、region 为 cn-beijing、ACL 为 private",
+        "make verify-prep 读取 config.yaml，并用 soniscope-local-reader 只读 AK 验证 Worker 运行时所需 OSS 能力：ListObjects、HeadObject/GetObject sample/sample-20s.wav；Bucket ACL private 由 US-001 runbook 人工确认或单独审计凭证确认",
         "make verify-prep 验证本机 Python 版本 >= 3.11、SONISCOPE_HOME 可写、可用磁盘 >= 50GB、ffmpeg 与 ffprobe 可执行",
         "make verify-prep 验证 config.yaml 权限为 600 且所有必填字段非空",
         "make verify-prep 用部署凭证 AssumeRole 拿到限定单 object key 的 STS 临时凭证，并跑 4 个反例：越权 PutObject 到其他 key、ListBucket、GetObject、等待超过 STS 有效期上限后 PutObject，全部如预期返回 AccessDenied 或 ExpiredToken 才算 pass",

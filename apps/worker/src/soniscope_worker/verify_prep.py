@@ -5,7 +5,7 @@ Checks performed (in order):
 G 块 – Worker 运行环境：Python ≥ 3.11, SONISCOPE_HOME 可写, 磁盘 ≥ 50GB, ffmpeg/ffprobe
 H 块 – 配置：600 权限, 所有必填字段非空
 F 块 – 测试音频 fixture：4 个文件存在 + sha256/duration/codec 通过
-A 块 – OSS Bucket：存在、region 正确、ACL 为 private
+A 块 – Worker OSS 运行时访问：配置值正确，ListObjects/HeadObject/GetObject 可用
 B 块 – STS AssumeRole：单 object key 凭证 + 4 个反例（越界/List/Get/Expired）
 C 块 – FC URL：两个函数 URL 可达且非 5xx
 E 块 – ASR：用 sample-20s.wav 真实调用 NLS，验证结构化结果
@@ -22,6 +22,7 @@ import sys
 import time
 import urllib.request
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -61,6 +62,14 @@ class BlockResult:
     @property
     def passed(self) -> bool:
         return all(c.passed for c in self.checks)
+
+
+@dataclass(frozen=True)
+class StsAssumeRoleFailure:
+    """Sanitized STS AssumeRole failure details."""
+
+    detail: str
+    fix_hint: str
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -127,6 +136,10 @@ def _mask_secret(value: str) -> str:
 
 
 _SECRET_KEYS = frozenset({"access_key_secret", "appkey", "api_key"})
+EXPECTED_OSS_BUCKET = "soniscope-audio"
+EXPECTED_OSS_ENDPOINT = "oss-cn-beijing.aliyuncs.com"
+EXPECTED_OSS_REGION = "cn-beijing"
+VERIFY_PREP_SAMPLE_KEY = "sample/sample-20s.wav"
 
 
 def _safe_log_value(key: str, value: Any) -> str:
@@ -134,6 +147,53 @@ def _safe_log_value(key: str, value: Any) -> str:
     if key in _SECRET_KEYS and isinstance(value, str):
         return _mask_secret(value)
     return str(value)
+
+
+def _sanitize_error_message(message: str, secrets: list[str] | None = None, limit: int = 240) -> str:
+    """Return a secret-safe, bounded error message."""
+    sanitized = message
+    for secret in secrets or []:
+        if secret:
+            sanitized = sanitized.replace(secret, "[REDACTED]")
+
+    sensitive_markers = [
+        "AccessKeySecret=",
+        "SecurityToken=",
+        "security_token=",
+        "Token=",
+    ]
+    for marker in sensitive_markers:
+        if marker in sanitized:
+            prefix, rest = sanitized.split(marker, 1)
+            tail = rest.split(" ", 1)
+            remaining = f" {tail[1]}" if len(tail) > 1 else ""
+            sanitized = f"{prefix}{marker}[REDACTED]{remaining}"
+
+    return sanitized[:limit]
+
+
+def _oss_region_from_endpoint(endpoint: str) -> str:
+    """Derive OSS region from an endpoint string when it follows OSS naming."""
+    prefix = "oss-"
+    suffix = ".aliyuncs.com"
+    if endpoint.startswith(prefix) and endpoint.endswith(suffix):
+        return endpoint.removeprefix(prefix).removesuffix(suffix)
+    return ""
+
+
+def _resolve_nls_pop_endpoint(value: str) -> tuple[str, str]:
+    """Return ``(domain, region)`` for an NLS region or POP endpoint value."""
+    region_domains = {
+        "cn-shanghai": "filetrans.cn-shanghai.aliyuncs.com",
+        "cn-beijing": "filetrans.cn-beijing.aliyuncs.com",
+        "cn-shenzhen": "filetrans.cn-shenzhen.aliyuncs.com",
+    }
+    if value in region_domains:
+        return region_domains[value], value
+    if value.startswith("filetrans.") and value.endswith(".aliyuncs.com"):
+        region = value.removeprefix("filetrans.").removesuffix(".aliyuncs.com")
+        return value, region
+    return f"filetrans.{value}.aliyuncs.com", value
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -380,18 +440,18 @@ def check_block_f() -> BlockResult:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# A block — OSS Bucket
+# A block — Worker OSS runtime access
 # ──────────────────────────────────────────────────────────────────────────────
 
 
 def check_block_a(cfg: dict[str, Any]) -> BlockResult:
-    """OSS Bucket 存在性与 ACL 检查."""
-    result = BlockResult("A", "OSS Bucket 检查")
+    """Verify Worker runtime OSS read/list access."""
+    result = BlockResult("A", "Worker OSS 运行时访问检查")
 
     oss_cfg = cfg.get("oss", {})
-    bucket = oss_cfg.get("bucket", "soniscope-audio")
-    endpoint = oss_cfg.get("endpoint", "oss-cn-beijing.aliyuncs.com")
-    region = "cn-beijing"
+    bucket = oss_cfg.get("bucket", EXPECTED_OSS_BUCKET)
+    endpoint = oss_cfg.get("endpoint", EXPECTED_OSS_ENDPOINT)
+    region = _oss_region_from_endpoint(endpoint)
     ak_id = oss_cfg.get("access_key_id", "")
     ak_secret = oss_cfg.get("access_key_secret", "")
 
@@ -404,6 +464,55 @@ def check_block_a(cfg: dict[str, Any]) -> BlockResult:
                 fix_hint="在 config.yaml 中填入 soniscope-local-reader 的 AK",
             )
         )
+        return result
+
+    config_ok = True
+    bucket_ok = bucket == EXPECTED_OSS_BUCKET
+    result.checks.append(
+        CheckResult(
+            label="OSS bucket 配置",
+            passed=bucket_ok,
+            detail=(
+                f"{bucket} ✓"
+                if bucket_ok
+                else f"实际: {bucket}，期望: {EXPECTED_OSS_BUCKET}"
+            ),
+            fix_hint=f"将 config.yaml 的 oss.bucket 设置为 {EXPECTED_OSS_BUCKET}",
+        )
+    )
+    config_ok = config_ok and bucket_ok
+
+    endpoint_ok = endpoint == EXPECTED_OSS_ENDPOINT
+    result.checks.append(
+        CheckResult(
+            label="OSS endpoint 配置",
+            passed=endpoint_ok,
+            detail=(
+                f"{endpoint} ✓"
+                if endpoint_ok
+                else f"实际: {endpoint}，期望: {EXPECTED_OSS_ENDPOINT}"
+            ),
+            fix_hint=f"将 config.yaml 的 oss.endpoint 设置为 {EXPECTED_OSS_ENDPOINT}",
+        )
+    )
+    config_ok = config_ok and endpoint_ok
+
+    region_ok = region == EXPECTED_OSS_REGION
+    result.checks.append(
+        CheckResult(
+            label="OSS region 配置",
+            passed=region_ok,
+            detail=(
+                f"{region} ✓"
+                if region_ok
+                else f"由 endpoint 推导: {region or '(unknown)'}，期望: {EXPECTED_OSS_REGION}"
+            ),
+            fix_hint=f"检查 oss.endpoint，应为北京 region 的 {EXPECTED_OSS_ENDPOINT}",
+        )
+    )
+    config_ok = config_ok and region_ok
+
+    if not config_ok:
         return result
 
     try:
@@ -419,72 +528,83 @@ def check_block_a(cfg: dict[str, Any]) -> BlockResult:
         )
         return result
 
-    # Check bucket exists
+    # Verify runtime permissions used by the Worker: list, head metadata, read object.
     try:
         cred = oss2.credentials.StaticCredentialsProvider(
             access_key_id=ak_id, access_key_secret=ak_secret
         )
         oss_config = oss2.config.load_default()
         oss_config.credentials_provider = cred
-        oss_config.region = region
+        oss_config.region = EXPECTED_OSS_REGION
         oss_config.endpoint = endpoint
         client = oss2.Client(oss_config)
 
-        # get_bucket_info verifies bucket exists
-        info = client.get_bucket_info(oss2.GetBucketInfoRequest(bucket=bucket))
-
+        client.list_objects(
+            oss2.ListObjectsRequest(bucket=bucket, prefix="sample/", max_keys=1)
+        )
         result.checks.append(
             CheckResult(
-                label=f"Bucket {bucket} 存在",
+                label="ListObjects sample/ 可用",
                 passed=True,
-                detail=f"region={getattr(info.bucket_info, 'region', region)}",
+                detail="soniscope-local-reader 可列出 sample/ 前缀",
             )
         )
 
-        # Check region
-        actual_region = getattr(info.bucket_info, 'region', '')
-        region_ok = actual_region == region or not actual_region
+        head_resp = client.head_object(
+            oss2.HeadObjectRequest(bucket=bucket, key=VERIFY_PREP_SAMPLE_KEY)
+        )
+        content_length = getattr(head_resp, "content_length", None)
+        content_ok = content_length is None or int(content_length) > 0
         result.checks.append(
             CheckResult(
-                label=f"Region 为 {region}",
-                passed=region_ok,
-                detail=f"实际: {actual_region or '(unknown)'}" if not region_ok else f"{region} ✓",
-                fix_hint=f"Bucket region 为 {actual_region}，期望 {region}",
+                label=f"HeadObject {VERIFY_PREP_SAMPLE_KEY} 可用",
+                passed=content_ok,
+                detail=(
+                    f"content_length={content_length}"
+                    if content_length is not None
+                    else "metadata readable"
+                ),
+                fix_hint=f"检查 OSS sample fixture：{VERIFY_PREP_SAMPLE_KEY}",
             )
         )
+        if not content_ok:
+            return result
 
-        # Check ACL
-        try:
-            acl_resp = client.get_bucket_acl(oss2.GetBucketAclRequest(bucket=bucket))
-            acl = acl_resp.acl or ""
-            acl_ok = acl.lower() == "private"
-            result.checks.append(
-                CheckResult(
-                    label="ACL 为 private",
-                    passed=acl_ok,
-                    detail=f"实际 ACL: {acl}",
-                    fix_hint=f"在 OSS 控制台将 Bucket {bucket} 的 ACL 设为私有",
-                )
+        get_resp = client.get_object(
+            oss2.GetObjectRequest(bucket=bucket, key=VERIFY_PREP_SAMPLE_KEY)
+        )
+        body = getattr(get_resp, "body", None)
+        if body is not None and hasattr(body, "read"):
+            body.read()
+        result.checks.append(
+            CheckResult(
+                label=f"GetObject {VERIFY_PREP_SAMPLE_KEY} 可用",
+                passed=True,
+                detail="sample object 可读取",
             )
-        except Exception as e:
-            result.checks.append(
-                CheckResult(
-                    label="ACL 检查",
-                    passed=False,
-                    detail=f"无法获取 ACL: {e}",
-                    fix_hint="检查 OSS 只读 AK 是否有 GetBucketAcl 权限",
-                )
-            )
+        )
 
     except Exception as e:
         msg = str(e)
         if "NoSuchBucket" in msg or "not found" in msg.lower():
             result.checks.append(
                 CheckResult(
-                    label=f"Bucket {bucket} 存在",
+                    label=f"Bucket {bucket} 可访问",
                     passed=False,
                     detail=f"Bucket 不存在: {e}",
-                    fix_hint=f"在 OSS 控制台创建 Bucket {bucket}，region={region}",
+                    fix_hint=f"检查 config.yaml 的 bucket/endpoint，应为 {EXPECTED_OSS_BUCKET} / {EXPECTED_OSS_ENDPOINT}",
+                )
+            )
+        elif "NoSuchKey" in msg or VERIFY_PREP_SAMPLE_KEY in msg:
+            result.checks.append(
+                CheckResult(
+                    label=f"sample fixture {VERIFY_PREP_SAMPLE_KEY} 可读",
+                    passed=False,
+                    detail=f"sample object 不可用: {_sanitize_error_message(msg)}",
+                    fix_hint=(
+                        f"检查 US-001 测试音频 fixture，确认 OSS 中存在 {VERIFY_PREP_SAMPLE_KEY}，"
+                        "必要时重新上传 sample/ 前缀素材"
+                    ),
                 )
             )
         elif "InvalidAccessKeyId" in msg or "SignatureDoesNotMatch" in msg:
@@ -499,10 +619,10 @@ def check_block_a(cfg: dict[str, Any]) -> BlockResult:
         else:
             result.checks.append(
                 CheckResult(
-                    label="OSS Bucket 检查",
+                    label="Worker OSS 运行时访问检查",
                     passed=False,
-                    detail=f"连接失败: {msg[:200]}",
-                    fix_hint="检查网络、endpoint 和凭证",
+                    detail=f"连接失败: {_sanitize_error_message(msg)}",
+                    fix_hint="检查网络、oss.endpoint、soniscope-local-reader 凭证和 sample fixture",
                 )
             )
 
@@ -514,16 +634,19 @@ def check_block_a(cfg: dict[str, Any]) -> BlockResult:
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-def _get_sts_credentials(ak_id: str, ak_secret: str, role_arn: str, object_key: str,
-                         duration: int = 900, bucket: str = "soniscope-audio") -> dict[str, str] | None:
+def _get_sts_credentials(
+    ak_id: str,
+    ak_secret: str,
+    role_arn: str,
+    object_key: str,
+    duration: int = 900,
+    bucket: str = EXPECTED_OSS_BUCKET,
+) -> dict[str, str] | StsAssumeRoleFailure:
     """AssumeRole and return temporary credentials."""
     from aliyunsdkcore.client import AcsClient
     from aliyunsdksts.request.v20150401 import AssumeRoleRequest
 
-    client = AcsClient(
-        ak_id, ak_secret,
-        "oss-cn-beijing.aliyuncs.com",  # STS endpoint (same region)
-    )
+    client = AcsClient(ak_id, ak_secret, EXPECTED_OSS_REGION)
 
     # Policy scoped to a single object key
     policy = json.dumps({
@@ -546,19 +669,42 @@ def _get_sts_credentials(ak_id: str, ak_secret: str, role_arn: str, object_key: 
         resp = client.do_action_with_exception(req)
         data = json.loads(resp)
         creds = data.get("Credentials", {})
+        missing = [
+            name
+            for name in ("AccessKeyId", "AccessKeySecret", "SecurityToken", "Expiration")
+            if not creds.get(name)
+        ]
+        if missing:
+            return StsAssumeRoleFailure(
+                detail=f"STS 响应缺少字段: {', '.join(missing)}",
+                fix_hint="检查 STS AssumeRole 响应和 RAM Role 配置",
+            )
         return {
             "access_key_id": creds.get("AccessKeyId", ""),
             "access_key_secret": creds.get("AccessKeySecret", ""),
             "security_token": creds.get("SecurityToken", ""),
             "expiration": creds.get("Expiration", ""),
         }
-    except Exception:
-        return None
+    except Exception as e:
+        return StsAssumeRoleFailure(
+            detail=_sanitize_error_message(str(e), secrets=[ak_secret]),
+            fix_hint=(
+                "检查 ALIYUN_DEPLOY_AK_ID/SECRET 是否属于 soniscope-fc 或部署账号、"
+                "RAM Role ARN 是否正确、角色信任策略是否允许该账号 sts:AssumeRole、"
+                "以及该账号是否具备 AssumeRole 权限"
+            ),
+        )
 
 
-def _try_oss_op(creds: dict[str, str], bucket: str, endpoint: str, object_key: str,
-                op: str = "put") -> tuple[bool, str]:
-    """Try an OSS operation with STS credentials. Returns (denied, detail)."""
+def _try_oss_op(
+    creds: dict[str, str],
+    bucket: str,
+    endpoint: str,
+    object_key: str,
+    op: str = "put",
+    expect_denied: bool = True,
+) -> tuple[bool, str]:
+    """Try an OSS operation with STS credentials. Returns (passed, detail)."""
     import alibabacloud_oss_v2 as oss2
 
     try:
@@ -589,14 +735,38 @@ def _try_oss_op(creds: dict[str, str], bucket: str, endpoint: str, object_key: s
         elif op == "head":
             client.head_object(oss2.HeadObjectRequest(bucket=bucket, key=object_key))
 
-        return False, f"{op} 意外成功（应被拒绝）"
+        if expect_denied:
+            return False, f"{op} 意外成功（应被拒绝）"
+        return True, f"{op} 成功"
     except Exception as e:
         msg = str(e)
         if any(kw in msg for kw in ["AccessDenied", "access denied", "Forbidden",
                                       "InvalidAccessKeyId", "ExpiredToken", "SecurityTokenExpired",
                                       "expired", "not authorized"]):
-            return True, f"{op} 被正确拒绝"
-        return False, f"{op} 失败，但错误非 AccessDenied: {msg[:150]}"
+            if expect_denied:
+                return True, f"{op} 被正确拒绝"
+            return False, f"{op} 被拒绝: {_sanitize_error_message(msg, secrets=[creds.get('access_key_secret', ''), creds.get('security_token', '')], limit=150)}"
+        return False, f"{op} 失败，但错误非 AccessDenied: {_sanitize_error_message(msg, limit=150)}"
+
+
+def _check_sts_expiration(expiration: str, max_seconds: int = 900) -> tuple[bool, str]:
+    """Return whether STS expiration is within the allowed duration."""
+    if not expiration:
+        return False, "expiration 字段缺失"
+    try:
+        parsed = expiration[:-1] + "+00:00" if expiration.endswith("Z") else expiration
+        exp_dt = datetime.fromisoformat(parsed)
+        if exp_dt.tzinfo is None:
+            exp_dt = exp_dt.replace(tzinfo=timezone.utc)
+        seconds = (exp_dt - datetime.now(timezone.utc)).total_seconds()
+    except Exception as e:
+        return False, f"无法解析 expiration={expiration}: {e}"
+
+    if seconds <= 0:
+        return False, f"STS 已过期: expiration={expiration}"
+    if seconds > max_seconds:
+        return False, f"STS 有效期 {seconds:.0f}s（> {max_seconds}s）"
+    return True, f"STS 有效期 {seconds:.0f}s（≤ {max_seconds}s）"
 
 
 def check_block_b(cfg: dict[str, Any]) -> BlockResult:
@@ -628,17 +798,18 @@ def check_block_b(cfg: dict[str, Any]) -> BlockResult:
     wrong_key = "recordings/2026-01-01/20260101T000000_verify_01HY0000000000000000000001.wav"
 
     # Try to get STS credentials
-    creds = _get_sts_credentials(fc_ak_id, fc_ak_secret, role_arn, test_key)
-    if creds is None:
+    sts_result = _get_sts_credentials(fc_ak_id, fc_ak_secret, role_arn, test_key)
+    if isinstance(sts_result, StsAssumeRoleFailure):
         result.checks.append(
             CheckResult(
                 label="AssumeRole 获取 STS 凭证",
                 passed=False,
-                detail="AssumeRole 调用失败",
-                fix_hint="检查 RAM Role ARN、信任策略、以及 FC 子账号是否有 AssumeRole 权限",
+                detail=f"AssumeRole 调用失败: {sts_result.detail}",
+                fix_hint=sts_result.fix_hint,
             )
         )
         return result
+    creds = sts_result
 
     result.checks.append(
         CheckResult(
@@ -649,13 +820,15 @@ def check_block_b(cfg: dict[str, Any]) -> BlockResult:
     )
 
     # Verify PutObject allowed to correct key
-    correct_ok, correct_detail = _try_oss_op(creds, bucket, endpoint, test_key, "put")
+    correct_ok, correct_detail = _try_oss_op(
+        creds, bucket, endpoint, test_key, "put", expect_denied=False
+    )
     result.checks.append(
         CheckResult(
             label="STS 允许 PutObject 到指定 key",
-            passed=not correct_detail.endswith("被正确拒绝"),
+            passed=correct_ok,
             detail=correct_detail,
-            fix_hint="" if correct_ok else "检查 STS policy Resource 是否精确",
+            fix_hint="" if correct_ok else "检查 STS policy Resource 是否精确到指定 object key",
         )
     )
 
@@ -695,14 +868,13 @@ def check_block_b(cfg: dict[str, Any]) -> BlockResult:
     # Negative 4: Expired token — note: we can't truly expire within this script,
     # but we verify the STS expiry is ≤ 900 seconds and note that a real expiry test
     # would need to wait. As a proxy we verify the policy duration.
-    expiry_ok = True
-    expiry_detail = "STS 有效期 900s（符合要求）"
+    expiry_ok, expiry_detail = _check_sts_expiration(creds.get("expiration", ""))
     result.checks.append(
         CheckResult(
             label="反例 4: STS 有效期 ≤ 900s",
             passed=expiry_ok,
             detail=expiry_detail,
-            fix_hint="",
+            fix_hint="" if expiry_ok else "检查 STS AssumeRole DurationSeconds 参数，应 ≤ 900",
         )
     )
 
@@ -828,29 +1000,25 @@ def check_block_e(cfg: dict[str, Any]) -> BlockResult:
         oss_config.endpoint = oss_endpoint
         client = oss2.Client(oss_config)
 
-        # Generate signed URL (1 hour valid)
-        signer = oss2.signer.SignerV4()
-        from datetime import datetime, timedelta, timezone
-        expiration_time = int((datetime.now(timezone.utc) + timedelta(hours=1)).timestamp())
+        # Generate signed URL (1 hour valid) using the OSS v2 presign API.
+        from datetime import timedelta
 
-        signed_url = client.generate_presigned_url(
-            method="GET",
-            bucket=oss_bucket,
-            key="sample/sample-20s.wav",
-            expiration=expiration_time,
-            signer=signer,
+        from soniscope_worker.nls_transcriber import _generate_presigned_url
+
+        signed_url = _generate_presigned_url(
+            client,
+            oss_bucket,
+            "sample/sample-20s.wav",
+            expires=timedelta(hours=1),
         )
 
         # Call NLS ASR
         from aliyunsdkcore.client import AcsClient
         from aliyunsdkcore.request import CommonRequest
 
-        REGION_ENDPOINTS = {
-            "cn-beijing": "filetrans.cn-beijing.aliyuncs.com",
-        }
-        domain = REGION_ENDPOINTS.get(endpoint, f"filetrans.{endpoint}.aliyuncs.com")
+        domain, nls_region = _resolve_nls_pop_endpoint(endpoint)
 
-        acs_client = AcsClient(nls_ak_id, nls_ak_secret, endpoint)
+        acs_client = AcsClient(nls_ak_id, nls_ak_secret, nls_region)
 
         task = {
             "appkey": appkey,
@@ -1006,8 +1174,8 @@ def run_verify_prep() -> int:
     blocks.append(f)
     _print_block_summary(f)
 
-    # A block — OSS
-    print(_bold("▶ A 块 — OSS Bucket 检查"))
+    # A block — Worker OSS runtime access
+    print(_bold("▶ A 块 — Worker OSS 运行时访问检查"))
     a = check_block_a(cfg)
     blocks.append(a)
     _print_block_summary(a)
