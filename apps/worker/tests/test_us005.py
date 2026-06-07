@@ -177,6 +177,23 @@ class TestPackageFunction:
         with zipfile.ZipFile(zip_path, "r") as zf:
             assert "handler.py" in zf.namelist()
 
+    @pytest.mark.parametrize("function", ["issue-credential", "verify-upload"])
+    def test_actual_package_contains_custom_runtime_entrypoint(
+        self,
+        function: str,
+        tmp_path: Path,
+        monkeypatch,
+    ) -> None:
+        """Deployed FC custom-runtime zip contains root app.py for start command."""
+        monkeypatch.setattr(dfc_module, "BUILD_DIR", tmp_path / "build" / "fc")
+
+        zip_path = dfc_module._package_function(function)
+
+        with zipfile.ZipFile(zip_path, "r") as zf:
+            names = zf.namelist()
+            assert "app.py" in names
+            assert "handler.py" in names
+
 
 # ---------------------------------------------------------------------------
 # Deploy log tests
@@ -284,9 +301,44 @@ class TestFcFunctionStructure:
         handler = REPO_ROOT / "apps" / "fc" / "issue_credential" / "handler.py"
         assert handler.is_file(), f"Expected {handler} to exist"
 
+    def test_issue_credential_custom_runtime_app_exists(self) -> None:
+        app = REPO_ROOT / "apps" / "fc" / "issue_credential" / "app.py"
+        assert app.is_file(), f"Expected {app} to exist"
+
     def test_verify_upload_handler_exists(self) -> None:
         handler = REPO_ROOT / "apps" / "fc" / "verify_upload" / "handler.py"
         assert handler.is_file(), f"Expected {handler} to exist"
+
+    def test_verify_upload_custom_runtime_app_exists(self) -> None:
+        app = REPO_ROOT / "apps" / "fc" / "verify_upload" / "app.py"
+        assert app.is_file(), f"Expected {app} to exist"
+
+    @pytest.mark.parametrize(
+        ("module_name", "src_dir"),
+        [
+            ("issue_credential_app", REPO_ROOT / "apps" / "fc" / "issue_credential"),
+            ("verify_upload_app", REPO_ROOT / "apps" / "fc" / "verify_upload"),
+        ],
+    )
+    def test_custom_runtime_app_is_importable(
+        self,
+        module_name: str,
+        src_dir: Path,
+    ) -> None:
+        """app.py can import both local handler.py and shared custom runtime."""
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location(module_name, src_dir / "app.py")
+        assert spec is not None
+        mod = importlib.util.module_from_spec(spec)
+
+        try:
+            spec.loader.exec_module(mod)  # type: ignore[union-attr]
+            assert hasattr(mod, "handler")
+            assert hasattr(mod, "serve")
+        finally:
+            sys.modules.pop(module_name, None)
+            sys.modules.pop("handler", None)
 
     def test_issue_credential_handler_is_importable(self) -> None:
         """The handler.py can be imported as a Python module."""
@@ -382,6 +434,40 @@ class TestFcFunctionStructure:
 # ---------------------------------------------------------------------------
 # Deploy command integration tests (with mocked FC client)
 # ---------------------------------------------------------------------------
+
+
+class TestCurlSurvivalCheck:
+    """AC: deploy survival check detects FC platform startup failures."""
+
+    def test_rejects_fc_platform_caexited_412(self, monkeypatch) -> None:
+        """FC 412 CAExited means the custom runtime did not start."""
+        proc = mock.MagicMock()
+        proc.returncode = 0
+        proc.stdout = (
+            '{"Code":"CAExited","Message":"Function instance exited unexpectedly"}'
+            "\n412"
+        )
+        proc.stderr = ""
+        monkeypatch.setattr(dfc_module.subprocess, "run", lambda *args, **kwargs: proc)
+
+        alive, detail = dfc_module._curl_survival_check("issue-credential")
+
+        assert alive is False
+        assert "HTTP 412" in detail
+        assert "CAExited" in detail
+
+    def test_accepts_business_400_as_reachable(self, monkeypatch) -> None:
+        """A business-layer 400 is acceptable because the function started."""
+        proc = mock.MagicMock()
+        proc.returncode = 0
+        proc.stdout = "{\"error\":\"INVALID_JSON\"}\n400"
+        proc.stderr = ""
+        monkeypatch.setattr(dfc_module.subprocess, "run", lambda *args, **kwargs: proc)
+
+        alive, detail = dfc_module._curl_survival_check("issue-credential")
+
+        assert alive is True
+        assert detail == "HTTP 400"
 
 
 class TestDeployIntegration:
@@ -555,6 +641,15 @@ class TestFcLogs:
 
 class TestEnvVarErrors:
     """AC: helpful error when deploy credentials are missing."""
+
+    def test_get_fc_client_uses_fcv3_endpoint(self, monkeypatch) -> None:
+        """FC 3.0 SDK client must use the official regional OpenAPI endpoint."""
+        monkeypatch.setenv("ALIYUN_DEPLOY_AK_ID", "dummy-ak")
+        monkeypatch.setenv("ALIYUN_DEPLOY_AK_SECRET", "dummy-secret")
+
+        client = dfc_module._get_fc_client()
+
+        assert client._endpoint == "fcv3.cn-beijing.aliyuncs.com"
 
     def test_get_fc_client_missing_env(self, monkeypatch, capsys) -> None:
         """Missing ALIYUN_DEPLOY_AK_ID exits cleanly with message."""

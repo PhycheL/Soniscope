@@ -37,6 +37,8 @@ Page({
   _interrupted: false, // 中断标记，防止重复生成草稿
   _currentDraft: null, // 当前草稿确认态中的草稿对象（最后一 chunk）
   _audioContext: null, // 试听音频上下文
+  _audioContextSeq: 0, // 试听上下文版本号，用于忽略释放后的异步回调
+  _pageHidden: false, // 页面后台态标记，用于区分预期音频权限错误
 
   // ── 长录音自动分片 ──────────────────────────────────────────────────
   _sessionId: null,       // 当前录音会话 ID（所有 chunk 共享）
@@ -51,23 +53,25 @@ Page({
 
   onShow: function () {
     logger.info('[Index] onShow');
+    this._pageHidden = false;
     // 回到前台时检查是否有被中断的草稿需要恢复
     this._checkInterruptedDraft();
   },
 
   onHide: function () {
     logger.info('[Index] onHide');
+    this._pageHidden = true;
     if (this.data.recording) {
       this._handleInterruption('hide');
     }
-    // 切后台时暂停试听
-    this._stopAudition();
+    // 切后台时释放试听资源，避免 iOS 后台态 operateAudio 权限错误
+    this._releaseAuditionAudio();
   },
 
   onUnload: function () {
     logger.info('[Index] onUnload');
     this._clearTimer();
-    this._destroyAudio();
+    this._releaseAuditionAudio({ resetState: false });
   },
 
   _initRecorder: function () {
@@ -399,22 +403,7 @@ Page({
       return;
     }
 
-    this._ensureAudio();
-
-    var that = this;
-    this._audioContext.src = this._currentDraft.tempFilePath;
-    this._audioContext.play();
-    this.setData({ audioPlaying: true, audioPaused: false });
-
-    this._audioContext.onEnded(function () {
-      that.setData({ audioPlaying: false, audioPaused: false });
-    });
-
-    this._audioContext.onError(function (err) {
-      logger.error('[Index] audio play error:', err);
-      that.setData({ audioPlaying: false, audioPaused: false });
-      wx.showToast({ title: '播放失败', icon: 'none', duration: 1500 });
-    });
+    this._prepareAuditionAudio(this._currentDraft.tempFilePath);
   },
 
   onPause: function () {
@@ -425,32 +414,131 @@ Page({
     }
   },
 
-  _stopAudition: function () {
-    if (this._audioContext) {
-      try {
-        this._audioContext.stop();
-      } catch (e) {
-        // ignore
+  _prepareAuditionAudio: function (src) {
+    this._releaseAuditionAudio();
+    this._configureAuditionAudioOptions();
+
+    var that = this;
+    var audio = wx.createInnerAudioContext();
+    audio.obeyMuteSwitch = false;
+    var seq = this._audioContextSeq + 1;
+    var playRequested = false;
+    this._audioContextSeq = seq;
+    this._audioContext = audio;
+
+    audio.onCanplay(function () {
+      if (!playRequested) {
+        playRequested = true;
+        that._startAuditionPlayback(audio, seq);
       }
+    });
+
+    audio.onPlay(function () {
+      if (that._isCurrentAuditionAudio(audio, seq)) {
+        logger.info('[Index] audition onPlay');
+        that.setData({ audioPlaying: true, audioPaused: false });
+      }
+    });
+
+    audio.onEnded(function () {
+      if (that._isCurrentAuditionAudio(audio, seq)) {
+        that.setData({ audioPlaying: false, audioPaused: false });
+      }
+    });
+
+    audio.onError(function (err) {
+      if (that._isExpectedReleasedAudioError(err, audio, seq)) {
+        logger.info('[Index] ignored released/background audio error:', err);
+        return;
+      }
+      that._handleAuditionError(err, audio, seq);
+    });
+
+    audio.src = src;
+    return audio;
+  },
+
+  _configureAuditionAudioOptions: function () {
+    if (typeof wx.setInnerAudioOption !== 'function') {
+      logger.warn('[Index] wx.setInnerAudioOption unavailable');
+      return;
+    }
+    try {
+      wx.setInnerAudioOption({
+        obeyMuteSwitch: false,
+        fail: function (err) {
+          logger.warn('[Index] setInnerAudioOption failed:', err);
+        },
+      });
+    } catch (err) {
+      logger.warn('[Index] setInnerAudioOption threw:', err);
+    }
+  },
+
+  _startAuditionPlayback: function (audio, seq) {
+    if (!this._isCurrentAuditionAudio(audio, seq)) {
+      return;
+    }
+    logger.info('[Index] audition canplay, requesting play');
+    try {
+      audio.play();
+      this.setData({ audioPlaying: true, audioPaused: false });
+    } catch (err) {
+      this._handleAuditionError(err, audio, seq);
+    }
+  },
+
+  _handleAuditionError: function (err, audio, seq) {
+    if (this._isExpectedReleasedAudioError(err, audio, seq)) {
+      logger.info('[Index] ignored released/background audio error:', err);
+      return;
+    }
+    logger.error('[Index] audio play error:', err);
+    this.setData({ audioPlaying: false, audioPaused: false });
+    wx.showToast({ title: '播放失败', icon: 'none', duration: 1500 });
+  },
+
+  _isCurrentAuditionAudio: function (audio, seq) {
+    return this._audioContext === audio && this._audioContextSeq === seq;
+  },
+
+  _isExpectedReleasedAudioError: function (err, audio, seq) {
+    if (!this._isCurrentAuditionAudio(audio, seq)) {
+      return true;
+    }
+    var errMsg = err && err.errMsg ? String(err.errMsg) : '';
+    return this._pageHidden &&
+      errMsg.indexOf('operateAudio:fail jsapi has no permission') !== -1 &&
+      errMsg.indexOf('runningState=background') !== -1;
+  },
+
+  _releaseAuditionAudio: function (options) {
+    var audio = this._audioContext;
+    if (audio) {
+      this._audioContextSeq += 1;
+      this._audioContext = null;
+      try {
+        audio.stop();
+      } catch (e) {
+        // ignore release errors
+      }
+      try {
+        audio.destroy();
+      } catch (e2) {
+        // ignore release errors
+      }
+    }
+    if (!options || options.resetState !== false) {
       this.setData({ audioPlaying: false, audioPaused: false });
     }
   },
 
-  _ensureAudio: function () {
-    if (!this._audioContext) {
-      this._audioContext = wx.createInnerAudioContext();
-    }
+  _stopAudition: function () {
+    this._releaseAuditionAudio();
   },
 
   _destroyAudio: function () {
-    if (this._audioContext) {
-      try {
-        this._audioContext.destroy();
-      } catch (e) {
-        // ignore
-      }
-      this._audioContext = null;
-    }
+    this._releaseAuditionAudio();
   },
 
   // ── 草稿确认态：重录 ──────────────────────────────────────────────────────
@@ -497,8 +585,8 @@ Page({
   },
 
   _clearCurrentDraft: function () {
-    // 停止试听（如有）
-    this._stopAudition();
+    // 停止并释放试听（如有）
+    this._releaseAuditionAudio();
     // 清理草稿对象
     this._currentDraft = null;
   },
@@ -664,6 +752,7 @@ Page({
         recorded_at: recordedAt,
       };
       that._saveDraft(summaryDraft);
+      that._releaseAuditionAudio();
 
       // 退出草稿确认态
       that._currentDraft = null;

@@ -34,6 +34,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 FC_SRC_DIR = REPO_ROOT / "apps" / "fc"
 BUILD_DIR = REPO_ROOT / "build" / "fc"
+FC_OPENAPI_ENDPOINT = "fcv3.cn-beijing.aliyuncs.com"
 
 # Mapping from kebab-case cloud function name to snake_case source directory.
 FUNCTION_DIR_MAP: dict[str, str] = {
@@ -71,7 +72,7 @@ def _get_fc_client():
         access_key_id=deploy_ak_id,
         access_key_secret=deploy_ak_secret,
         region_id="cn-beijing",
-        endpoint="fc20230330.cn-beijing.aliyuncs.com",
+        endpoint=FC_OPENAPI_ENDPOINT,
     )
     return Client(cfg)
 
@@ -321,18 +322,35 @@ def _curl_survival_check(function: str) -> tuple[bool, str]:
 
     try:
         result = subprocess.run(
-            ["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", "--max-time", "10", url],
+            ["curl", "-s", "-w", "\n%{http_code}", "--max-time", "10", url],
             capture_output=True,
             text=True,
             timeout=15,
         )
-        http_code_str = result.stdout.strip()
+        output = result.stdout
+        if result.returncode != 0:
+            detail = result.stderr.strip() or output.strip()
+            return False, f"curl failed: {detail}"
+
+        body, _, http_code_str = output.rpartition("\n")
+        http_code_str = http_code_str.strip()
         try:
             http_code = int(http_code_str)
         except ValueError:
-            return False, f"unexpected curl output: {http_code_str!r}"
+            return False, f"unexpected curl output: {output.strip()!r}"
 
-        if 200 <= http_code < 600:
+        if http_code == 412:
+            try:
+                error_body = json.loads(body) if body.strip() else {}
+            except json.JSONDecodeError:
+                error_body = {}
+            code = str(error_body.get("Code", ""))
+            message = str(error_body.get("Message", ""))
+            if code:
+                return False, f"HTTP 412 {code}: {message[:160]}"
+            return False, "HTTP 412"
+
+        if 200 <= http_code < 500:
             return True, f"HTTP {http_code}"
         return False, f"HTTP {http_code} (unexpected)"
     except subprocess.TimeoutExpired:

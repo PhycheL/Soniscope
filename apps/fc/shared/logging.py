@@ -7,9 +7,7 @@ Always logs: openid hash, fragment_id, decision/result, elapsed time.
 from __future__ import annotations
 
 import hashlib
-import json
 import logging
-import time
 
 # ---------------------------------------------------------------------------
 # Logger

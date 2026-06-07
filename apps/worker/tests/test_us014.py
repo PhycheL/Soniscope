@@ -38,6 +38,14 @@ def _read_json(path: Path) -> dict:
         return json.load(f)
 
 
+def _extract_page_method(content: str, method_name: str) -> str:
+    marker = f"  {method_name}: function"
+    start = content.index(marker)
+    match = re.search(r"\n  [_A-Za-z0-9]+: function", content[start + 1 :])
+    end = start + 1 + match.start() if match else len(content)
+    return content[start:end]
+
+
 # ── Tests: draft preview mode after stopping ────────────────────────────────
 
 
@@ -131,6 +139,111 @@ class TestAudition:
         content = self._get_index()
         has_destroy = ".destroy()" in content or "_destroyAudio" in content
         assert has_destroy, "must destroy audio context on page unload"
+
+
+class TestAuditionLifecycle:
+    """验证试听音频上下文生命周期不会在真机后台路径泄漏"""
+
+    def _get_index(self) -> str:
+        return _read_text(MP_DIR / "pages" / "index" / "index.js")
+
+    def test_audition_does_not_bind_audio_callbacks_per_tap(self):
+        """AC: onAudition 不应每次点击都重复注册 onEnded/onError"""
+        content = self._get_index()
+        body = _extract_page_method(content, "onAudition")
+
+        assert ".onEnded(" not in body, (
+            "onAudition must not register onEnded on every tap; bind once in audio lifecycle helper"
+        )
+        assert ".onError(" not in body, (
+            "onAudition must not register onError on every tap; bind once in audio lifecycle helper"
+        )
+        assert "_prepareAuditionAudio" in body, (
+            "onAudition should prepare a clean managed audio context before play"
+        )
+
+    def test_audition_waits_for_audio_canplay_before_play(self):
+        """AC: iOS 真机试听应等待音频资源可播放后再触发 play"""
+        content = self._get_index()
+        body = _extract_page_method(content, "onAudition")
+
+        assert ".play()" not in body, (
+            "onAudition must not call play immediately after setting src"
+        )
+        assert ".onCanplay(" in content, (
+            "audition context must listen for onCanplay before starting playback"
+        )
+        assert "_startAuditionPlayback" in content, (
+            "audition playback should be started through a guarded helper"
+        )
+
+    def test_audition_disables_ios_mute_switch_for_preview(self):
+        """AC: iOS 真机草稿试听不应被系统静音开关静默吞掉"""
+        content = self._get_index()
+        prepare_body = _extract_page_method(content, "_prepareAuditionAudio")
+
+        assert "_configureAuditionAudioOptions" in prepare_body, (
+            "audition should configure audio options before creating the playback context"
+        )
+        assert "setInnerAudioOption" in content, (
+            "must use wx.setInnerAudioOption so iOS silent mode does not mute draft preview"
+        )
+        assert "obeyMuteSwitch: false" in content, (
+            "audition must set obeyMuteSwitch:false for iOS real-device preview"
+        )
+
+    def test_shared_release_helper_exists(self):
+        """AC: 试听资源释放必须走统一 helper"""
+        content = self._get_index()
+        assert "_releaseAuditionAudio" in content, (
+            "must have a shared helper that releases audition audio context"
+        )
+
+    def test_draft_exit_paths_release_audition_audio(self):
+        """AC: 草稿退出、切后台、卸载都释放试听资源"""
+        content = self._get_index()
+
+        assert "_releaseAuditionAudio" in _extract_page_method(content, "onHide"), (
+            "onHide must release audition audio resources"
+        )
+        assert "_releaseAuditionAudio" in _extract_page_method(content, "onUnload"), (
+            "onUnload must release audition audio resources"
+        )
+        assert "_clearCurrentDraft" in _extract_page_method(content, "onReRecord"), (
+            "re-record must exit through current draft cleanup"
+        )
+        assert "_releaseAuditionAudio" in _extract_page_method(content, "_clearCurrentDraft"), (
+            "current draft cleanup must release audition audio resources"
+        )
+        assert "that._releaseAuditionAudio" in content, (
+            "successful save-and-upload exit must release audition audio resources"
+        )
+
+    def test_expected_background_audio_error_is_classified(self):
+        """AC: 后台态 operateAudio 预期错误不应作为前台播放失败处理"""
+        content = self._get_index()
+        assert "_isExpectedReleasedAudioError" in content, (
+            "must classify expected background/released audio errors"
+        )
+
+    def test_no_ios_android_page_split_for_audio_lifecycle(self):
+        """AC: 不为 iOS/Android 拆两套页面或上传流程"""
+        app_json = _read_json(MP_DIR / "app.json")
+        pages = app_json.get("pages", [])
+        lower_pages = [page.lower() for page in pages]
+
+        assert "pages/index/index" in pages, "shared index page must remain present"
+        assert not any("ios" in page or "android" in page for page in lower_pages), (
+            "must not introduce iOS/Android-specific page routes"
+        )
+        platform_files = [
+            path
+            for path in (MP_DIR / "pages").rglob("*")
+            if path.is_file() and re.search(r"(ios|android)", path.name, re.IGNORECASE)
+        ]
+        assert platform_files == [], (
+            "must not introduce iOS/Android-specific page source files"
+        )
 
 
 # ── Tests: re-record ────────────────────────────────────────────────────────

@@ -18,11 +18,7 @@ from .errors import (
     ERROR_INVALID_JSON,
     ERROR_MISSING_FIELD,
     ERROR_OPENID_NOT_ALLOWED,
-    ERROR_SIZE_EXCEEDED,
-    bad_request,
-    forbidden,
     internal_error,
-    unauthorized,
 )
 from .logging import get_logger, log_auth_attempt, log_auth_result, log_error, log_request, log_response
 

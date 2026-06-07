@@ -20,11 +20,6 @@ from urllib import request as urllib_request
 from urllib.error import HTTPError, URLError
 
 from .config import SharedConfig, read_shared_config
-from .errors import (
-    ERROR_INTERNAL,
-    bad_request,
-    internal_error,
-)
 from .logging import get_logger
 
 # ---------------------------------------------------------------------------
