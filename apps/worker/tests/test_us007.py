@@ -553,6 +553,7 @@ class TestStsAssumeRoleCall:
         call_args = mock_urlopen.call_args[0][0]
         url = call_args.full_url if hasattr(call_args, "full_url") else str(call_args)
         assert "Action=AssumeRole" in url
+        assert "AccessKeyId=ak-test" in url
         assert "RoleArn=acs%3Aram%3A%3A123%3Arole%2Ftest-role" in url
         assert "DurationSeconds=900" in url
         assert "SignatureMethod=HMAC-SHA1" in url

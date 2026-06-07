@@ -30,10 +30,10 @@
 -  绑定系统策略：`AliyunSTSAssumeRoleAccess`（且仅此一条）
 -  AK 保存位置：`1Password` 中 `阿里云 soniscope-fc 账户 RAM`
 
-### 2.2 子账号 soniscope-local-reader（供 Worker 拉音频）
+### 2.2 子账号 soniscope-local-reader（供 Worker 拉音频 + verify-upload 只读校验）
 
 -  登录名：`soniscope-local-reader`
--  用途：Worker 进程从 OSS 下载音频
+-  用途：Worker 进程从 OSS 下载音频；FC `verify-upload` 用同等只读权限执行 OSS HeadObject
 -  绑定自定义策略：`soniscope-bucket-readonly`
 -  AK 保存位置：`1Password` 中 `阿里云 soniscope-local-reader 账户 RAM` 
 

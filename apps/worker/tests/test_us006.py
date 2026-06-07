@@ -38,12 +38,14 @@ def _clean_env() -> None:
     """Clear FC env vars so tests start from a known state."""
     for var in ("OSS_BUCKET", "OSS_REGION", "OSS_ENDPOINT", "WX_APPID",
                 "WX_APP_SECRET", "OPENID_ALLOWLIST", "MAX_UPLOAD_BYTES",
-                "RAM_ROLE_ARN", "ALIYUN_AK_ID", "ALIYUN_AK_SECRET"):
+                "RAM_ROLE_ARN", "ALIYUN_AK_ID", "ALIYUN_AK_SECRET",
+                "ALIYUN_OSS_AK_ID", "ALIYUN_OSS_AK_SECRET"):
         os.environ.pop(var, None)
     yield
     for var in ("OSS_BUCKET", "OSS_REGION", "OSS_ENDPOINT", "WX_APPID",
                 "WX_APP_SECRET", "OPENID_ALLOWLIST", "MAX_UPLOAD_BYTES",
-                "RAM_ROLE_ARN", "ALIYUN_AK_ID", "ALIYUN_AK_SECRET"):
+                "RAM_ROLE_ARN", "ALIYUN_AK_ID", "ALIYUN_AK_SECRET",
+                "ALIYUN_OSS_AK_ID", "ALIYUN_OSS_AK_SECRET"):
         os.environ.pop(var, None)
 
 
@@ -76,6 +78,28 @@ class TestSharedConfig:
         assert cfg.ram_role_arn == "acs:ram::123:role/test"
         assert cfg.aliyun_ak_id == "test-ak"
         assert cfg.aliyun_ak_secret == "test-as"
+        assert cfg.aliyun_oss_ak_id == "test-ak"
+        assert cfg.aliyun_oss_ak_secret == "test-as"
+
+    def test_optional_oss_credentials_override_headobject_credentials(self) -> None:
+        from shared.config import read_shared_config
+
+        os.environ["OSS_BUCKET"] = "test-bucket"
+        os.environ["OSS_REGION"] = "cn-beijing"
+        os.environ["OSS_ENDPOINT"] = "oss-cn-beijing.aliyuncs.com"
+        os.environ["WX_APPID"] = "wx123"
+        os.environ["WX_APP_SECRET"] = "secret456"
+        os.environ["RAM_ROLE_ARN"] = "acs:ram::123:role/test"
+        os.environ["ALIYUN_AK_ID"] = "sts-only-ak"
+        os.environ["ALIYUN_AK_SECRET"] = "sts-only-secret"
+        os.environ["ALIYUN_OSS_AK_ID"] = "oss-read-ak"
+        os.environ["ALIYUN_OSS_AK_SECRET"] = "oss-read-secret"
+
+        cfg = read_shared_config()
+        assert cfg.aliyun_ak_id == "sts-only-ak"
+        assert cfg.aliyun_ak_secret == "sts-only-secret"
+        assert cfg.aliyun_oss_ak_id == "oss-read-ak"
+        assert cfg.aliyun_oss_ak_secret == "oss-read-secret"
 
     def test_missing_vars_raises_with_list(self) -> None:
         from shared.config import _ConfigError, read_shared_config

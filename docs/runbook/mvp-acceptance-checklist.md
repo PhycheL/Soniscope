@@ -44,6 +44,7 @@ make init-dirs
 - [x] OSS Bucket `soniscope-audio`（`cn-beijing`，ACL private）已按 runbook 人工确认；`make verify-prep` A 块只验证 Worker 运行时所需的 `ListObjects` / `HeadObject` / `GetObject` 访问
 - [x] FC `issue-credential`（`https://issue-cedential-ottfirocds.cn-beijing.fcapp.run`）公网可达
 - [x] FC `verify-upload`（`https://verify-upload-nnjpaoamhw.cn-beijing.fcapp.run`）公网可达
+- [ ] FC `verify-upload` 已配置 `ALIYUN_OSS_AK_ID` / `ALIYUN_OSS_AK_SECRET`，且该 AK 具备 `soniscope-audio/recordings/*` 的 HeadObject/GetObject 只读权限
 - [x] NLS ASR 项目 `soniscope`（AppKey `1k8tqkjQsq65wp2m`）可用
 - [x] 微信小程序 AppID `wx3f973c7297728b0c` 已配置服务器域名白名单
 

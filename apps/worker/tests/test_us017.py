@@ -63,6 +63,15 @@ def _js_syntax_ok(path: Path) -> bool:
     return result.returncode == 0, result.stderr
 
 
+def _run_uploader_node(script: str) -> subprocess.CompletedProcess[str]:
+    """Run a small Node script with uploader.js path as argv[1]."""
+    return subprocess.run(
+        ["node", "-e", textwrap.dedent(script), str(UPLOADER_PATH)],
+        capture_output=True,
+        text=True,
+    )
+
+
 # ── Test: Uploader module structure ──────────────────────────────────────────
 
 class TestUploaderModuleStructure:
@@ -140,6 +149,70 @@ class TestUploaderInternalHelpers:
         content = _read_js(UPLOADER_PATH)
         assert "FC_VERIFY_UPLOAD_URL" in content or "verify-upload" in content
 
+    def test_verify_upload_uses_fresh_wx_login_code(self):
+        content = _read_js(UPLOADER_PATH)
+        pattern = re.compile(
+            r"_ossUploadWithRetry\(record,\s*stsResult,\s*0,\s*function\s*\(ossErr\)\s*\{"
+            r"(?s:.*?)"
+            r"_wxLogin\(function\s*\(verifyCodeErr,\s*verifyCode\)"
+            r"(?s:.*?)"
+            r"_verifyUploadWithRetry\(record,\s*verifyCode,\s*0,"
+        )
+        assert pattern.search(content), (
+            "verify-upload must call wx.login again and use a fresh code; "
+            "wx.login code used by issue-credential cannot be reused"
+        )
+
+    def test_verify_retry_uses_fresh_wx_login_code(self):
+        result = _run_uploader_node(
+            """
+            const uploaderPath = process.argv[1];
+            const originalSetTimeout = global.setTimeout;
+            global.setTimeout = (fn) => fn();
+
+            const seenCodes = [];
+            const retryCodes = ['verify-code-2'];
+            global.wx = {
+              getStorageSync: () => ({}),
+              request: (opts) => {
+                seenCodes.push(opts.data.code);
+                if (seenCodes.length === 1) {
+                  opts.success({
+                    statusCode: 502,
+                    data: { error: 'INTERNAL_ERROR', detail: 'first HeadObject failed' }
+                  });
+                  return;
+                }
+                opts.success({ statusCode: 200, data: { verified: true } });
+              },
+              login: (opts) => opts.success({ code: retryCodes.shift() })
+            };
+            global.getCurrentPages = () => [];
+
+            const uploader = require(uploaderPath);
+            const record = {
+              fragmentId: '20260607T231133_t0wgi7_01KTHA78CJ1YCNSE9S2K00DWBR',
+              size: 52903,
+              audio: { size_bytes: 52903 }
+            };
+
+            uploader._verifyUploadWithRetry(record, 'verify-code-1', 0, (err) => {
+              global.setTimeout = originalSetTimeout;
+              if (err) {
+                console.error('verify should pass after one retry: ' + JSON.stringify(err));
+                process.exit(1);
+              }
+              const expected = JSON.stringify(['verify-code-1', 'verify-code-2']);
+              const actual = JSON.stringify(seenCodes);
+              if (actual !== expected) {
+                console.error('verify retry reused wx.login code: ' + actual);
+                process.exit(1);
+              }
+            });
+            """
+        )
+        assert result.returncode == 0, result.stderr
+
     def test_retry_logic_with_intervals(self):
         content = _read_js(UPLOADER_PATH)
         assert "UPLOAD_MAX_RETRIES" in content
@@ -171,6 +244,49 @@ class TestUploaderInternalHelpers:
         assert "ossMeta" in content
         assert "metaKeys" in content
         assert "x-oss-meta" in content or "ossMeta" in content
+
+    def test_oss_postobject_policy_uses_meta_field_names(self):
+        result = _run_uploader_node(
+            """
+            const uploader = require(process.argv[1]);
+            const form = uploader._buildOssFormData({
+              bucket: 'soniscope-audio',
+              object_key: 'recordings/2026-06-07/test.wav',
+              access_key_id: 'STS.ak',
+              access_key_secret: 'secret',
+              security_token: 'token'
+            }, {
+              ossMeta: {
+                'x-oss-meta-session-id': 'session-1',
+                'x-oss-meta-sha256': 'abc123'
+              }
+            });
+            const policy = JSON.parse(Buffer.from(form.policy, 'base64').toString('utf8'));
+            const hasCondition = (name, value) => policy.conditions.some(
+              (condition) => !Array.isArray(condition) && condition && condition[name] === value
+            );
+            if (form['x-oss-meta-session-id'] !== 'session-1') {
+              console.error('formData missing x-oss-meta-session-id');
+              process.exit(1);
+            }
+            if (!hasCondition('x-oss-meta-session-id', 'session-1')) {
+              console.error('policy missing x-oss-meta-session-id condition: ' + JSON.stringify(policy.conditions));
+              process.exit(1);
+            }
+            if (!hasCondition('x-oss-meta-sha256', 'abc123')) {
+              console.error('policy missing x-oss-meta-sha256 condition: ' + JSON.stringify(policy.conditions));
+              process.exit(1);
+            }
+            const invalidMetaCondition = policy.conditions.some(
+              (condition) => !Array.isArray(condition) && condition && condition.key === 'x-oss-meta-session-id'
+            );
+            if (invalidMetaCondition) {
+              console.error('policy must not use the OSS object key field for metadata conditions');
+              process.exit(1);
+            }
+            """
+        )
+        assert result.returncode == 0, result.stderr
 
     def test_upload_progress_tracking(self):
         content = _read_js(UPLOADER_PATH)
@@ -206,6 +322,21 @@ class TestCryptoHelpers:
     def test_sha1_function_exists(self):
         content = _read_js(UPLOADER_PATH)
         assert "function _sha1Bytes" in content
+
+    def test_hmac_sha1_matches_node_crypto(self):
+        result = _run_uploader_node(
+            """
+            const crypto = require('crypto');
+            const uploader = require(process.argv[1]);
+            const actual = uploader._hmacSha1Base64('abc', 'secret');
+            const expected = crypto.createHmac('sha1', 'secret').update('abc').digest('base64');
+            if (actual !== expected) {
+              console.error('actual=' + actual + ' expected=' + expected);
+              process.exit(1);
+            }
+            """
+        )
+        assert result.returncode == 0, result.stderr
 
 
 # ── Test: app.js integration ─────────────────────────────────────────────────

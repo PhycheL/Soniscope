@@ -78,13 +78,13 @@ def head_object(
 
     signature = base64.b64encode(
         hmac.new(
-            config.aliyun_ak_secret.encode("utf-8"),
+            config.aliyun_oss_ak_secret.encode("utf-8"),
             string_to_sign.encode("utf-8"),
             hashlib.sha1,
         ).digest()
     ).decode("ascii")
 
-    auth_header = f"OSS {config.aliyun_ak_id}:{signature}"
+    auth_header = f"OSS {config.aliyun_oss_ak_id}:{signature}"
 
     logger.debug("oss_headobject_request object_key=%s", object_key)
 

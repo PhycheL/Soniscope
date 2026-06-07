@@ -24,6 +24,8 @@ class SharedConfig(NamedTuple):
     ram_role_arn: str
     aliyun_ak_id: str
     aliyun_ak_secret: str
+    aliyun_oss_ak_id: str
+    aliyun_oss_ak_secret: str
 
 
 # ---------------------------------------------------------------------------
@@ -72,6 +74,13 @@ def read_shared_config() -> SharedConfig:
         ram_role_arn=required["RAM_ROLE_ARN"],
         aliyun_ak_id=required["ALIYUN_AK_ID"],
         aliyun_ak_secret=required["ALIYUN_AK_SECRET"],
+        aliyun_oss_ak_id=(
+            os.environ.get("ALIYUN_OSS_AK_ID", "") or required["ALIYUN_AK_ID"]
+        ),
+        aliyun_oss_ak_secret=(
+            os.environ.get("ALIYUN_OSS_AK_SECRET", "")
+            or required["ALIYUN_AK_SECRET"]
+        ),
     )
 
 

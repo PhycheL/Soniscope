@@ -334,8 +334,10 @@ FC 函数运行时依赖以下环境变量（在 FC 控制台 → 服务配置�
 | `OSS_REGION` | Bucket 所在 region | `cn-beijing` |
 | `OSS_ENDPOINT` | OSS endpoint | `oss-cn-beijing.aliyuncs.com` |
 | `RAM_ROLE_ARN` | STS AssumeRole 的角色 ARN | `acs:ram::1633875501759333:role/soniscope-uploader-role` |
-| `ALIYUN_AK_ID` | FC 子账号 `soniscope-fc` 的 AK ID | — |
-| `ALIYUN_AK_SECRET` | FC 子账号 `soniscope-fc` 的 AK Secret | — |
+| `ALIYUN_AK_ID` | FC 子账号 `soniscope-fc` 的 AK ID；仅用于 `issue-credential` 调 STS AssumeRole | — |
+| `ALIYUN_AK_SECRET` | FC 子账号 `soniscope-fc` 的 AK Secret；仅用于 `issue-credential` 调 STS AssumeRole | — |
+| `ALIYUN_OSS_AK_ID` | OSS 只读 AK ID；`verify-upload` HeadObject 优先使用，生产必须配置 | 可使用 `soniscope-local-reader` 或等价只读子账号 |
+| `ALIYUN_OSS_AK_SECRET` | OSS 只读 AK Secret；`verify-upload` HeadObject 优先使用，生产必须配置 | 未配置时仅为兼容回退到 `ALIYUN_AK_SECRET` |
 | `WX_APPID` | 微信小程序 AppID | — |
 | `WX_APP_SECRET` | 微信小程序 AppSecret | — |
 | `OPENID_ALLOWLIST` | 允许访问的 openid 列表（逗号分隔） | 单用户填 1 个 |

@@ -494,7 +494,7 @@
         <tr><th>③ 云端语音转文字 API</th><td>默认阿里云 NLS 录音文件极速版；AppKey + 调用凭证</td></tr>
         <tr><th>④ 测试音频素材</th><td>4 段标准音频（3 wav + 1 m4a），存于 OSS 私有 bucket，本地 <code class="inline">tests/audio/</code> 经脚本拉取，记录 sha256</td></tr>
         <tr><th>⑤ Worker 运行环境</th><td>任意可跑 Python 3.11+ 的主机；<code class="inline">$SONISCOPE_HOME</code> 工作目录（默认 <code class="inline">~/SoniScope/</code>）</td></tr>
-        <tr><th>⑥ 凭证注入</th><td>FC 环境变量（9 项）+ Worker <code class="inline">~/SoniScope/config.yaml</code>（chmod 600）</td></tr>
+        <tr><th>⑥ 凭证注入</th><td>FC 环境变量（11 项）+ Worker <code class="inline">~/SoniScope/config.yaml</code>（chmod 600）</td></tr>
       </table>
 
       <div class="redlines" style="margin-top: 18px;">
@@ -965,17 +965,19 @@ cd my_soniscope</pre>
       <h2><span class="chip">H</span>凭证注入：FC 环境变量 + Worker config.yaml<span class="state" id="state-block-h"></span></h2>
       <p class="lead">目标：把 A~E 块拿到的所有凭证 / ID / endpoint 注入两个目标位置。<b>明文 AK 一律不进 git</b>。</p>
 
-      <h3 class="step-title">H-1 FC 环境变量（共 9 项）</h3>
+      <h3 class="step-title">H-1 FC 环境变量（共 11 项）</h3>
       <p style="font-size: 13.5px;">FC 3.0 控制台 → 函数列表 → 函数 <code class="inline">issue-credential</code> → <b>配置 → 环境变量</b>。逐项填入。<br>
-      <b>注意</b>：FC 3.0 取消了"服务"层级，<b>没有"服务级共享环境变量"概念</b>，必须在 <code class="inline">verify-upload</code> 函数下<b>再配一份完全相同的 9 项</b>。建议用 <code class="inline">jq</code> 或 s.yaml 模板批量同步，避免手抖漏键。后续 US-003 / US-005 部署脚本会用阿里云 SDK 一次性写入两个函数，无需手工维护。</p>
+      <b>注意</b>：FC 3.0 取消了"服务"层级，<b>没有"服务级共享环境变量"概念</b>，必须在 <code class="inline">verify-upload</code> 函数下<b>再配一份完全相同的 11 项</b>。建议用 <code class="inline">jq</code> 或 s.yaml 模板批量同步，避免手抖漏键。后续 US-003 / US-005 部署脚本会用阿里云 SDK 一次性写入两个函数，无需手工维护。</p>
       <table class="kv">
         <tr><th>Key</th><th>说明 / 取值</th></tr>
         <tr><td><code class="inline">OSS_BUCKET</code></td><td>来自 A 块，固定值 <code class="inline">soniscope-audio</code></td></tr>
         <tr><td><code class="inline">OSS_REGION</code></td><td><code class="inline">cn-beijing</code></td></tr>
         <tr><td><code class="inline">OSS_ENDPOINT</code></td><td><code class="inline">oss-cn-beijing.aliyuncs.com</code></td></tr>
         <tr><td><code class="inline">RAM_ROLE_ARN</code></td><td>B-3 创建的 <code class="inline">soniscope-uploader-role</code> 的 ARN</td></tr>
-        <tr><td><code class="inline">ALIYUN_AK_ID</code></td><td>B-1 创建的 <code class="inline">soniscope-fc</code> 子账号的 AK ID</td></tr>
+        <tr><td><code class="inline">ALIYUN_AK_ID</code></td><td>B-1 创建的 <code class="inline">soniscope-fc</code> 子账号的 AK ID；仅用于 <code class="inline">issue-credential</code> 调 STS AssumeRole</td></tr>
         <tr><td><code class="inline">ALIYUN_AK_SECRET</code></td><td>同上 AK Secret（FC 控制台脱敏显示，可放心填）</td></tr>
+        <tr><td><code class="inline">ALIYUN_OSS_AK_ID</code></td><td>B-2 创建的 <code class="inline">soniscope-local-reader</code> 子账号 AK ID；供 <code class="inline">verify-upload</code> HeadObject 只读校验</td></tr>
+        <tr><td><code class="inline">ALIYUN_OSS_AK_SECRET</code></td><td>同上 AK Secret（只读 OSS 凭证，不要与 STS 凭证混用）</td></tr>
         <tr><td><code class="inline">WX_APPID</code></td><td>D-1 拿到的小程序 AppID</td></tr>
         <tr><td><code class="inline">WX_APP_SECRET</code></td><td>D-1 拿到的 AppSecret</td></tr>
         <tr><td><code class="inline">OPENID_ALLOWLIST</code></td><td>D-4 拿到的真机 openid（单值或逗号分隔多值）</td></tr>
@@ -989,6 +991,8 @@ cd my_soniscope</pre>
   "RAM_ROLE_ARN": "acs:ram::&lt;UID&gt;:role/soniscope-uploader-role",
   "ALIYUN_AK_ID": "&lt;B-1 soniscope-fc 的 AK ID&gt;",
   "ALIYUN_AK_SECRET": "&lt;B-1 soniscope-fc 的 AK Secret&gt;",
+  "ALIYUN_OSS_AK_ID": "&lt;B-2 soniscope-local-reader 的 AK ID&gt;",
+  "ALIYUN_OSS_AK_SECRET": "&lt;B-2 soniscope-local-reader 的 AK Secret&gt;",
   "WX_APPID": "&lt;D-1 小程序 AppID&gt;",
   "WX_APP_SECRET": "&lt;D-1 小程序 AppSecret&gt;",
   "OPENID_ALLOWLIST": "&lt;D-4 真机 openid，多个用英文逗号分隔&gt;"
@@ -1032,13 +1036,13 @@ grep -c '^[a-z]' ~/SoniScope/config.yaml
       <div class="callout danger">
         <span class="title">✗ 红线提醒</span>
         ① <code class="inline">~/SoniScope/config.yaml</code> 必须在 <code class="inline">.gitignore</code> 覆盖范围内（运行时目录默认与代码仓库分离，且 <code class="inline">SONISCOPE_HOME</code> 默认值在 <code class="inline">~/SoniScope/</code>，不在 repo 里）。<br>
-        ② FC 环境变量值在控制台是脱敏显示，但 FC 函数代码访问 <code class="inline">os.environ['ALIYUN_AK_SECRET']</code> 可拿到明文，<b>禁止</b> 在日志中打印完整 Secret，必须遵守"前后 4 位"约定。
+        ② FC 环境变量值在控制台是脱敏显示，但 FC 函数代码访问 <code class="inline">os.environ['ALIYUN_AK_SECRET']</code> / <code class="inline">os.environ['ALIYUN_OSS_AK_SECRET']</code> 可拿到明文，<b>禁止</b> 在日志中打印完整 Secret，必须遵守"前后 4 位"约定。
       </div>
 
       <h3 class="step-title">验收清单</h3>
       <ul class="checklist" data-block="block-h">
-        <li><input type="checkbox" id="h1"><label for="h1">FC 控制台 → <code class="inline">issue-credential</code> → 配置 → 环境变量：能看到 9 个键都已填值（脱敏显示）。</label></li>
-        <li><input type="checkbox" id="h2"><label for="h2"><code class="inline">verify-upload</code> 函数 <b>独立</b>配置了同样 9 个环境变量（FC 3.0 无服务级共享，两份必须各自填全）。</label></li>
+        <li><input type="checkbox" id="h1"><label for="h1">FC 控制台 → <code class="inline">issue-credential</code> → 配置 → 环境变量：能看到 11 个键都已填值（脱敏显示）。</label></li>
+        <li><input type="checkbox" id="h2"><label for="h2"><code class="inline">verify-upload</code> 函数 <b>独立</b>配置了同样 11 个环境变量（FC 3.0 无服务级共享，两份必须各自填全）。</label></li>
         <li><input type="checkbox" id="h3"><label for="h3">Worker 主机：<code class="inline">~/SoniScope/config.yaml</code> 存在，且 <code class="inline">grep -c '^[a-z]' </code> ≥ 8。</label></li>
         <li><input type="checkbox" id="h4"><label for="h4"><code class="inline">ls -la ~/SoniScope/config.yaml</code> 权限为 <code class="inline">-rw-------</code>（chmod 600）。</label></li>
         <li><input type="checkbox" id="h5"><label for="h5"><b>回头确认（US-002 完成后）</b>：跑 <code class="inline">make check-config</code> 输出"所有必填字段已就绪"。</label></li>
@@ -1054,7 +1058,7 @@ grep -c '^[a-z]' ~/SoniScope/config.yaml
       <ol class="steps">
         <li><b>## 阿里云 OSS</b>：Bucket 名 / region / Endpoint / 创建日期</li>
         <li><b>## 阿里云 RAM</b>：两个子账号名 / 角色名 / 角色 ARN / AK 保存位置（如「1Password vault: soniscope」）</li>
-        <li><b>## 阿里云 FC</b>：服务名 / 两个函数名 / 两个 HTTP URL / 9 个环境变量名（<b>只列名字不列值</b>）</li>
+        <li><b>## 阿里云 FC</b>：服务名 / 两个函数名 / 两个 HTTP URL / 11 个环境变量名（<b>只列名字不列值</b>）</li>
         <li><b>## 微信小程序</b>：AppID / AppSecret 保存位置 / 体验者列表 / 自己的 openid</li>
         <li><b>## 云端 ASR 服务</b>：服务商名 / 项目名 / AppKey / API endpoint / 免费额度信息 / 月度成本估算 / 联调基线 JSON 片段</li>
         <li><b>## 测试音频素材</b>：4 个 fixture 文件的相对路径 + sha256 + duration</li>
@@ -1076,7 +1080,7 @@ git status docs/runbook/cloud-setup.md</pre>
         <li><input type="checkbox" id="i2"><label for="i2">8 个章节齐全（OSS / RAM / FC / 小程序 / ASR / 测试音频 / Worker 环境 / 凭证约定）。</label></li>
         <li><input type="checkbox" id="i3"><label for="i3"><code class="inline">grep -E 'LTAI|sk-|aliyun_ak' docs/runbook/cloud-setup.md</code> <b>无匹配</b>（无明文 AK 泄漏）。</label></li>
         <li><input type="checkbox" id="i4"><label for="i4"><code class="inline">git status</code> 显示 runbook 已被跟踪。</label></li>
-        <li><input type="checkbox" id="i5"><label for="i5">FC 9 个环境变量章节中<b>只列 key 名，不列 value</b>。</label></li>
+        <li><input type="checkbox" id="i5"><label for="i5">FC 11 个环境变量章节中<b>只列 key 名，不列 value</b>。</label></li>
         <li><input type="checkbox" id="i6"><label for="i6">ASR 联调基线 JSON 片段已贴入。</label></li>
         <li><input type="checkbox" id="i7"><label for="i7">4 个 fixture 文件的 sha256 已记录。</label></li>
       </ul>

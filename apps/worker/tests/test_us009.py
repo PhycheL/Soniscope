@@ -40,6 +40,7 @@ def _clean_env() -> None:
         "WX_APPID", "WX_APP_SECRET", "OPENID_ALLOWLIST",
         "MAX_UPLOAD_BYTES", "RAM_ROLE_ARN",
         "ALIYUN_AK_ID", "ALIYUN_AK_SECRET",
+        "ALIYUN_OSS_AK_ID", "ALIYUN_OSS_AK_SECRET",
     ):
         os.environ.pop(var, None)
     yield
@@ -48,6 +49,7 @@ def _clean_env() -> None:
         "WX_APPID", "WX_APP_SECRET", "OPENID_ALLOWLIST",
         "MAX_UPLOAD_BYTES", "RAM_ROLE_ARN",
         "ALIYUN_AK_ID", "ALIYUN_AK_SECRET",
+        "ALIYUN_OSS_AK_ID", "ALIYUN_OSS_AK_SECRET",
     ):
         os.environ.pop(var, None)
 
@@ -225,6 +227,37 @@ class TestHeadObject:
             url = call_args[0][0] if call_args[0] else ""
             assert "soniscope-audio.oss-cn-beijing.aliyuncs.com" in url
             assert "recordings/2026-05-26/test.wav" in url
+
+    def test_prefers_oss_readonly_credentials_when_present(self) -> None:
+        """HeadObject should use read-only OSS credentials, not the STS-only AK."""
+        _set_required_env()
+        os.environ["ALIYUN_OSS_AK_ID"] = "oss-read-ak"
+        os.environ["ALIYUN_OSS_AK_SECRET"] = "oss-read-secret"
+
+        from shared.oss import head_object
+
+        mock_resp = mock.MagicMock()
+        mock_resp.__enter__.return_value = mock_resp
+        mock_resp.headers = {
+            "Content-Length": "100",
+            "ETag": '"x"',
+            "Last-Modified": "Thu, 01 Jan 2026 00:00:00 GMT",
+        }
+
+        with mock.patch("shared.oss.urllib_request.Request") as mock_req_class:
+            mock_req = mock.MagicMock()
+            mock_req_class.return_value = mock_req
+
+            with mock.patch("shared.oss.urllib_request.urlopen", return_value=mock_resp):
+                head_object("recordings/2026-05-26/test.wav")
+
+            auth_headers = [
+                call.args[1]
+                for call in mock_req.add_header.call_args_list
+                if call.args and call.args[0] == "Authorization"
+            ]
+            assert auth_headers
+            assert auth_headers[0].startswith("OSS oss-read-ak:")
 
 
 # ---------------------------------------------------------------------------

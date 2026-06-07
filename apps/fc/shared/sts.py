@@ -156,6 +156,7 @@ def _call_assume_role(object_key: str, config: SharedConfig) -> dict:
     policy_json = json.dumps(policy, separators=(",", ":"))
 
     params: dict[str, str] = {
+        "AccessKeyId": config.aliyun_ak_id,
         "Action": "AssumeRole",
         "Format": "JSON",
         "Version": "2015-04-01",

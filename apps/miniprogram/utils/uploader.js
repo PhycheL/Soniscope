@@ -222,7 +222,8 @@ function deleteRecord(fragmentId) {
  *  1. wx.login → get code
  *  2. POST FC /issue-credential → get STS
  *  3. wx.uploadFile → OSS (STS auth + x-oss-meta-* headers)
- *  4. POST FC /verify-upload → verify receipt
+ *  4. wx.login → get a fresh code
+ *  5. POST FC /verify-upload → verify receipt
  *
  * @param {Array} list  — full upload list
  * @param {number} index — index of the record to upload
@@ -270,26 +271,36 @@ function _uploadOne(list, index) {
           return;
         }
 
-        // ── Step 4: POST FC /verify-upload ──
-        _verifyUploadWithRetry(record, code, 0, function (verifyErr) {
-          if (verifyErr) {
-            logger.error('[Uploader] verify failed:', verifyErr);
-            _handleVerifyFailure(list, index, verifyErr.reason || 'VERIFY_FAILED');
+        // ── Step 4: wx.login → get a fresh code for verify-upload ──
+        _wxLogin(function (verifyCodeErr, verifyCode) {
+          if (verifyCodeErr) {
+            logger.error('[Uploader] verify wx.login failed:', verifyCodeErr);
+            _handleVerifyFailure(list, index, 'INVALID_CODE');
             _continueNext(list, index);
             return;
           }
 
-          // ── All steps passed! ──
-          logger.info('[Uploader] upload + verify complete for', record.fragmentId);
-          _updateRecordStatus(list, index, constants.UPLOAD_STATUS.VERIFIED, {
-            verifiedAt: new Date().toISOString()
+          // ── Step 5: POST FC /verify-upload ──
+          _verifyUploadWithRetry(record, verifyCode, 0, function (verifyErr) {
+            if (verifyErr) {
+              logger.error('[Uploader] verify failed:', verifyErr);
+              _handleVerifyFailure(list, index, verifyErr.reason || 'VERIFY_FAILED');
+              _continueNext(list, index);
+              return;
+            }
+
+            // ── All steps passed! ──
+            logger.info('[Uploader] upload + verify complete for', record.fragmentId);
+            _updateRecordStatus(list, index, constants.UPLOAD_STATUS.VERIFIED, {
+              verifiedAt: new Date().toISOString()
+            });
+            _notifyPages(list);
+
+            // AC5/AC6: run auto-cleanup to purge 48h+ verified records
+            cleanup.runAutoCleanup();
+
+            _continueNext(list, index);
           });
-          _notifyPages(list);
-
-          // AC5/AC6: run auto-cleanup to purge 48h+ verified records
-          cleanup.runAutoCleanup();
-
-          _continueNext(list, index);
         });
       });
     });
@@ -501,7 +512,9 @@ function _buildOssFormData(stsResult, record) {
   // Add conditions for each x-oss-meta-* header
   var metaKeys = Object.keys(meta);
   for (var mi = 0; mi < metaKeys.length; mi++) {
-    conditions.push({ key: metaKeys[mi], value: String(meta[metaKeys[mi]]) });
+    var metaCondition = {};
+    metaCondition[metaKeys[mi]] = String(meta[metaKeys[mi]]);
+    conditions.push(metaCondition);
   }
 
   var policyDoc = {
@@ -664,60 +677,73 @@ function _stringToBytes(str) {
  * Pure JS SHA-1 implementation for HMAC.
  */
 function _sha1Bytes(msg) {
-  // SHA-1 constants
-  var H = [0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476, 0xC3D2E1F0];
+  var bytes = msg.slice(0);
+  var msgLenBits = bytes.length * 8;
+  var h0 = 0x67452301;
+  var h1 = 0xEFCDAB89;
+  var h2 = 0x98BADCFE;
+  var h3 = 0x10325476;
+  var h4 = 0xC3D2E1F0;
 
-  // Pre-processing
-  var msgLenBits = msg.length * 8;
-  msg.push(0x80);
+  bytes.push(0x80);
 
-  while ((msg.length % 64) !== 56) {
-    msg.push(0);
+  while ((bytes.length % 64) !== 56) {
+    bytes.push(0);
   }
 
-  // Append length as 64-bit big-endian
-  for (var i = 7; i >= 4; i--) {
-    msg.push(0);
-  }
-  msg.push((msgLenBits >>> 24) & 0xff);
-  msg.push((msgLenBits >>> 16) & 0xff);
-  msg.push((msgLenBits >>> 8) & 0xff);
-  msg.push(msgLenBits & 0xff);
+  var high = Math.floor(msgLenBits / 0x100000000);
+  var low = msgLenBits >>> 0;
+  bytes.push((high >>> 24) & 0xff);
+  bytes.push((high >>> 16) & 0xff);
+  bytes.push((high >>> 8) & 0xff);
+  bytes.push(high & 0xff);
+  bytes.push((low >>> 24) & 0xff);
+  bytes.push((low >>> 16) & 0xff);
+  bytes.push((low >>> 8) & 0xff);
+  bytes.push(low & 0xff);
 
-  // Process each 512-bit block
-  for (var blockStart = 0; blockStart < msg.length; blockStart += 64) {
+  for (var blockStart = 0; blockStart < bytes.length; blockStart += 64) {
     var W = new Array(80);
     for (var t = 0; t < 16; t++) {
-      W[t] = (msg[blockStart + t * 4] << 24) |
-             (msg[blockStart + t * 4 + 1] << 16) |
-             (msg[blockStart + t * 4 + 2] << 8) |
-             msg[blockStart + t * 4 + 3];
+      W[t] = (
+        (bytes[blockStart + t * 4] << 24) |
+        (bytes[blockStart + t * 4 + 1] << 16) |
+        (bytes[blockStart + t * 4 + 2] << 8) |
+        bytes[blockStart + t * 4 + 3]
+      ) >>> 0;
     }
     for (var t = 16; t < 80; t++) {
-      W[t] = _rotl(W[t - 3] ^ W[t - 8] ^ W[t - 14] ^ W[t - 16], 1);
+      W[t] = _rotl(W[t - 3] ^ W[t - 8] ^ W[t - 14] ^ W[t - 16], 1) >>> 0;
     }
 
-    var a = H[0], b = H[1], c = H[2], d = H[3], e = H[4];
+    var a = h0;
+    var b = h1;
+    var c = h2;
+    var d = h3;
+    var e = h4;
 
     for (var t = 0; t < 80; t++) {
-      var temp = (_rotl(a, 5) + _sha1F(t, b, c, d) + e + W[t] + _sha1K(t)) | 0;
+      var temp = _sha1Add(
+        _sha1Add(_rotl(a, 5), _sha1F(t, b, c, d)),
+        _sha1Add(_sha1Add(e, W[t]), _sha1K(t))
+      ) >>> 0;
       e = d;
       d = c;
-      c = _rotl(b, 30);
+      c = _rotl(b, 30) >>> 0;
       b = a;
       a = temp;
     }
 
-    H[0] = (H[0] + a) | 0;
-    H[1] = (H[1] + b) | 0;
-    H[2] = (H[2] + c) | 0;
-    H[3] = (H[3] + d) | 0;
-    H[4] = (H[4] + e) | 0;
+    h0 = _sha1Add(h0, a) >>> 0;
+    h1 = _sha1Add(h1, b) >>> 0;
+    h2 = _sha1Add(h2, c) >>> 0;
+    h3 = _sha1Add(h3, d) >>> 0;
+    h4 = _sha1Add(h4, e) >>> 0;
   }
 
-  // Convert to byte array
   var result = [];
-  for (var i = 0; i < 5; i++) {
+  var H = [h0, h1, h2, h3, h4];
+  for (var i = 0; i < H.length; i++) {
     result.push((H[i] >>> 24) & 0xff);
     result.push((H[i] >>> 16) & 0xff);
     result.push((H[i] >>> 8) & 0xff);
@@ -730,17 +756,23 @@ function _rotl(x, n) {
   return (x << n) | (x >>> (32 - n));
 }
 
+function _sha1Add(x, y) {
+  var lsw = (x & 0xffff) + (y & 0xffff);
+  var msw = (x >>> 16) + (y >>> 16) + (lsw >>> 16);
+  return ((msw & 0xffff) << 16) | (lsw & 0xffff);
+}
+
 function _sha1F(t, b, c, d) {
-  if (t < 20) return (b & c) | (~b & d);
-  if (t < 40) return b ^ c ^ d;
-  if (t < 60) return (b & c) | (b & d) | (c & d);
-  return b ^ c ^ d;
+  if (t < 20) return ((b & c) | (~b & d)) >>> 0;
+  if (t < 40) return (b ^ c ^ d) >>> 0;
+  if (t < 60) return ((b & c) | (b & d) | (c & d)) >>> 0;
+  return (b ^ c ^ d) >>> 0;
 }
 
 function _sha1K(t) {
   if (t < 20) return 0x5A827999;
   if (t < 40) return 0x6ED9EBA1;
-  if (t < 60) return 0x8F1BCDCD;
+  if (t < 60) return 0x8F1BBCDC;
   return 0xCA62C1D6;
 }
 
@@ -756,7 +788,14 @@ function _verifyUploadWithRetry(record, code, attempt, callback) {
   if (attempt > 0) {
     var delay = constants.UPLOAD_RETRY_INTERVALS[attempt - 1] || 45000;
     setTimeout(function () {
-      _doVerifyUpload(record, code, attempt, callback);
+      _wxLogin(function (retryCodeErr, retryCode) {
+        if (retryCodeErr) {
+          logger.error('[Uploader] verify retry wx.login failed:', retryCodeErr);
+          callback({ reason: 'INVALID_CODE' });
+          return;
+        }
+        _doVerifyUpload(record, retryCode, attempt, callback);
+      });
     }, delay);
   } else {
     _doVerifyUpload(record, code, attempt, callback);
@@ -803,12 +842,16 @@ function _doVerifyUpload(record, code, attempt, callback) {
         }
       } else if (res.statusCode >= 500) {
         // 5xx — retry
-        logger.error('[Uploader] verify 5xx, retrying...');
+        var error5xx = (res.data && res.data.error) || 'VERIFY_5XX';
+        var detail5xx = (res.data && res.data.detail) || '';
+        logger.error('[Uploader] verify 5xx, retrying:', res.statusCode, error5xx, detail5xx);
         _verifyUploadWithRetry(record, code, attempt + 1, callback);
       } else if (res.statusCode >= 400) {
         // 4xx auth — don't retry
-        logger.error('[Uploader] verify 4xx, not retrying');
-        callback({ reason: 'VERIFY_4XX' });
+        var error4xx = (res.data && res.data.error) || 'VERIFY_4XX';
+        var detail4xx = (res.data && res.data.detail) || '';
+        logger.error('[Uploader] verify 4xx, not retrying:', res.statusCode, error4xx, detail4xx);
+        callback({ reason: error4xx, detail: detail4xx });
       } else {
         logger.error('[Uploader] verify unexpected status:', res.statusCode);
         _verifyUploadWithRetry(record, code, attempt + 1, callback);
