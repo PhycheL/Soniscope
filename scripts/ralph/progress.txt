@@ -7,7 +7,9 @@
 - mypy/ruff/pytest 配置集中在根 pyproject.toml；mypy 用 files=apps/worker/{src,tests} + mypy_path + explicit_package_bases 适配 src 布局。
 - 运行时数据目录与 repo 分离：$SONISCOPE_HOME（默认 ~/SoniScope），由 paths.py 解析；config.yaml、运行时目录、测试音频二进制均 gitignore，不进 git。
 - 不要“修正”真实云资源里的拼写，尤其 issue-cedential-ottfirocds（少一个 r）。
-- 遗留 scripts/test_asr.py、scripts/fetch_test_fixtures.py 暂不纳入 lint（ruff 只查 apps/），由其归属 story（US-003 等）收口。
+- 遗留 scripts/test_asr.py 暂不纳入 lint（ruff 只查 apps/），由其归属 story 收口。
+- scripts/ 下脚本「收口」模式（US-003 fetch_test_fixtures.py）：可测逻辑抽进 Worker 包（如 soniscope_worker/fixtures.py，自动被 mypy strict + ruff + pytest 覆盖），scripts/ 脚本作薄 CLU/IO 壳（OSS 下载等）复用之；脚本顶部 `sys.path.insert(0, REPO_ROOT/"apps/worker/src")` 后再 `from soniscope_worker... import`（带 `# noqa: E402`），使裸 `python3 scripts/xxx.py`（未装包）也能导入。
+- fixture 校验：sha256 是唯一权威校验源（runbook §6），duration/codec 用 ffprobe 实测做 ±2s/容器编码的辅助校验；期望值数据驱动放 tests/audio/fixtures.manifest.json（duration_seconds 存 sha256 权威文件的实测时长，可能与文件名/runbook 标称值不同）。校验失败统一输出 fixtures.FIX_HINT 指向 runbook 第 6 节。
 - 敏感字段脱敏：用 `MaskedSecret(SecretStr)` 子类重写 `_display()` 显示前后 4 位（`mask_secret`：>8 位显示首尾各 4，≤8 位整体打码）。Pydantic 自动把 str 验证成 MaskedSecret，业务侧用 `.get_secret_value()` 取明文，repr/str/日志只出脱敏摘要。
 - make 命令优先做成 Worker CLI 子命令（typer），Makefile 只 `uv run python -m soniscope_worker <cmd>`；逻辑放 Python 便于 mypy/pytest 覆盖，CLI 失败用 `raise typer.Exit(code=1)` 保证非零退出。
 - 配置加载：`load_config(path=None)` 默认走 `config_path()`，可注入路径便于测试；Pydantic ValidationError 用 `.errors()` 按 `type=="missing"` 汇总，一次性列全缺失字段（dotted loc）。
@@ -47,4 +49,35 @@
   - 陷阱：SecretStr 默认 repr 是全打码 `**********`；要前后 4 位需子类重写 `_display()`，不要直接改 `__repr__`。
   - 上下文：US-003 接手 scripts/fetch_test_fixtures.py（fixture 拉取/校验 sha256+duration+codec），sha256 基线见 AGENTS.md 测试音频表；ruff 仍只查 apps/，该脚本归属 US-003 时再决定是否纳入。
   - 上下文：config 的 transcriber 字段（appkey=1k8tqkjQsq65wp2m、provider=aliyun-nls、api_endpoint=cn-beijing）将被 US-025/US-026 的 Transcriber 工厂与 NLS 实现复用。
+---
+
+## 2026-06-27 01:05 - US-003
+- 实现了什么：测试音频 fixture 拉取与校验脚本（sha256 + ffprobe duration ±2s + codec/容器）。
+  - apps/worker/src/soniscope_worker/fixtures.py（新增，mypy strict + ruff + pytest 覆盖）：
+    Fixture/Manifest/MediaInfo/VerifyResult 数据类；load_manifest()（缺失/非法抛 FixtureError）；
+    sha256_of()（流式）；probe_media()（ffprobe -print_format json，不信任扩展名，ffprobe 缺失/失败抛 FixtureError）；
+    codec_matches()（wav→format 含 wav 或 pcm_*；m4a→format 含 m4a/mp4 或 codec=aac）；
+    verify_fixture()（只读：存在性→sha256→duration ±2s→codec；check_media=False 跳过 ffprobe）；
+    常量 DURATION_TOLERANCE_SECONDS=2.0、FIX_HINT（指向 docs/runbook/cloud-setup.md 第 6 节）。
+  - scripts/fetch_test_fixtures.py（重写为薄壳）：复用 fixtures.py 校验逻辑；保留 OSS 下载（lazy import）；
+    --check 只校验不下载不修改；正常/--force 下载 .part→size+sha256 校验→原子 rename→ffprobe 复校；
+    顶部 sys.path 插入 apps/worker/src，裸 python3 也能 import soniscope_worker.fixtures。
+  - tests/audio/fixtures.manifest.json：duration_seconds 改为 sha256 权威文件的 ffprobe 实测值
+    （20s.wav→24、54s.wav→54、25min.wav→1536、20s.m4a→24），加 _comment_duration 说明与标称值差异以实测为准。
+  - apps/worker/tests/test_fixtures.py（新增 19 用例）：monkeypatch probe_media 打桩 ffprobe，
+    覆盖 manifest 解析/缺失/非法、sha256、codec wav/m4a(aac)/容器/不匹配、duration 容差内外、
+    缺失文件、check_media=False 跳过、FIX_HINT 指向 runbook 第 6 节。
+- 更改的文件：apps/worker/src/soniscope_worker/fixtures.py（新）、scripts/fetch_test_fixtures.py（重写）、
+  tests/audio/fixtures.manifest.json、apps/worker/tests/test_fixtures.py（新）、scripts/ralph/{prd.json,progress.txt}。
+- 验证：make typecheck（mypy 9 文件 0 错）、make lint（ruff apps/ 全过）、make test（38 passed）全部通过；
+  `python3 scripts/fetch_test_fixtures.py --check` 对本地 4 个真实 fixture 全部「校验通过」exit=0
+  （真实 ffprobe + sha256，m4a 经 codec=aac 路径识别通过）。
+- **未来迭代的学习：**
+  - 陷阱：sha256 权威文件实测时长与 AC/runbook 标称值不一致（sample-20s.wav 实为 24.02s、25min 实为 1536s）；
+    sha256 是唯一权威校验源，duration 期望值应以实测值入 manifest，否则 --check 会误判权威文件不合格。
+  - 陷阱：ffprobe format.duration 可能为 None（某些容器只有 stream.duration），probe_media 已回退到流时长并显式 None 兜底，
+    否则 mypy 报 float(Any|None) arg-type。
+  - 上下文：US-004 make verify-prep 的「F 块」fixture 校验可直接复用 soniscope_worker.fixtures.verify_fixture/load_manifest，
+    无需重复实现 sha256/duration/codec 逻辑。
+  - 上下文：scripts/ 脚本要进 pytest，把逻辑放 Worker 包内（testpaths=apps/worker/tests），脚本只留 IO 壳。
 ---
