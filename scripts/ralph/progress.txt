@@ -8,6 +8,10 @@
 - 运行时数据目录与 repo 分离：$SONISCOPE_HOME（默认 ~/SoniScope），由 paths.py 解析；config.yaml、运行时目录、测试音频二进制均 gitignore，不进 git。
 - 不要“修正”真实云资源里的拼写，尤其 issue-cedential-ottfirocds（少一个 r）。
 - 遗留 scripts/test_asr.py、scripts/fetch_test_fixtures.py 暂不纳入 lint（ruff 只查 apps/），由其归属 story（US-003 等）收口。
+- 敏感字段脱敏：用 `MaskedSecret(SecretStr)` 子类重写 `_display()` 显示前后 4 位（`mask_secret`：>8 位显示首尾各 4，≤8 位整体打码）。Pydantic 自动把 str 验证成 MaskedSecret，业务侧用 `.get_secret_value()` 取明文，repr/str/日志只出脱敏摘要。
+- make 命令优先做成 Worker CLI 子命令（typer），Makefile 只 `uv run python -m soniscope_worker <cmd>`；逻辑放 Python 便于 mypy/pytest 覆盖，CLI 失败用 `raise typer.Exit(code=1)` 保证非零退出。
+- 配置加载：`load_config(path=None)` 默认走 `config_path()`，可注入路径便于测试；Pydantic ValidationError 用 `.errors()` 按 `type=="missing"` 汇总，一次性列全缺失字段（dotted loc）。
+- mypy strict 下测试夹具参数用 `Mapping[str, object]`（covariant），不要用裸 `dict`/`dict[str, object]`（invariant 会报 arg-type）。
 
 ---
 
@@ -27,4 +31,20 @@
   - 陷阱：`ruff check .` 会扫到遗留 scripts/test_asr.py 报 E501 等 12 个错；本仓库 lint 故意只查 apps/，新代码放 apps/ 下即纳入检查。
   - 上下文：US-002 接手 config.py（Pydantic v2 schema + 脱敏加载 + 缺失字段一次列全）、check-config、init-dirs，并在 worker 依赖里加 pydantic/pyyaml；make target 命名见 tech-spec §6.5。
   - 上下文：mypy 用 strict，新增模块需完整类型注解；typer 命令函数返回 None 要显式标注。
+---
+
+## 2026-06-27 00:42 - US-002
+- 实现了什么：配置 schema、脱敏加载器与运行时目录初始化。
+  - config.py：Pydantic v2 schema（OSSConfig/PollConfig/TranscriberConfig/LocalConfig/SoniScopeConfig），覆盖 AC 列出的全部字段（含 transcriber.upload_mode、local.enabled）。`MaskedSecret(SecretStr)` 对 access_key_secret/appkey 脱敏（前后 4 位）。`load_config()` 文件缺失/非映射/字段缺失均抛 ConfigError；缺失字段一次性列全。`config_permission_is_600()` 权限检查。`masked_summary()` 输出脱敏摘要。
+  - paths.py：新增 inbox_failed_dir()、runtime_dirs()、init_runtime_dirs()（幂等创建 inbox/、inbox/failed/、fragments/、tmp/）。
+  - cli.py：新增 check-config（校验→脱敏摘要→600 权限警告，失败 exit 1）与 init-dirs 子命令。
+  - Makefile：check-config / init-dirs 改为调用 `uv run python -m soniscope_worker <cmd>`。
+  - 依赖：apps/worker 加 pydantic>=2、pyyaml>=6；根 dev 组加 types-pyyaml。
+  - 测试：apps/worker/tests/test_config.py（19 个用例，含 mask、schema 覆盖、脱敏不泄漏、缺失字段全列、权限、幂等目录、CLI 成功/失败/init-dirs）。
+- 更改的文件：apps/worker/pyproject.toml、pyproject.toml、apps/worker/src/soniscope_worker/{config,paths,cli}.py、Makefile、apps/worker/tests/test_config.py、uv.lock、scripts/ralph/prd.json（US-002 passes=true）。
+- 验证：make typecheck（mypy 7 文件 0 错）、make lint（ruff 全过）、make test（19 passed）全部通过；手动用临时 SONISCOPE_HOME + config.yaml 跑 `check-config`（644 权限正确告警、密钥脱敏为 ossS...CDEF）与 `init-dirs`（四目录创建）通过。
+- **未来迭代的学习：**
+  - 陷阱：SecretStr 默认 repr 是全打码 `**********`；要前后 4 位需子类重写 `_display()`，不要直接改 `__repr__`。
+  - 上下文：US-003 接手 scripts/fetch_test_fixtures.py（fixture 拉取/校验 sha256+duration+codec），sha256 基线见 AGENTS.md 测试音频表；ruff 仍只查 apps/，该脚本归属 US-003 时再决定是否纳入。
+  - 上下文：config 的 transcriber 字段（appkey=1k8tqkjQsq65wp2m、provider=aliyun-nls、api_endpoint=cn-beijing）将被 US-025/US-026 的 Transcriber 工厂与 NLS 实现复用。
 ---

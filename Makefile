@@ -13,11 +13,11 @@ help: ## 显示可用命令
 install: ## 安装所有 Python 依赖并生成 lock 文件（uv workspace）
 	uv sync
 
-check-config: ## 读取 config.yaml → 打印脱敏摘要 → 校验必填字段（完整实现见 US-002）
-	@echo "check-config: 完整配置校验将在 US-002 实现"
+check-config: ## 读取 config.yaml → 校验必填字段 → 打印脱敏摘要 → 检查 600 权限
+	uv run python -m soniscope_worker check-config
 
-init-dirs: ## 在 \$$SONISCOPE_HOME 下创建 inbox/ fragments/ tmp/（完整实现见 US-002）
-	@echo "init-dirs: 运行时目录初始化将在 US-002 实现"
+init-dirs: ## 在 \$$SONISCOPE_HOME 下幂等创建 inbox/ inbox/failed/ fragments/ tmp/
+	uv run python -m soniscope_worker init-dirs
 
 worker-run: ## 启动 Worker 主轮询
 	uv run python -m soniscope_worker run
