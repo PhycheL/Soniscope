@@ -243,3 +243,21 @@
   - 上下文：STS region 取 env.oss_region（cn-beijing），STS endpoint=sts.<region>.aliyuncs.com，与 verify_prep._assume_role_single_key 一致；mypy override 已含 alibabacloud_sts20150401.* / alibabacloud_tea_openapi.*（US-004 已加），lazy import 函数返回 Any 即可。
   - 上下文：US-009（verify-upload HeadObject）将需 ALIYUN_AK_ID/SECRET（HeadObject 凭证），可仿 load_sts_env 加 verify-upload 专属 loader；不要把这些塞进共享 DEFAULT_REQUIRED_VARS。
 ---
+
+## 2026-06-27 05:10 - US-008
+- 实现了什么：issue-credential 云端联调与 STS 安全反例脚本 `make test-fc-live`（tech-spec §4.1/§4.4，AGENTS「单元测试 mock 云端，真实调用进 live target」）。沿用 verify_prep 的「纯断言逻辑 + IO Protocol」模式。
+  - apps/worker/src/soniscope_worker/fc_live.py（新增，mypy strict + ruff + pytest 全覆盖）：
+    · 纯断言逻辑（无 IO，直接单测）：assert_status_error（401 INVALID_CODE / 403 OPENID_NOT_ALLOWED + 拒绝响应里若混入 7 个 STS 字段判 FAIL 的安全检查，AC#2/#3）、assert_credential_complete（200 + 7 字段齐全非空，只展示 object_key 绝不展示 secret/token，AC#4）、assert_size_exceeded（400 SIZE_EXCEEDED + limit_bytes/actual_bytes，AC#8）、assert_escape_op（复用 verify_prep.is_denied 判定越权 AccessDenied / 过期 ExpiredToken，AC#5/#6/#7）、parse_issued_credential、other_recordings_key（越权目标 key）、make_fragment_id（合法 <YYYYMMDDTHHMMSS>_<device>_<26 ULID>）。
+    · 编排 run_checks/_run_credential_path/all_passed/format_report：A 伪造 code→401；B allowlist 外 code→403（无 code 则 SKIP）；C-H allowlist 内 code→签发 STS→5 个越权/过期反例（put 其他 key / get / list / delete / 过期 put）；I size=60MB→SIZE_EXCEEDED（无 code 则 SKIP）。code 一次性，缺失场景 SKIP；ProbeError 收敛为单项 FAIL；报告绝不打印 AK Secret / SecurityToken。
+    · IO 注入点 FcLiveProbes Protocol：call_issue_credential（urllib POST FC_ISSUE_URL）+ oss_escape_ops（复用 verify_prep._import_oss/_oss_sts_client/_run_oss_op/_seconds_until_expiry，STS 临时凭证带 security_token 跑反例，--skip-expiry 跳过 ≥900s 等待）。RealFcLiveProbes 构造无副作用、调用才触网，缺 SDK/不可达抛 ProbeError。
+  - cli.py：新增 test-fc-live 子命令（--code / --code-not-allowed / --size-code / --skip-expiry，lazy import，typer.Exit(code)）。
+  - Makefile：新增 test-fc-live target（CODE= CODE_NOT_ALLOWED= SIZE_CODE= SKIP_EXPIRY=1 透传）+ .PHONY。
+  - apps/worker/tests/test_fc_live.py（新增 26 用例）：FakeProbes 注入全程不触网，覆盖每个 assert_* pass/fail、STS 字段泄漏检测、code 缺失 SKIP、--skip-expiry 时过期反例 SKIP、FC 不可达/探针错误收敛 FAIL、报告无 secret 明文、退出码、CLI skip-only exit0 / 失败 exit1、fragment_id 正则与唯一性。
+  - 修复：上一轮遗留的 test_run_checks_skip_expiry 用 `"过期" in r.name` 过滤过期反例，但 expired_put 展示名按 AC#7 措辞为「等待超过 STS 有效期上限后 PutObject」（含「超过」非「过期」），导致空匹配 FAIL；改为按 ESCAPE_OPS 中 expired_put 的 display 精确定位，保持展示名与 AC 一致不改。
+- 更改的文件：apps/worker/src/soniscope_worker/{fc_live.py(新),cli.py}、Makefile、apps/worker/tests/test_fc_live.py(新)、scripts/ralph/{prd.json,progress.txt}。
+- 验证：make typecheck（mypy 27 文件 0 错）、make lint（ruff apps/ 全过）、make test（220 passed，+26）全部通过；CLI --help 显示 test-fc-live。
+  未跑：真实 `make deploy-fc FUNCTION=issue-credential` + `make test-fc-live CODE=…`（需真实 DevTools wx.login 一次性 code + ALIYUN_AK + AssumeRole 触网 + 过期反例 ≥900s 等待，本沙箱不具备）。AC#1 部署后 curl 存活复用 US-005 deploy_one；AC#9 看日志复用 `make fc-logs FUNCTION=issue-credential`，本模块不重复实现。
+- **未来迭代的学习：**
+  - live target 模式：FC live 联调脚本复用 verify_prep 的 OSS STS 反例工具（_import_oss/_oss_sts_client/_run_oss_op/_seconds_until_expiry/is_denied），不重复实现；wx.login code 一次性，每个场景（成功/403/SIZE）各需独立 code，缺失即 SKIP 而非 FAIL，使无 code 的本地 CI 也能 exit 0。
+  - 陷阱：越权/过期反例的展示名要与 AC 措辞一致（AC#7 是「等待超过…有效期上限」），测试里别用脆弱的子串（如「过期」）去匹配展示名；用 ESCAPE_OPS 的 (name, display) 元组精确定位。
+  - 上下文：US-009（verify-upload HeadObject）落地后，US-010 的 make test-verify-upload 可仿本处 FcLiveProbes 模式：纯断言逻辑 + HTTP/OSS Probe 注入；verify_prep 的 check_fc / check_sts_escape 在 issue-credential 真实部署+live 验证后可接到真实签发转绿。

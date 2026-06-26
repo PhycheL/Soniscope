@@ -110,3 +110,33 @@ def fc_logs(
     for line in lines:
         typer.echo(line, err=code != 0)
     raise typer.Exit(code=code)
+
+
+@app.command(name="test-fc-live")
+def test_fc_live(
+    code: str = typer.Option(
+        "", "--code", help="allowlist 内的一次性 wx.login code（成功 + STS 反例）"
+    ),
+    code_not_allowed: str = typer.Option(
+        "", "--code-not-allowed", help="真实但不在 allowlist 的一次性 code（403 路径）"
+    ),
+    size_code: str = typer.Option(
+        "", "--size-code", help="用于 size 超限场景的一次性 code（SIZE_EXCEEDED）"
+    ),
+    skip_expiry: bool = typer.Option(
+        False, "--skip-expiry", help="跳过过期反例（避免等待 >= 900s）"
+    ),
+) -> None:
+    """issue-credential 云端联调与 STS 安全反例（伪造 code / allowlist / 越权 / 过期 / size）。"""
+    from soniscope_worker.fc_live import LiveOptions, run_test_fc_live
+
+    opts = LiveOptions(
+        allow_code=code,
+        not_allowed_code=code_not_allowed,
+        size_code=size_code,
+        check_expiry=not skip_expiry,
+    )
+    lines, exit_code = run_test_fc_live(opts)
+    for line in lines:
+        typer.echo(line, err=exit_code != 0)
+    raise typer.Exit(code=exit_code)

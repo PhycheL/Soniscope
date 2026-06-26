@@ -4,7 +4,7 @@
 # worker-run / typecheck / lint / test；check-config 与 init-dirs 的完整逻辑在 US-002 实现。
 
 .PHONY: install check-config init-dirs verify-prep worker-run \
-	deploy-fc rollback-fc fc-logs typecheck lint test help
+	deploy-fc rollback-fc fc-logs test-fc-live typecheck lint test help
 .DEFAULT_GOAL := help
 
 help: ## 显示可用命令
@@ -34,6 +34,13 @@ rollback-fc: ## 从最新备份回滚 FC 函数（FUNCTION=<name>）
 
 fc-logs: ## 拉取近 1 小时 FC 日志（FUNCTION=<name>）
 	uv run python -m soniscope_worker fc-logs --function $(FUNCTION)
+
+test-fc-live: ## issue-credential 云端联调（CODE= CODE_NOT_ALLOWED= SIZE_CODE= SKIP_EXPIRY=1）
+	uv run python -m soniscope_worker test-fc-live \
+		$(if $(strip $(CODE)),--code $(CODE),) \
+		$(if $(strip $(CODE_NOT_ALLOWED)),--code-not-allowed $(CODE_NOT_ALLOWED),) \
+		$(if $(strip $(SIZE_CODE)),--size-code $(SIZE_CODE),) \
+		$(if $(strip $(SKIP_EXPIRY)),--skip-expiry,)
 
 typecheck: ## mypy strict 类型检查
 	uv run mypy
