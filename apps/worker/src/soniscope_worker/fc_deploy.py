@@ -43,6 +43,9 @@ LOG_LOOKBACK_HOURS = 1.0
 # 打包时排除的目录 / 文件名片段。
 EXCLUDE_DIR_NAMES = frozenset({"__pycache__"})
 EXCLUDE_SUFFIXES = (".pyc", ".pyo")
+# FC 共享模块（US-006）：随每个函数代码一起 vendoring 到包根，使两函数都能 import fc_shared。
+SHARED_PARENT = ("apps", "fc", "shared")  # 含 fc_shared 包
+SHARED_PACKAGE = "fc_shared"
 
 
 class FcDeployError(Exception):
@@ -180,6 +183,16 @@ def log_path(build_root: Path, timestamp: str) -> Path:
     return build_root / "logs" / f"deploy-{timestamp}.log"
 
 
+def _vendor_shared(repo_root: Path, staging: Path) -> None:
+    """把 ``apps/fc/shared/fc_shared`` vendoring 到函数包根（US-006）。
+
+    使部署后的函数能 ``import fc_shared``。共享包不存在时静默跳过（便于单测用临时仓库）。
+    """
+    shared_pkg = repo_root.joinpath(*SHARED_PARENT) / SHARED_PACKAGE
+    if shared_pkg.is_dir():
+        _copy_tree(shared_pkg, staging / SHARED_PACKAGE)
+
+
 def package_function(repo_root: Path, function: str, build_root: Path, api: FcApi) -> PackageResult:
     """打包单个函数代码及运行依赖到 ``build/fc/<function_name>/`` 与同名 zip。"""
     name = source_dir_name(function)
@@ -191,6 +204,7 @@ def package_function(repo_root: Path, function: str, build_root: Path, api: FcAp
         shutil.rmtree(staging)
     staging.mkdir(parents=True)
     _copy_tree(src, staging)
+    _vendor_shared(repo_root, staging)
     reqs = read_requirements(src / "requirements.txt")
     if reqs:
         api.install_deps(staging, reqs)

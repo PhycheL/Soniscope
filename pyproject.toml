@@ -27,8 +27,10 @@ soniscope-worker = { workspace = true }
 [tool.mypy]
 strict = true
 python_version = "3.11"
-files = ["apps/worker/src", "apps/worker/tests"]
-mypy_path = ["apps/worker/src"]
+# FC 共享模块 fc_shared（US-006）纳入 strict 检查；FC 函数 handler.py（apps/fc/<fn>/）
+# 仍只受 ruff 检查（两个 handler.py 同名，避免 mypy 模块名冲突，沿用 US-005 约定）。
+files = ["apps/worker/src", "apps/worker/tests", "apps/fc/shared", "apps/fc/tests"]
+mypy_path = ["apps/worker/src", "apps/fc/shared"]
 explicit_package_bases = true
 
 # 云 SDK 为可选运行时依赖（lazy import，无类型 stub），verify-prep 等真实探针用到。
@@ -45,10 +47,12 @@ ignore_missing_imports = true
 [tool.ruff]
 target-version = "py311"
 line-length = 100
-src = ["apps/worker/src", "apps/worker/tests"]
+src = ["apps/worker/src", "apps/worker/tests", "apps/fc/shared", "apps/fc/tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
 
 [tool.pytest.ini_options]
-testpaths = ["apps/worker/tests"]
+testpaths = ["apps/worker/tests", "apps/fc/tests"]
+# fc_shared 不作为已安装包，加入 sys.path 供 apps/fc/tests 导入。
+pythonpath = ["apps/fc/shared"]
