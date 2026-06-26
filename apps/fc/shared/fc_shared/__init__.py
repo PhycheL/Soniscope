@@ -9,41 +9,80 @@
 
 from __future__ import annotations
 
+from . import sts
 from .audit import hash_openid, is_sensitive, log_event
 from .auth import AuthContext, authorize_request, check_allowlist
-from .env import DEFAULT_REQUIRED_VARS, FcEnv, load_env, parse_allowlist
+from .env import (
+    DEFAULT_MAX_UPLOAD_BYTES,
+    DEFAULT_REQUIRED_VARS,
+    ISSUE_CREDENTIAL_REQUIRED_VARS,
+    FcEnv,
+    StsEnv,
+    load_env,
+    load_sts_env,
+    parse_allowlist,
+)
 from .errors import (
     INVALID_CODE,
     INVALID_REQUEST,
     OPENID_NOT_ALLOWED,
     SERVER_MISCONFIGURED,
+    SIZE_EXCEEDED,
+    STS_ISSUE_FAILED,
     FcConfigError,
     FcHttpError,
 )
 from .http import error_response, json_response, read_json_body, require_fields, status_line
+from .sts import (
+    STS_MAX_DURATION_SECONDS,
+    StsCredential,
+    StsIssuer,
+    check_size,
+    credential_response,
+    get_issuer,
+    object_key_for,
+    parse_size,
+    single_key_policy,
+)
 from .wechat import code_to_openid
 
 __all__ = [
+    "DEFAULT_MAX_UPLOAD_BYTES",
     "DEFAULT_REQUIRED_VARS",
     "INVALID_CODE",
     "INVALID_REQUEST",
+    "ISSUE_CREDENTIAL_REQUIRED_VARS",
     "OPENID_NOT_ALLOWED",
     "SERVER_MISCONFIGURED",
+    "SIZE_EXCEEDED",
+    "STS_ISSUE_FAILED",
+    "STS_MAX_DURATION_SECONDS",
     "AuthContext",
     "FcConfigError",
     "FcEnv",
     "FcHttpError",
+    "StsCredential",
+    "StsEnv",
+    "StsIssuer",
     "authorize_request",
     "check_allowlist",
+    "check_size",
     "code_to_openid",
+    "credential_response",
     "error_response",
+    "get_issuer",
     "hash_openid",
     "is_sensitive",
     "json_response",
     "load_env",
+    "load_sts_env",
     "log_event",
+    "object_key_for",
     "parse_allowlist",
+    "parse_size",
     "read_json_body",
     "require_fields",
+    "single_key_policy",
     "status_line",
+    "sts",
 ]

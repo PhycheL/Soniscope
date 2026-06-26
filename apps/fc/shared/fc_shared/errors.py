@@ -13,7 +13,9 @@ from collections.abc import Iterable
 INVALID_CODE = "INVALID_CODE"  # 401：jscode2session 换 openid 失败
 OPENID_NOT_ALLOWED = "OPENID_NOT_ALLOWED"  # 403：openid 不在 allowlist
 INVALID_REQUEST = "INVALID_REQUEST"  # 400：JSON 解析失败 / 非对象 / 字段缺失
+SIZE_EXCEEDED = "SIZE_EXCEEDED"  # 400：size 超过 MAX_UPLOAD_BYTES（US-007）
 SERVER_MISCONFIGURED = "SERVER_MISCONFIGURED"  # 500：缺必填运行时环境变量
+STS_ISSUE_FAILED = "STS_ISSUE_FAILED"  # 500：AssumeRole 签发 STS 失败（不泄漏明文，US-007）
 
 
 class FcHttpError(Exception):

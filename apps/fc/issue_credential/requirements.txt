@@ -1,5 +1,4 @@
-# issue-credential 运行依赖（US-005 基线占位）。
-# 真实依赖在 US-006 / US-007 补全，例如：
-#   alibabacloud-sts20150401
-#   alibabacloud-oss-v2
-# 当前占位处理器无第三方依赖；deploy-fc 打包时遇到非注释行才会安装运行依赖。
+# issue-credential 运行依赖（US-007：STS AssumeRole 单 object key 签发）。
+# deploy-fc 打包时对非注释行执行 install_deps，随函数代码一起打包。
+alibabacloud-sts20150401
+alibabacloud-tea-openapi

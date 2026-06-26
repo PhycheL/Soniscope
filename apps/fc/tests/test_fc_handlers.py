@@ -32,6 +32,9 @@ HANDLERS = [
     ("issue-credential", "issue_credential", "size"),
     ("verify-upload", "verify_upload", "expected_size"),
 ]
+# 仍返回占位 "authorized" 响应的 handler（issue-credential 自 US-007 起改为签发 STS，
+# 其鉴权通过路径在 test_issue_credential.py 专项覆盖）。
+PLACEHOLDER_HANDLERS = [h for h in HANDLERS if h[0] != "issue-credential"]
 
 
 def _load_handler(source_dir: str) -> ModuleType:
@@ -129,7 +132,7 @@ def test_handler_not_in_allowlist_is_403(
     assert payload["error"] == fc_shared.OPENID_NOT_ALLOWED
 
 
-@pytest.mark.parametrize(("function", "source_dir", "field"), HANDLERS)
+@pytest.mark.parametrize(("function", "source_dir", "field"), PLACEHOLDER_HANDLERS)
 def test_handler_authorized_path(
     function: str, source_dir: str, field: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:

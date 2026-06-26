@@ -22,6 +22,17 @@ DEFAULT_REQUIRED_VARS: tuple[str, ...] = (
     "OPENID_ALLOWLIST",
 )
 
+# tech-spec §4.0 / §4.1：issue-credential 额外依赖的 STS AssumeRole 运行时变量。
+# verify-upload 不需要这些，故不放入共享 DEFAULT_REQUIRED_VARS。
+ISSUE_CREDENTIAL_REQUIRED_VARS: tuple[str, ...] = (
+    "RAM_ROLE_ARN",
+    "ALIYUN_AK_ID",
+    "ALIYUN_AK_SECRET",
+)
+
+# tech-spec §4.0：MAX_UPLOAD_BYTES 可选，缺失 / 非法时回退默认 50 MB。
+DEFAULT_MAX_UPLOAD_BYTES = 52428800
+
 
 @dataclass(frozen=True)
 class FcEnv:
@@ -33,6 +44,50 @@ class FcEnv:
     wx_appid: str
     wx_app_secret: str
     openid_allowlist: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class StsEnv:
+    """issue-credential 的 STS AssumeRole 运行时配置。
+
+    ``ak_id`` / ``ak_secret`` 是 FC 子账号长期凭证，仅供内部调用 AssumeRole，
+    绝不进日志（见 ``audit.is_sensitive`` 兜底）。
+    """
+
+    ram_role_arn: str
+    ak_id: str
+    ak_secret: str
+    max_upload_bytes: int
+
+
+def _parse_max_upload_bytes(raw: str) -> int:
+    """解析 MAX_UPLOAD_BYTES；缺失 / 非正整数时回退默认值。"""
+    text = raw.strip()
+    if not text:
+        return DEFAULT_MAX_UPLOAD_BYTES
+    try:
+        value = int(text)
+    except ValueError:
+        return DEFAULT_MAX_UPLOAD_BYTES
+    return value if value > 0 else DEFAULT_MAX_UPLOAD_BYTES
+
+
+def load_sts_env(
+    source: Mapping[str, str] | None = None,
+    *,
+    required: Sequence[str] = ISSUE_CREDENTIAL_REQUIRED_VARS,
+) -> StsEnv:
+    """加载 issue-credential STS 专属环境变量；缺必填变量抛 FcConfigError。"""
+    env = os.environ if source is None else source
+    missing = [name for name in required if not str(env.get(name, "")).strip()]
+    if missing:
+        raise FcConfigError(missing)
+    return StsEnv(
+        ram_role_arn=str(env.get("RAM_ROLE_ARN", "")).strip(),
+        ak_id=str(env.get("ALIYUN_AK_ID", "")).strip(),
+        ak_secret=str(env.get("ALIYUN_AK_SECRET", "")).strip(),
+        max_upload_bytes=_parse_max_upload_bytes(str(env.get("MAX_UPLOAD_BYTES", ""))),
+    )
 
 
 def parse_allowlist(value: str) -> tuple[str, ...]:
