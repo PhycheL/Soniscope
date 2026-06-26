@@ -200,3 +200,25 @@
     （非注释行会触发 package_function → api.install_deps 用 uv pip install --target 装进暂存目录一起打包）。
   - oss-delete-obj（US-010 首交付）/ show-oss-object（US-017 首交付）不属于 US-005，未实现。
 ---
+
+## 2026-06-27 03:30 - US-006
+- 实现了什么：FC 两个顶级 Web 函数（issue-credential / verify-upload）复用的共享鉴权 / 请求校验 / 安全日志模块 fc_shared，并把两个 handler.py 占位接入该模块。
+  - apps/fc/shared/fc_shared/（新增包，mypy strict + ruff + pytest 全覆盖）：
+    · errors.py：稳定错误码 INVALID_CODE(401)/OPENID_NOT_ALLOWED(403)/INVALID_REQUEST(400)/SERVER_MISCONFIGURED(500)；FcHttpError(status+error_code+安全 payload，绝不含敏感值)、FcConfigError(只列缺失变量名)。
+    · env.py：DEFAULT_REQUIRED_VARS=OSS_BUCKET/OSS_REGION/OSS_ENDPOINT/WX_APPID/WX_APP_SECRET/OPENID_ALLOWLIST；load_env() 缺失一次列全（AC#3）；FcEnv frozen dataclass；parse_allowlist() 逗号分隔去空白去空项（AC#2）。
+    · http.py：read_json_body（空/非法 JSON/非对象→400 INVALID_REQUEST，AC#5）、require_fields（缺字段/空串→400，0 视为存在）、json_response/error_response/status_line。
+    · wechat.py：code_to_openid 调 jscode2session，任意失败（网络/errcode/缺 openid）统一 401 INVALID_CODE，不泄漏 code/secret/session_key（AC#1）；HTTP 拉取经 fetch 注入便于单测。
+    · auth.py：authorize_request 编排「解析体→require_fields(含 code)→换 openid→check_allowlist」；不在 allowlist→403 OPENID_NOT_ALLOWED（AC#2）；返回 AuthContext(openid、openid_hash、body)。
+    · audit.py：hash_openid（sha256 前 16）、is_sensitive（显式名 + 子串兜底 secret/token/appkey/api_key/session_key/password）、log_event（敏感字段 ***REDACTED***、None 省略、按名排序，print 到 stdout 供 FC 采集，AC#4）。
+  - apps/fc/issue_credential/handler.py、apps/fc/verify_upload/handler.py：从 US-005 占位改为 import fc_shared；GET=存活探针，POST=load_env→authorize_request→脱敏 log_event；FcConfigError→500、FcHttpError→error_response；鉴权通过后返回占位（STS 签发=US-007、HeadObject=US-009）。
+  - fc_deploy.py：package_function 新增 _vendor_shared，把 apps/fc/shared/fc_shared vendoring 到每个函数包根（部署后两函数都能 import fc_shared，AC#6）；共享包不存在时静默跳过（兼容单测临时仓库）。
+  - pyproject.toml：mypy files/mypy_path、ruff src、pytest testpaths 加入 apps/fc/shared + apps/fc/tests；pytest pythonpath=apps/fc/shared 使 fc_shared 可被导入（非安装包）。
+  - apps/fc/tests/test_fc_shared.py（26 用例）+ test_fc_handlers.py（12 用例，importlib 动态加载两 handler 参数化验证存活/500/400/403/200 五路径，并断言 mod.fc_shared is fc_shared）。
+- 更改的文件：apps/fc/shared/fc_shared/{__init__,errors,env,http,wechat,auth,audit}.py(新)、apps/fc/{issue_credential,verify_upload}/handler.py、apps/worker/src/soniscope_worker/fc_deploy.py、pyproject.toml、apps/fc/tests/{test_fc_shared,test_fc_handlers}.py(新)、scripts/ralph/{prd.json,progress.txt}。
+- 验证：make typecheck（mypy 22 文件 0 错）、make lint（ruff apps/ 全过）、make test（148 passed，+38）全部通过。未跑：真实云端（微信 jscode2session 需真实 AppSecret+code，OSS/STS 在 US-007/009 接入）。
+- **未来迭代的学习：**
+  - 两个 FC handler.py 文件同名，mypy 会模块名冲突——故 mypy files 只纳入 apps/fc/shared（fc_shared 包），不纳入 apps/fc/<fn>/handler.py；handler 仅受 ruff 检查 + pytest 用 importlib 以唯一模块名（fc_handler_<dir>）动态加载验证。
+  - fc_shared 不是安装包，pytest 用 pyproject [tool.pytest.ini_options] pythonpath=["apps/fc/shared"] 让测试能 import fc_shared；部署时由 fc_deploy._vendor_shared vendoring 进函数包根（不走 pip/uv）。
+  - US-007（issue-credential STS 签发）：在 handler 鉴权通过分支替换占位，复用 ctx.body 的 fragment_id/size + env 的 OSS_BUCKET/OSS_REGION；MAX_UPLOAD_BYTES/RAM_ROLE_ARN 等需新增 env 变量（按需扩展 load_env required 或单独读取）。US-009（verify-upload HeadObject）同理替换其占位分支。
+  - 安全红线已落实：FcHttpError.payload 只含开发者自定义安全文案；audit.log_event 对 code/session_key/AK Secret/SecurityToken 强制脱敏（即便调用方误传）；env/config 缺失只列变量名不列值。新增 FC 逻辑沿用 log_event 记日志即自动脱敏。
+---
