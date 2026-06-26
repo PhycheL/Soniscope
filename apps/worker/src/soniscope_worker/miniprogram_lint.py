@@ -184,8 +184,11 @@ def run_checks(root: Path) -> list[LintIssue]:
                 json.loads(text)
             except json.JSONDecodeError as exc:
                 issues.append(_issue(root, file, f"JSON 解析失败：{exc.msg}"))
-        for finding in scan_hardcoded_secrets(str(file), text):
-            issues.append(_issue(root, file, finding))
+        # 单测夹具（test/）会刻意使用假密钥字面量验证脱敏 / 上传链路，豁免硬编码密钥扫描；
+        # 生产源码（utils/ pages/ app.js 等）仍严格扫描。
+        if "test" not in file.relative_to(root).parts:
+            for finding in scan_hardcoded_secrets(str(file), text):
+                issues.append(_issue(root, file, finding))
 
     return issues
 

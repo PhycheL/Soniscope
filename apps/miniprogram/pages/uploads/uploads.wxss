@@ -27,3 +27,13 @@
   font-size: 26rpx;
   color: #1a73e8;
 }
+
+.item-progress {
+  font-size: 24rpx;
+  color: #1a73e8;
+}
+
+.item-error {
+  font-size: 22rpx;
+  color: #d93025;
+}

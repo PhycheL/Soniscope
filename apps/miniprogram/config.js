@@ -11,6 +11,9 @@ const FC_ISSUE_CREDENTIAL_URL = 'https://issue-cedential-ottfirocds.cn-beijing.f
 const FC_VERIFY_UPLOAD_URL = 'https://verify-upload-nnjpaoamhw.cn-beijing.fcapp.run'
 const OSS_UPLOAD_URL = 'https://soniscope-audio.oss-cn-beijing.aliyuncs.com'
 
+// OSS region（OSS V4 PostObject 表单签名所需，US-017）。与 runbook 登记一致。
+const OSS_REGION = 'cn-beijing'
+
 // request 合法域名（两条，FC 3.0 每函数子域名独立，白名单不支持通配符）
 const REQUEST_LEGAL_DOMAINS = [FC_ISSUE_CREDENTIAL_URL, FC_VERIFY_UPLOAD_URL]
 // uploadFile 合法域名
@@ -29,6 +32,7 @@ module.exports = {
   FC_ISSUE_CREDENTIAL_URL,
   FC_VERIFY_UPLOAD_URL,
   OSS_UPLOAD_URL,
+  OSS_REGION,
   REQUEST_LEGAL_DOMAINS,
   UPLOAD_LEGAL_DOMAINS,
   CHUNK_MAX_DURATION_SECONDS,

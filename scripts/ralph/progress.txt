@@ -458,3 +458,73 @@
   - 长录音确认态复用单草稿 UI：_buildSessionDraft 产出 is_long/chunk_total/session_id/聚合总时长 + 最后一片 temp_file_path（供试听）；真实分片记录始终以 this._session.chunks 为权威（含 Date 类型 recordedAt），draft 仅作展示，避免 setData 序列化 Date 问题。onTapSaveUpload 多片分支读 this._session.chunks 而非 draft。
   - 测试模拟分片：Page 集成测试调 inst._maybeRotateChunk(600) 触发 stop，再 recorder.handlers.stop(res) 走分片边界路由 → addChunk + _startNextChunk（recorder.start++）；最终 inst.onTapRecord() 触发 _stopRecording 收尾。每次 _startTimer 起真实 setInterval，最终停止后已 _clearTimer，无需额外 onUnload，但测试结尾仍 onUnload 兜底防事件循环挂起（沿用 US-013/014 陷阱）。
 ---
+
+## 2026-06-27 14:00 - US-017
+- 实现了什么：小程序上传队列、静默登录、获取单文件 STS 与 OSS 直传（tech-spec §3.2/§4.1），
+  以及 make show-oss-object（US-017 首交付）与 make test-sts-escape（AC#8）。沿用「纯函数 utils + Page 薄壳」
+  与「纯逻辑 + IO 注入 Probe」分层。
+  - apps/miniprogram/utils/sha256.js：重构出 hashWords 内核，新增 sha256Bytes（32 字节 digest）/ bytesToHex /
+    导出 toBytes，供 HMAC 复用；sha256Hex 行为不变。
+  - apps/miniprogram/utils/hmac.js（新，纯函数）：hmacSha256/hmacSha256Hex（复用 sha256Bytes 内核）+ base64Encode
+    （微信无 btoa，纯实现）。已对照 node:crypto 标准向量与随机字节校验。
+  - apps/miniprogram/utils/oss_sign.js（新，纯函数）：buildPostObjectForm —— OSS V4 PostObject 表单签名
+    （OSS4-HMAC-SHA256，policy base64 + 派生签名密钥链 aliyun_v4→date→region→oss→aliyun_v4_request）。
+    注入 now 确定性产出；object_key 用 FC 返回值（AC#4），全部 x-oss-meta-* 进表单条件与字段（AC#5）。
+    签名已与独立 node:crypto V4 计算逐字节对照一致。
+  - apps/miniprogram/utils/upload_queue.js：补全 tech-spec §6.7 八状态常量与中文文案（pending_verify=待 verify、
+    manual_retry=待人工重传、upload_failed=上传失败、verified=上传成功、manual_verify=待人工 verify）；
+    新增 updateQueueItem（按 fragmentId 不可变更新，自动同步 statusText）。八态全量渲染/折叠仍属 US-019。
+  - apps/miniprogram/utils/uploader.js（新，纯逻辑 + 注入 deps）：classifyFcResponse（200+7 字段→凭证；非 200→
+    取 body.error 稳定错误码，AC#3）、RETRY_DELAYS_MS=[5s,15s,45s]/MAX=3、uploadFragment 编排——
+    onStatus(uploading)→login→requestSts→FC 非 200 立即待人工重传记错误码（AC#1/#3）→buildPostObjectForm→
+    uploadFile 带进度回调，OSS 非 2xx/网络错误按退避重试最多 3 次（共 4 次尝试）仍失败→待人工重传，
+    2xx→待 verify（AC#6/#7）。绝不打印 secret/token（仅记 object_key/状态/错误码）。
+  - apps/miniprogram/config.js：新增 OSS_REGION='cn-beijing'（V4 签名所需）。
+  - apps/miniprogram/pages/uploads/uploads.js：onShow 自动驱动 queued 项上传——_processQueue（_processing 锁防并发、
+    wx.getNetworkType 离线则跳过保持 queued）→ _uploadOne 构造真实 wx 适配器（wx.login/wx.request POST
+    FC_ISSUE_CREDENTIAL_URL/wx.uploadFile OSS_UPLOAD_URL + onProgressUpdate）交给 uploader.uploadFragment；
+    onStatus/onProgress 即时 updateQueueItem 落盘 + setData。uploads.wxml/wxss 增加进度% 与红色错误码展示。
+  - apps/worker/src/soniscope_worker/oss_admin.py：OssObjectStore 协议新增 head_object；ObjectStat dataclass
+    （exists/size/etag/last_modified/metadata）+ RealOssObjectStore.head_object（404→不存在，读 metadata 用户元数据）
+    + _is_not_found + format_object_stat + run_show_oss_object（存在/不存在均 exit 0；非法 id/缺依赖/HeadObject 异常 exit 1）。
+  - apps/worker/src/soniscope_worker/sts_escape.py（新，make test-sts-escape）：assert_escape_denied（纯，复用
+    verify_prep.is_denied）+ StsEscapeProbes Protocol + RealStsEscapeProbes（无 CODE 时用部署凭证 AssumeRole 单 key
+    签发「等价测试凭证」，有 CODE 时走 FC issue-credential）→ put_object 越权写另一个 key → 断言 AccessDenied。
+    缺凭证 SKIP（本地 exit 0），真实环境跑真实反例。复用 fc_live.IssuedCredential/other_recordings_key/make_fragment_id。
+  - cli.py：新增 show-oss-object（--fragment-id）+ test-sts-escape（--code 可选）。
+  - Makefile：新增 show-oss-object（FRAGMENT_ID=）+ test-sts-escape（CODE= 可选）target + .PHONY。
+  - miniprogram_lint.py：硬编码密钥扫描豁免 test/ 目录（单测夹具刻意用假密钥验证脱敏/上传链路；生产源码仍严扫）。
+  - 测试：apps/miniprogram/test/{oss_sign.test.js(8),uploader.test.js(13)}（node --test，对照 node:crypto）；
+    apps/worker/tests/{test_oss_admin.py(+10 head/show),test_sts_escape.py(新 10)}。
+- 更改的文件：apps/miniprogram/utils/{sha256,hmac(新),oss_sign(新),upload_queue,uploader(新)}.js、
+  apps/miniprogram/config.js、apps/miniprogram/pages/uploads/{uploads.js,uploads.wxml,uploads.wxss}、
+  apps/miniprogram/test/{oss_sign,uploader}.test.js(新)、
+  apps/worker/src/soniscope_worker/{oss_admin,sts_escape(新),cli,miniprogram_lint}.py、Makefile、
+  apps/worker/tests/{test_oss_admin,test_sts_escape(新)}.py、scripts/ralph/{prd.json,progress.txt}。
+- 验证：make typecheck（mypy 41 文件 0 错）、make lint（ruff apps/ 全过 + miniprogram lint passed）、
+  make test（327 passed，+16）全部通过；node --test 全量 60/60（含 +21 新：8 oss_sign + 13 uploader）；
+  CLI --help 显示两命令；test-sts-escape 无凭证优雅 SKIP exit 0。OSS V4 签名已与 node:crypto 独立计算逐字节对照一致。
+  未跑：微信开发者工具录 5 秒保存上传 + make show-oss-object 核对 size（AC#10 真机/模拟器项，需真实 config.yaml
+  + 触网 OSS）；真实 FC 部署后 wx.login code 联调；真实 test-sts-escape（需部署 AK + OSS SDK 触网）——本沙箱不具备，
+  需人工在 DevTools/真机 + 部署主机复验。
+- **未来迭代的学习：**
+  - OSS 直传走「PostObject 表单上传」而非 PUT：wx.uploadFile 只能 POST multipart/form-data，故用 OSS V4
+    PostObject（policy + OSS4-HMAC-SHA256 签名），不是带 Authorization 头的 PUT。表单字段在 oss_sign.buildPostObjectForm
+    统一产出（key/policy/x-oss-signature-version/x-oss-credential/x-oss-date/x-oss-security-token/x-oss-signature/
+    success_action_status + 全部 x-oss-meta-*），喂给 wx.uploadFile 的 formData。HMAC-SHA256 纯 JS 复用 sha256 内核。
+  - 签名正确性已用 node:crypto 独立重算 V4 链对照（test/oss_sign.test.js）；本沙箱无真实 OSS，真机首次直传若 403
+    多半是 region/时间/policy 条件不匹配，按 oss_sign 的条件逐项核对。
+  - uploads 页 _processQueue 用 _processing 锁防并发：onShow 会触发一次未 await 的 _processQueue（持锁），
+    测试里若再显式 await _processQueue() 会因持锁早返回而拿到中间态——测试应直接 await 单次 _processQueue()，
+    不要叠加 onShow()（沿用 US-013/014 的 Page harness：global.Page 捕获 + delete require.cache + setData 浅合并）。
+  - 错误码语义（AC#3）：FC 非 200 立即 待人工重传（4xx 鉴权/配额/参数不重试，AGENTS 错误处理表）；OSS 非 2xx/网络
+    才走 5s/15s/45s 退避（最多 3 次，共 4 次尝试）。uploader 把这两类区分开：requestSts 失败/分类失败→manual_retry，
+    uploadFile 失败→退避循环。
+  - show-oss-object（US-017 首交付）扩展了 oss_admin.OssObjectStore 协议加 head_object，所有实现/Fake 必须同步加
+    （test_oss_admin.FakeStore 已加，否则 mypy 结构化协议报缺方法）；US-029 verify-oss-retention/list-oss-objects 可复用
+    RealOssObjectStore + object_key_for，不重复实现。
+  - test-sts-escape 默认用部署凭证 AssumeRole 单 key 出「等价测试凭证」（无需一次性 wx.login code，部署主机可常态跑），
+    传 CODE= 才走 FC 真实链路；与 fc_live 的越权反例共用 verify_prep._oss_sts_client/_run_oss_op/is_denied。
+  - miniprogram_lint 硬编码密钥扫描已豁免 test/ 目录：单测需用 access_key_secret/security_token 等真实字段名构造夹具，
+    生产源码（utils/pages/app.js）仍严扫；新增小程序单测放 test/ 下即可用假密钥。
+---

@@ -5,6 +5,7 @@
 
 .PHONY: install check-config init-dirs verify-prep worker-run \
 	deploy-fc rollback-fc fc-logs test-fc-live test-verify-upload oss-delete-obj \
+	show-oss-object test-sts-escape \
 	lint-miniprogram typecheck lint test help
 .DEFAULT_GOAL := help
 
@@ -52,6 +53,13 @@ test-verify-upload: ## verify-upload 云端闭环（VERIFIED_CODE= NOT_FOUND_COD
 oss-delete-obj: ## 【仅测试用】删除 OSS 对象构造缺失场景（FRAGMENT_ID=<id> YES=1 或 SONISCOPE_ALLOW_OSS_DELETE=1）
 	uv run python -m soniscope_worker oss-delete-obj --fragment-id $(FRAGMENT_ID) \
 		$(if $(strip $(YES)),--yes,)
+
+show-oss-object: ## 查看 OSS 对象详情（FRAGMENT_ID=<id>：存在性/size/etag/last_modified/元数据）
+	uv run python -m soniscope_worker show-oss-object --fragment-id $(FRAGMENT_ID)
+
+test-sts-escape: ## STS 单 key 越权验证：写其他 key 必须 AccessDenied（CODE= 可选走 FC）
+	uv run python -m soniscope_worker test-sts-escape \
+		$(if $(strip $(CODE)),--code $(CODE),)
 
 typecheck: ## mypy strict 类型检查
 	uv run mypy

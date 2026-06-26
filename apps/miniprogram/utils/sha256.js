@@ -62,8 +62,8 @@ function toBytes(input) {
   throw new TypeError('sha256: unsupported input type')
 }
 
-// 计算 SHA-256，返回小写 hex 字符串（64 字符）。
-function sha256Hex(input) {
+// 计算 SHA-256，返回 8 个 32-bit 字（内部用）。
+function hashWords(input) {
   const bytes = toBytes(input)
   const h = [
     0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
@@ -131,9 +131,41 @@ function sha256Hex(input) {
     h[6] = (h[6] + g) | 0
     h[7] = (h[7] + hh) | 0
   }
-  return h.map(toHex8).join('')
+  return h
+}
+
+// 计算 SHA-256，返回小写 hex 字符串（64 字符）。
+function sha256Hex(input) {
+  return hashWords(input).map(toHex8).join('')
+}
+
+// 计算 SHA-256，返回 32 字节 Uint8Array（HMAC / 签名用）。
+function sha256Bytes(input) {
+  const h = hashWords(input)
+  const out = new Uint8Array(32)
+  for (let i = 0; i < 8; i++) {
+    const x = h[i] >>> 0
+    out[i * 4] = (x >>> 24) & 0xff
+    out[i * 4 + 1] = (x >>> 16) & 0xff
+    out[i * 4 + 2] = (x >>> 8) & 0xff
+    out[i * 4 + 3] = x & 0xff
+  }
+  return out
+}
+
+// 字节数组 → 小写 hex 字符串。
+function bytesToHex(bytes) {
+  const b = toBytes(bytes)
+  let s = ''
+  for (let i = 0; i < b.length; i++) {
+    s += b[i].toString(16).padStart(2, '0')
+  }
+  return s
 }
 
 module.exports = {
   sha256Hex: sha256Hex,
+  sha256Bytes: sha256Bytes,
+  bytesToHex: bytesToHex,
+  toBytes: toBytes,
 }

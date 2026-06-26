@@ -5,22 +5,35 @@ from __future__ import annotations
 import pytest
 
 from soniscope_worker.oss_admin import (
+    ObjectStat,
     OssAdminError,
     delete_allowed,
+    format_object_stat,
     object_key_for,
     run_oss_delete_obj,
+    run_show_oss_object,
 )
 
 VALID_FID = "20260526T144800_dev01_01HZX3K8MN5PQR9TFB7AYWVCDE"
+VALID_KEY = f"recordings/2026-05-26/{VALID_FID}.wav"
 
 
 class FakeStore:
     """记录 put/delete 调用的内存 OSS store。"""
 
-    def __init__(self, *, fail_delete: bool = False) -> None:
+    def __init__(
+        self,
+        *,
+        fail_delete: bool = False,
+        head: ObjectStat | None = None,
+        fail_head: bool = False,
+    ) -> None:
         self.put_calls: list[tuple[str, bytes]] = []
         self.delete_calls: list[str] = []
+        self.head_calls: list[str] = []
         self._fail_delete = fail_delete
+        self._head = head
+        self._fail_head = fail_head
 
     def put_object(self, key: str, body: bytes) -> None:
         self.put_calls.append((key, body))
@@ -29,6 +42,14 @@ class FakeStore:
         if self._fail_delete:
             raise RuntimeError("boom")
         self.delete_calls.append(key)
+
+    def head_object(self, key: str) -> ObjectStat:
+        self.head_calls.append(key)
+        if self._fail_head:
+            raise RuntimeError("boom-head")
+        if self._head is not None:
+            return self._head
+        return ObjectStat(key=key, exists=False)
 
 
 # ── object_key_for ──────────────────────────────────────────────────────────
@@ -112,3 +133,68 @@ def test_delete_obj_store_error_is_contained() -> None:
     assert any("删除" in ln and "失败" in ln for ln in lines)
     # 不泄漏异常细节明文（只含类名）。
     assert all("boom" not in ln for ln in lines)
+
+
+# ── format_object_stat ──────────────────────────────────────────────────────
+def test_format_object_stat_exists_with_metadata() -> None:
+    stat = ObjectStat(
+        key=VALID_KEY,
+        exists=True,
+        size=4096,
+        etag='"abc"',
+        last_modified="2026-05-26T14:48:30Z",
+        metadata={"x-oss-meta-sha256": "deadbeef", "x-oss-meta-chunk-seq": "1"},
+    )
+    lines = format_object_stat(stat)
+    joined = "\n".join(lines)
+    assert "对象存在" in joined
+    assert "4096" in joined
+    assert "x-oss-meta-sha256: deadbeef" in joined
+    assert "x-oss-meta-chunk-seq: 1" in joined
+
+
+def test_format_object_stat_missing() -> None:
+    lines = format_object_stat(ObjectStat(key=VALID_KEY, exists=False))
+    assert any("对象不存在" in ln for ln in lines)
+
+
+# ── run_show_oss_object 入口（US-017 AC#9）──────────────────────────────────
+def test_show_oss_object_exists() -> None:
+    head = ObjectStat(
+        key=VALID_KEY,
+        exists=True,
+        size=4096,
+        etag='"abc"',
+        last_modified="2026-05-26T14:48:30Z",
+        metadata={"x-oss-meta-sha256": "deadbeef"},
+    )
+    store = FakeStore(head=head)
+    lines, code = run_show_oss_object(VALID_FID, store=store)
+    assert code == 0
+    assert store.head_calls == [VALID_KEY]
+    assert any("对象存在" in ln for ln in lines)
+    assert any("4096" in ln for ln in lines)
+    assert any("x-oss-meta-sha256: deadbeef" in ln for ln in lines)
+
+
+def test_show_oss_object_missing_is_exit0() -> None:
+    store = FakeStore(head=ObjectStat(key=VALID_KEY, exists=False))
+    lines, code = run_show_oss_object(VALID_FID, store=store)
+    assert code == 0
+    assert any("对象不存在" in ln for ln in lines)
+
+
+def test_show_oss_object_invalid_fragment_id() -> None:
+    store = FakeStore()
+    lines, code = run_show_oss_object("bad-id", store=store)
+    assert code == 1
+    assert store.head_calls == []
+    assert any("FAIL" in ln for ln in lines)
+
+
+def test_show_oss_object_head_error_is_contained() -> None:
+    store = FakeStore(fail_head=True)
+    lines, code = run_show_oss_object(VALID_FID, store=store)
+    assert code == 1
+    assert any("HeadObject" in ln and "失败" in ln for ln in lines)
+    assert all("boom-head" not in ln for ln in lines)

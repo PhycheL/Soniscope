@@ -6,6 +6,8 @@
     <view wx:for="{{items}}" wx:key="fragmentId" class="item">
       <text class="item-id">{{item.fragmentId}}</text>
       <text class="item-status">{{item.statusText}}</text>
+      <text wx:if="{{item.status === 'uploading'}}" class="item-progress">{{item.progress || 0}}%</text>
+      <text wx:if="{{item.errorCode}}" class="item-error">{{item.errorCode}}</text>
     </view>
   </view>
 </view>

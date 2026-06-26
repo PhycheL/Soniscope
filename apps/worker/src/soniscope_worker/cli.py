@@ -193,6 +193,38 @@ def test_verify_upload(
     raise typer.Exit(code=exit_code)
 
 
+@app.command(name="show-oss-object")
+def show_oss_object(
+    fragment_id: str = typer.Option("", "--fragment-id", help="目标 fragment_id"),
+) -> None:
+    """查看单个 OSS 对象详情（存在性 / size / etag / last_modified / 用户自定义元数据，US-017）。"""
+    from soniscope_worker.oss_admin import run_show_oss_object
+
+    if not fragment_id.strip():
+        typer.echo("缺少 --fragment-id（make show-oss-object FRAGMENT_ID=<id>）", err=True)
+        raise typer.Exit(code=1)
+    lines, code = run_show_oss_object(fragment_id)
+    for line in lines:
+        typer.echo(line, err=code != 0)
+    raise typer.Exit(code=code)
+
+
+@app.command(name="test-sts-escape")
+def test_sts_escape(
+    code: str = typer.Option(
+        "", "--code", help="可选：allowlist 内一次性 wx.login code（走 FC 真实签发）"
+    ),
+) -> None:
+    """STS 单 key 越权验证：用单文件 STS 写其他 key 必须被 OSS 拒（AccessDenied，US-017）。"""
+    from soniscope_worker.sts_escape import StsEscapeOptions, run_test_sts_escape
+
+    opts = StsEscapeOptions(code=code)
+    lines, exit_code = run_test_sts_escape(opts)
+    for line in lines:
+        typer.echo(line, err=exit_code != 0)
+    raise typer.Exit(code=exit_code)
+
+
 @app.command(name="lint-miniprogram")
 def lint_miniprogram() -> None:
     """对 apps/miniprogram 做静态检查（配置/域名/页面/无硬编码密钥，US-011）。"""

@@ -14,6 +14,7 @@ from __future__ import annotations
 import datetime
 import re
 from collections.abc import Mapping
+from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 from soniscope_worker.config import ConfigError, config_path, load_config
@@ -54,16 +55,59 @@ def delete_allowed(*, confirmed: bool, env: Mapping[str, str]) -> bool:
     return confirmed or env.get(TEST_ONLY_DELETE_ENV, "") == "1"
 
 
-class OssObjectStore(Protocol):
-    """OSS put / delete 的注入点（单测用 Fake 替换）。
+def _is_not_found(exc: BaseException) -> bool:
+    """从 OSS 异常判定 404 / NoSuchKey（对象不存在）。"""
+    for attr in ("status_code", "statusCode", "code", "error_code", "Code"):
+        val = getattr(exc, attr, None)
+        if val in (404, "404", "NoSuchKey", "NoSuchObject"):
+            return True
+    text = str(exc)
+    return "NoSuchKey" in text or "404" in text or "NoSuchObject" in text
 
-    本期只需 put（构造测试对象）+ delete（仅测试用，构造对象缺失场景）；
-    show-oss-object 等 HeadObject 读取能力由 US-017 / US-029 扩展。
+
+def format_object_stat(stat: ObjectStat) -> list[str]:
+    """渲染 show-oss-object 输出（绝不打印 AK Secret）。"""
+    if not stat.exists:
+        return [f"对象不存在：{stat.key}", "（尚未上传，或 fragment_id 对应的对象已被删除）"]
+    lines = [
+        f"✅ 对象存在：{stat.key}",
+        f"  size          : {stat.size}",
+        f"  etag          : {stat.etag}",
+        f"  last_modified : {stat.last_modified}",
+    ]
+    if stat.metadata:
+        lines.append("  用户自定义元数据：")
+        for k in sorted(stat.metadata):
+            lines.append(f"    {k}: {stat.metadata[k]}")
+    else:
+        lines.append("  用户自定义元数据：（无）")
+    return lines
+
+
+@dataclass(frozen=True)
+class ObjectStat:
+    """HeadObject 读回的对象详情（show-oss-object 输出，US-017 AC#9）。"""
+
+    key: str
+    exists: bool
+    size: int | None = None
+    etag: str = ""
+    last_modified: str = ""
+    metadata: Mapping[str, str] = field(default_factory=dict)
+
+
+class OssObjectStore(Protocol):
+    """OSS put / delete / head 的注入点（单测用 Fake 替换）。
+
+    put（构造测试对象）+ delete（仅测试用，构造对象缺失场景）+ head_object
+    （show-oss-object 读取对象存在性 / size / etag / last_modified / 用户自定义元数据，US-017）。
     """
 
     def put_object(self, key: str, body: bytes) -> None: ...
 
     def delete_object(self, key: str) -> None: ...
+
+    def head_object(self, key: str) -> ObjectStat: ...
 
 
 # ── 真实实现（lazy import OSS SDK；用 config.yaml 的 OSS AK）─────────────────
@@ -105,6 +149,26 @@ class RealOssObjectStore:
         client = self._client()
         client.delete_object(oss.DeleteObjectRequest(bucket=self._bucket, key=key))
 
+    def head_object(self, key: str) -> ObjectStat:
+        oss = self._oss or self._import()
+        client = self._client()
+        try:
+            result = client.head_object(oss.HeadObjectRequest(bucket=self._bucket, key=key))
+        except Exception as exc:  # noqa: BLE001 - 404 → 不存在，其余上抛由入口收敛
+            if _is_not_found(exc):
+                return ObjectStat(key=key, exists=False)
+            raise
+        raw_meta = getattr(result, "metadata", None) or {}
+        metadata = {str(k): str(v) for k, v in dict(raw_meta).items()}
+        return ObjectStat(
+            key=key,
+            exists=True,
+            size=int(getattr(result, "content_length", 0) or 0),
+            etag=str(getattr(result, "etag", "") or ""),
+            last_modified=str(getattr(result, "last_modified", "") or ""),
+            metadata=metadata,
+        )
+
     def _import(self) -> Any:
         from soniscope_worker.verify_prep import _import_oss
 
@@ -145,4 +209,34 @@ def run_oss_delete_obj(
         lines.append(f"FAIL — 删除 {key} 失败：{type(exc).__name__}")
         return lines, 1
     lines.append(f"✅ 已删除 OSS 对象：{key}")
+    return lines, 0
+
+
+# ── show-oss-object 入口（US-017 首交付，US-029 复用）───────────────────────
+def run_show_oss_object(
+    fragment_id: str,
+    *,
+    store: OssObjectStore | None = None,
+) -> tuple[list[str], int]:
+    """由 ``fragment_id`` 推导 object key 并 HeadObject 输出对象详情。返回（输出行, 退出码）。
+
+    对象存在 → exit 0；对象不存在 → exit 0（输出「对象不存在」，便于脚本判断而非报错）；
+    非法 fragment_id / 缺依赖 / HeadObject 异常 → exit 1。绝不打印 AK Secret 明文。
+    """
+    lines: list[str] = []
+    try:
+        key = object_key_for(fragment_id)
+    except OssAdminError as exc:
+        return [f"FAIL — {exc}"], 1
+    used = store
+    if used is None:
+        try:
+            used = RealOssObjectStore()
+        except OssAdminError as exc:
+            return [f"FAIL — {exc}"], 1
+    try:
+        stat = used.head_object(key)
+    except Exception as exc:  # noqa: BLE001 - 收敛为单项 fail，不泄漏明文
+        return [f"FAIL — HeadObject {key} 失败：{type(exc).__name__}"], 1
+    lines.extend(format_object_stat(stat))
     return lines, 0
