@@ -3,6 +3,7 @@
 
 const config = require('./config')
 const { createLogger } = require('./utils/logger')
+const { ensureDeviceShortId } = require('./utils/device')
 
 const logger = createLogger('app')
 
@@ -11,7 +12,10 @@ App({
     env: config.ENV,
   },
   onLaunch() {
-    logger.info('app launched', { env: config.ENV })
+    // US-015 AC#1：首次启动生成并持久化 device_short_id（4-8 字符），冷启动保持不变。
+    const deviceShortId = ensureDeviceShortId(wx)
+    this.globalData.deviceShortId = deviceShortId
+    logger.info('app launched', { env: config.ENV, deviceShortId: deviceShortId })
   },
   onError(err) {
     logger.error('app error', err)

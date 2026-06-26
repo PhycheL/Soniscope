@@ -90,6 +90,16 @@ function previewFragmentId(recordedAt) {
   return fragmentTimestamp(recordedAt) + '_pending_pending'
 }
 
+// fragment_id 正则（与 FC fc_shared/sts.py 的 _FRAGMENT_ID_RE 保持一致）：
+// <YYYYMMDDTHHMMSS>_<deviceShortId 4-8>_<ULID 26>。
+const FRAGMENT_ID_RE =
+  /^\d{4}\d{2}\d{2}T\d{6}_[A-Za-z0-9]{4,8}_[0-9A-Za-z]{26}$/
+
+// US-015 正式 fragment_id：<本地时间前缀>_<deviceShortId>_<ULID>（ULID 由调用方生成，保证唯一）。
+function buildFragmentId(recordedAt, deviceShortId, ulidStr) {
+  return fragmentTimestamp(recordedAt) + '_' + deviceShortId + '_' + ulidStr
+}
+
 // object key 预览：recordings/<YYYY-MM-DD>/<fragment_id>.wav（始终 .wav 目标扩展名）。
 function buildObjectKeyPreview(fragmentId, recordedAt) {
   return 'recordings/' + objectKeyDate(recordedAt) + '/' + fragmentId + OSS_OBJECT_KEY_EXT
@@ -114,7 +124,53 @@ function buildDraftManifest(opts) {
   }
 }
 
+// US-015 上传前 manifest 草案：在草稿确认（保存并上传）时补齐正式 fragment_id / session_id /
+// chunk_seq / chunk_total / upload.original_sha256，供 OSS 直传与 Worker HeadObject 读回（tech-spec §3.3）。
+// chunk_total：非分片单条录音为 null（manifest 语义；OSS meta 侧映射为 0，见 buildOssMetadata）。
+function buildUploadManifestDraft(opts) {
+  const recordedAt = opts.recordedAt
+  const fragmentId = opts.fragmentId
+  const chunkTotal =
+    opts.chunkTotal === undefined || opts.chunkTotal === null ? null : opts.chunkTotal
+  return {
+    fragment_id: fragmentId,
+    session_id: String(opts.sessionId || ''),
+    chunk_seq: Number(opts.chunkSeq) || 1,
+    chunk_total: chunkTotal,
+    device_id: String(opts.deviceShortId || ''),
+    recorded_at: toIso(recordedAt),
+    duration_seconds: Number(opts.durationSeconds) || 0,
+    audio: {
+      original_format: opts.originalFormat || 'unknown',
+      size_bytes: Number(opts.sizeBytes) || 0,
+    },
+    upload: {
+      original_sha256: String(opts.originalSha256 || ''),
+    },
+    object_key: buildObjectKeyPreview(fragmentId, recordedAt),
+    temp_file_path: String(opts.tempFilePath || ''),
+  }
+}
+
+// US-015 AC#6：从 manifest 草案派生 OSS 用户自定义元数据（tech-spec §3.2）。
+// 非分片 chunk_total 在 OSS meta 中写 0（manifest 内为 null）。
+function buildOssMetadata(manifest) {
+  const audio = (manifest && manifest.audio) || {}
+  const upload = (manifest && manifest.upload) || {}
+  const chunkTotal = manifest.chunk_total == null ? 0 : manifest.chunk_total
+  return {
+    'x-oss-meta-session-id': String(manifest.session_id || ''),
+    'x-oss-meta-chunk-seq': String(manifest.chunk_seq),
+    'x-oss-meta-chunk-total': String(chunkTotal),
+    'x-oss-meta-recorded-at': String(manifest.recorded_at || ''),
+    'x-oss-meta-duration': String(manifest.duration_seconds),
+    'x-oss-meta-original-format': String(audio.original_format || ''),
+    'x-oss-meta-sha256': String(upload.original_sha256 || ''),
+  }
+}
+
 module.exports = {
+  FRAGMENT_ID_RE: FRAGMENT_ID_RE,
   formatDuration: formatDuration,
   extensionOf: extensionOf,
   detectOriginalFormat: detectOriginalFormat,
@@ -122,5 +178,8 @@ module.exports = {
   fragmentTimestamp: fragmentTimestamp,
   toIso: toIso,
   buildObjectKeyPreview: buildObjectKeyPreview,
+  buildFragmentId: buildFragmentId,
   buildDraftManifest: buildDraftManifest,
+  buildUploadManifestDraft: buildUploadManifestDraft,
+  buildOssMetadata: buildOssMetadata,
 }

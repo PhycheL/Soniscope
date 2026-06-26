@@ -6,7 +6,13 @@
 // 临时文件为准；OSS object key 预览始终用 .wav 目标扩展名，仅表示 Worker 标准化目标。
 
 const { createLogger } = require('../../utils/logger')
-const { formatDuration, buildDraftManifest } = require('../../utils/audio')
+const {
+  formatDuration,
+  buildDraftManifest,
+  buildFragmentId,
+  buildUploadManifestDraft,
+  buildOssMetadata,
+} = require('../../utils/audio')
 const {
   INTERRUPT_DRAFT_STORAGE_KEY,
   buildInterruptedDraft,
@@ -17,6 +23,9 @@ const {
   buildQueuedFragment,
   appendQueuedFragment,
 } = require('../../utils/upload_queue')
+const { ensureDeviceShortId } = require('../../utils/device')
+const { monotonicFactory } = require('../../utils/ulid')
+const { sha256Hex } = require('../../utils/sha256')
 
 const logger = createLogger('index')
 
@@ -47,7 +56,11 @@ Page({
     this._interruptReason = ''
     // 草稿试听播放器（懒创建于 onTapPlay，US-014）。
     this._audio = null
+    // 单调 ULID 生成器（US-015）：保证同一秒/同一毫秒内连续保存得到不同 fragment_id / session_id。
+    this._nextUlid = monotonicFactory()
     this._bindRecorder()
+    // 首次启动生成并持久化 device_short_id（US-015 AC#1，幂等）。
+    ensureDeviceShortId(wx)
     logger.info('index page loaded')
   },
 
@@ -290,13 +303,40 @@ Page({
     logger.info('draft deleted')
   },
 
-  // 保存并上传（AC#5）：冻结草稿、晋升为「待上传」队列项并落盘；防重复点击生成重复 Fragment。
+  // 保存并上传（US-014 AC#5 + US-015）：生成正式 fragment_id / session_id / sha256 与 manifest 草案，
+  // 冻结草稿、晋升为「待上传」队列项并落盘；防重复点击生成重复 Fragment。
   onTapSaveUpload() {
     const draft = this.data.draft
     if (!draft || draft.frozen) {
       return
     }
-    const item = buildQueuedFragment(draft)
+    // US-015 AC#1：取持久化的 device_short_id（冷启动不变）。
+    const deviceShortId = ensureDeviceShortId(wx)
+    const recordedAt = draft.recorded_at
+      ? new Date(draft.recorded_at)
+      : new Date(this.startedAt || Date.now())
+    // US-016 会把 session_id 提前到录音开始；本期单条录音在保存时生成（chunk_seq=1、chunk_total=null）。
+    const sessionId = this._nextUlid()
+    // US-015 AC#2/#3：fragment_id = <时间前缀>_<device>_<ULID>；单调 ULID 保证同秒唯一。
+    const fragmentId = buildFragmentId(recordedAt, deviceShortId, this._nextUlid())
+    // US-015 AC#5：计算原始音频字节 sha256，写入 upload.original_sha256。
+    const originalSha256 = this._computeOriginalSha256(draft.temp_file_path)
+    const manifest = buildUploadManifestDraft({
+      recordedAt: recordedAt,
+      deviceShortId: deviceShortId,
+      fragmentId: fragmentId,
+      sessionId: sessionId,
+      chunkSeq: 1,
+      chunkTotal: null,
+      durationSeconds: draft.duration_seconds,
+      originalFormat: draft.audio && draft.audio.original_format,
+      sizeBytes: draft.audio && draft.audio.size_bytes,
+      originalSha256: originalSha256,
+      tempFilePath: draft.temp_file_path,
+    })
+    // US-015 AC#6：准备 OSS 用户自定义元数据，供 US-017 直传时附带。
+    const ossMetadata = buildOssMetadata(manifest)
+    const item = buildQueuedFragment(draft, manifest, ossMetadata)
     let queue = []
     try {
       queue = wx.getStorageSync(UPLOAD_QUEUE_STORAGE_KEY) || []
@@ -308,13 +348,35 @@ Page({
     // 草稿已晋升 Fragment：清掉中断槽位，冻结当前草稿（禁用确认态按钮）。
     this._clearInterruptStorage()
     this._destroyAudio()
-    const frozen = Object.assign({}, draft, { frozen: true })
+    const frozen = Object.assign({}, draft, { frozen: true, fragment_id: fragmentId })
     this.setData({ draft: frozen })
+    // AC#8：vConsole 显示 fragment_id 与 device_short_id（sha256 非密钥，截断便于核对）。
     logger.info('draft saved & queued for upload', {
-      fragmentId: item.fragmentId,
+      fragmentId: fragmentId,
+      deviceShortId: deviceShortId,
+      sessionId: sessionId,
+      sha256Prefix: originalSha256 ? originalSha256.slice(0, 12) : '',
       status: item.status,
     })
     wx.showToast({ title: '已加入上传队列', icon: 'success' })
+  },
+
+  // US-015 AC#5：读取本地临时音频字节并计算原始 sha256；读不到时返回空串（不阻断入队）。
+  _computeOriginalSha256(tempFilePath) {
+    if (!tempFilePath) {
+      return ''
+    }
+    try {
+      const fs = wx.getFileSystemManager && wx.getFileSystemManager()
+      if (!fs || !fs.readFileSync) {
+        return ''
+      }
+      const buf = fs.readFileSync(tempFilePath)
+      return sha256Hex(buf)
+    } catch (e) {
+      logger.error('compute original sha256 failed', { errMsg: e && e.message })
+      return ''
+    }
   },
 
   _destroyAudio() {

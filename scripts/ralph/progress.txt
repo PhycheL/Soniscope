@@ -410,3 +410,24 @@
   - innerAudioContext 懒创建于 onTapPlay 并存 this._audio；重录/删除/保存上传/_startRecording/onUnload 都要 _destroyAudio（stop+destroy）防止播放泄漏与残留；测试里凡留录音态（onReRecord 后）必须 inst.onUnload() 清计时器+音频，避免 node 事件循环挂起（沿用 US-013 陷阱）。
   - 防重复 Fragment 双保险：Page 侧 draft.frozen 守卫（按钮 wx:if 隐藏 + 函数早返回）+ upload_queue.appendQueuedFragment 按 fragmentId 去重；onDiscardDraft（US-013 中断「丢弃」）与 onDeleteDraft（US-014 确认态「删除」）是两个独立 handler，勿混用。
 ---
+
+## 2026-06-27 12:00 - US-015
+- 实现了什么：小程序保存并上传前生成稳定 device_short_id、全局唯一 fragment_id、原始音频 sha256，并把将传给 Worker 的 OSS 用户自定义元数据草案备齐（tech-spec §3.1/§3.2/§3.3）。沿用「纯函数 utils + Page 薄壳」分层。
+  - apps/miniprogram/utils/sha256.js（新增，纯函数）：无依赖纯 JS SHA-256，sha256Hex 接受 ArrayBuffer/TypedArray/number[]/UTF-8 字符串→小写 hex；64-bit 长度填充用 hi/lo 拆分避免 32-bit 溢出。wasm-crypto 优化（AGENTS 建议）留作后续性能项。
+  - apps/miniprogram/utils/ulid.js（新增，纯函数）：26 字符 Crockford base32 ULID（10 时间 + 16 随机），字符集 [0-9A-Z] 满足 FC 正则 [0-9A-Za-z]{26}；monotonicFactory 单调工厂——时间不前进时递增随机段，保证同毫秒/同秒连续生成不同 ULID（AC#3）。time/rng 可注入做确定性单测。
+  - apps/miniprogram/utils/device.js（新增）：device_short_id 6 字符（4-8 区间）字母数字；ensureDeviceShortId(storage, rng) 读 storage→非法/缺失则生成并持久化（幂等，AC#1，冷启动不变）；isValidDeviceShortId/DEVICE_SHORT_ID_RE 与 FC 正则一致。storage IO 与纯生成分离（运行时传 wx，测试传 mock）。
+  - apps/miniprogram/utils/audio.js：新增 FRAGMENT_ID_RE（镜像 fc_shared/sts.py _FRAGMENT_ID_RE）、buildFragmentId(recordedAt, deviceShortId, ulid)、buildUploadManifestDraft（AC#4 全字段：fragment_id/session_id/chunk_seq/chunk_total(null)/device_id/recorded_at/duration_seconds/audio.{original_format,size_bytes}/upload.original_sha256/object_key/temp_file_path）、buildOssMetadata（AC#6：7 个 x-oss-meta-*；非分片 chunk-total 映射为 "0"，manifest 内为 null，遵 §3.2）。
+  - apps/miniprogram/utils/upload_queue.js：buildQueuedFragment(draft, manifest?, ossMetadata?) 向后兼容——传 manifest 时用正式 fragment_id/object_key 并把 manifest+ossMetadata 挂到队列项（供 US-017 直传）；不传退回 US-014 行为（object key 反推）。
+  - apps/miniprogram/pages/index/index.js：onLoad 建单调 ULID 生成器 this._nextUlid + ensureDeviceShortId(wx)；onTapSaveUpload 改为生成 deviceShortId/sessionId/fragmentId + 计算 sha256（_computeOriginalSha256 用 wx.getFileSystemManager().readFileSync→sha256Hex，读不到返回空串不阻断）→ buildUploadManifestDraft + buildOssMetadata → 入队；冻结草稿写回 fragment_id；vConsole 日志打印 fragmentId/deviceShortId/sessionId/sha256Prefix（AC#8）。
+  - apps/miniprogram/app.js：onLaunch ensureDeviceShortId(wx) 首启持久化并存 globalData.deviceShortId（AC#1）。
+  - apps/miniprogram/test/ids.test.js（新增，node --test，13 用例）：device 持久化/非法重生成/注入 rng；ulid 26 字符；fragment_id 正则；同毫秒唯一；manifest 字段完整；OSS meta 全字段 + chunk-total=0；sha256 空/已知向量（abc）+ 与 node crypto 随机字节对照（Uint8Array & ArrayBuffer）；Page 集成保存并上传生成 fragment_id+sha256+manifest、device_short_id 复用、同秒两条不同 fragment_id 同 device。
+- 更改的文件：apps/miniprogram/utils/{sha256.js(新),ulid.js(新),device.js(新),audio.js,upload_queue.js}、apps/miniprogram/pages/index/index.js、apps/miniprogram/app.js、apps/miniprogram/test/ids.test.js(新)、scripts/ralph/{prd.json,progress.txt}。
+- 验证：make typecheck（mypy 39 文件 0 错）、make lint（ruff apps/ 全过 + miniprogram lint passed）、make test（311 passed；JS 包装测试内部 node --test 31/31：13 ids + 9 草稿 + 9 中断）全部通过；8 个改动/新增 .js 全部 node --check OK；sha256 已对照 node crypto 验证正确（含空输入 e3b0c4… 与 "abc" ba7816… 向量）。
+  未跑：微信开发者工具连续录两条短录音并保存上传、vConsole 显示两个不同 fragment_id 且 device_short_id 一致（AC#8 真机/模拟器项）——本沙箱无 WeChat DevTools/真机，需人工复验（集成测试已在 node 侧等价验证同秒两条不同 fragment_id + device 一致）。
+- **未来迭代的学习：**
+  - fragment_id/device_short_id 正则的单一真实来源有两处需同步：前端 audio.FRAGMENT_ID_RE / device.DEVICE_SHORT_ID_RE 必须与 FC 的 fc_shared/sts.py _FRAGMENT_ID_RE（deviceShortId [A-Za-z0-9]{4,8}、ULID [0-9A-Za-z]{26}）一致，否则前端生成的 id 会被 FC object_key_for 400。改一处务必核对另一处。
+  - 同秒唯一性靠 ULID 单调（monotonicFactory），不靠时间前缀（fragment 时间前缀只到秒，同秒必然相同）；session_id 与 fragment ULID 都从同一 this._nextUlid 取，单调保证彼此不同。US-016 会把 session_id 提前到录音开始（本期单条在保存时生成 chunk_seq=1/chunk_total=null）。
+  - OSS meta 与 manifest 的 chunk_total 语义不同：manifest 非分片存 null，OSS x-oss-meta-chunk-total 存 "0"（§3.2 约定，Worker HeadObject 读回 0→manifest null）。buildOssMetadata 已做该映射，勿在 Page 侧另写。
+  - sha256 纯 JS 实现已对照 node crypto 验证；大文件（25min wav）主线程计算可能卡顿，AGENTS 建议 wasm-crypto，属后续性能优化；前端读字节用 wx.getFileSystemManager().readFileSync(path)→ArrayBuffer，sha256Hex 直接吃 ArrayBuffer。
+  - 日志安全：logger SENSITIVE_KEY_RE 不匹配 sha256/session_id/fragment_id/deviceShortId（无 secret/token/api_key/...key 子串），可安全打印；仍只打 sha256 前 12 位前缀（非密钥但避免冗长）。
+---

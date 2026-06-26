@@ -31,18 +31,31 @@ function fragmentIdFromObjectKey(objectKey) {
 }
 
 // 从已确认（冻结）的草稿构造上传队列项。
-function buildQueuedFragment(draft) {
-  const objectKey = (draft && draft.object_key_preview) || ''
+// US-015：传入 manifest（含正式 fragment_id / object_key / sha256）与 ossMetadata 时，
+// 队列项使用正式 fragment_id 与 object key，并携带 manifest 草案 + OSS 元数据供 US-017 直传使用；
+// 不传时退回 US-014 行为（从 object key 预览反推 fragmentId）。
+function buildQueuedFragment(draft, manifest, ossMetadata) {
+  const m = manifest || null
   const audio = (draft && draft.audio) || {}
-  return {
-    fragmentId: fragmentIdFromObjectKey(objectKey),
+  const objectKey = (m && m.object_key) || (draft && draft.object_key_preview) || ''
+  const fragmentId = (m && m.fragment_id) || fragmentIdFromObjectKey(objectKey)
+  const item = {
+    fragmentId: fragmentId,
     status: STATUS_QUEUED,
     statusText: statusText(STATUS_QUEUED),
     durationSeconds: (draft && draft.duration_seconds) || 0,
-    originalFormat: audio.original_format || 'unknown',
+    originalFormat:
+      audio.original_format || (m && m.audio && m.audio.original_format) || 'unknown',
     objectKeyPreview: objectKey,
     tempFilePath: (draft && draft.temp_file_path) || '',
   }
+  if (m) {
+    item.manifest = m
+  }
+  if (ossMetadata) {
+    item.ossMetadata = ossMetadata
+  }
+  return item
 }
 
 // 追加到队列；同一 fragmentId 已存在则不重复追加（AC#5：不允许重复点击生成重复 Fragment）。
