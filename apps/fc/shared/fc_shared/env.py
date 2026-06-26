@@ -30,6 +30,13 @@ ISSUE_CREDENTIAL_REQUIRED_VARS: tuple[str, ...] = (
     "ALIYUN_AK_SECRET",
 )
 
+# tech-spec §4.0 / §4.2：verify-upload 额外依赖的 OSS 读凭证（HeadObject 用）。
+# issue-credential 不需要这些（它用 STS AssumeRole），故各自独立、不进共享 DEFAULT_REQUIRED_VARS。
+VERIFY_UPLOAD_REQUIRED_VARS: tuple[str, ...] = (
+    "ALIYUN_AK_ID",
+    "ALIYUN_AK_SECRET",
+)
+
 # tech-spec §4.0：MAX_UPLOAD_BYTES 可选，缺失 / 非法时回退默认 50 MB。
 DEFAULT_MAX_UPLOAD_BYTES = 52428800
 
@@ -58,6 +65,34 @@ class StsEnv:
     ak_id: str
     ak_secret: str
     max_upload_bytes: int
+
+
+@dataclass(frozen=True)
+class VerifyEnv:
+    """verify-upload 的 OSS HeadObject 运行时配置。
+
+    ``ak_id`` / ``ak_secret`` 是 FC 子账号长期凭证，仅供内部调用 OSS HeadObject，
+    绝不进日志（见 ``audit.is_sensitive`` 兜底）。
+    """
+
+    ak_id: str
+    ak_secret: str
+
+
+def load_verify_env(
+    source: Mapping[str, str] | None = None,
+    *,
+    required: Sequence[str] = VERIFY_UPLOAD_REQUIRED_VARS,
+) -> VerifyEnv:
+    """加载 verify-upload OSS 读凭证环境变量；缺必填变量抛 FcConfigError。"""
+    env = os.environ if source is None else source
+    missing = [name for name in required if not str(env.get(name, "")).strip()]
+    if missing:
+        raise FcConfigError(missing)
+    return VerifyEnv(
+        ak_id=str(env.get("ALIYUN_AK_ID", "")).strip(),
+        ak_secret=str(env.get("ALIYUN_AK_SECRET", "")).strip(),
+    )
 
 
 def _parse_max_upload_bytes(raw: str) -> int:

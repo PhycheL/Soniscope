@@ -32,9 +32,10 @@ HANDLERS = [
     ("issue-credential", "issue_credential", "size"),
     ("verify-upload", "verify_upload", "expected_size"),
 ]
-# 仍返回占位 "authorized" 响应的 handler（issue-credential 自 US-007 起改为签发 STS，
-# 其鉴权通过路径在 test_issue_credential.py 专项覆盖）。
-PLACEHOLDER_HANDLERS = [h for h in HANDLERS if h[0] != "issue-credential"]
+# 两个 handler 的鉴权通过路径自 US-007 / US-009 起都执行真实业务（STS 签发 / HeadObject），
+# 不再返回占位 "authorized" 响应；各自路径在 test_issue_credential.py /
+# test_verify_upload.py 专项覆盖。本文件只覆盖两 handler 共有的 imports / GET 存活 /
+# 缺 env 500 / 非法 body 400 / allowlist 403。
 
 
 def _load_handler(source_dir: str) -> ModuleType:
@@ -130,21 +131,3 @@ def test_handler_not_in_allowlist_is_403(
     status, payload = _call(mod, _environ("POST", body))
     assert status == "403 Forbidden"
     assert payload["error"] == fc_shared.OPENID_NOT_ALLOWED
-
-
-@pytest.mark.parametrize(("function", "source_dir", "field"), PLACEHOLDER_HANDLERS)
-def test_handler_authorized_path(
-    function: str, source_dir: str, field: str, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    for key, val in REQUIRED_ENV.items():
-        monkeypatch.setenv(key, val)
-
-    def fake_code_to_openid(code: str, appid: str, secret: str, **_kw: Any) -> str:
-        return "OID-allowed"
-
-    monkeypatch.setattr(fc_shared.wechat, "code_to_openid", fake_code_to_openid)
-    mod = _load_handler(source_dir)
-    body = json.dumps({"code": "c", "fragment_id": "f1", field: 100}).encode("utf-8")
-    status, payload = _call(mod, _environ("POST", body))
-    assert status == "200 OK"
-    assert payload["status"] == "authorized"

@@ -261,3 +261,26 @@
   - live target 模式：FC live 联调脚本复用 verify_prep 的 OSS STS 反例工具（_import_oss/_oss_sts_client/_run_oss_op/_seconds_until_expiry/is_denied），不重复实现；wx.login code 一次性，每个场景（成功/403/SIZE）各需独立 code，缺失即 SKIP 而非 FAIL，使无 code 的本地 CI 也能 exit 0。
   - 陷阱：越权/过期反例的展示名要与 AC 措辞一致（AC#7 是「等待超过…有效期上限」），测试里别用脆弱的子串（如「过期」）去匹配展示名；用 ESCAPE_OPS 的 (name, display) 元组精确定位。
   - 上下文：US-009（verify-upload HeadObject）落地后，US-010 的 make test-verify-upload 可仿本处 FcLiveProbes 模式：纯断言逻辑 + HTTP/OSS Probe 注入；verify_prep 的 check_fc / check_sts_escape 在 issue-credential 真实部署+live 验证后可接到真实签发转绿。
+
+## 2026-06-27 06:00 - US-009
+- 实现了什么：FC verify-upload 的 OSS HeadObject 上传确认接口（tech-spec §4.2）。沿用 US-007 的「纯逻辑放 fc_shared（mypy strict + ruff + pytest 全覆盖）+ IO 用 Protocol 注入」模式；handler.py 仍只受 ruff + importlib pytest。
+  - apps/fc/shared/fc_shared/head.py（新增）：
+    · 纯逻辑（无 IO，直接单测）：ObjectHead dataclass（exists/content_length/etag/last_modified）、verify_upload_result（§4.2 三态映射：不存在→OBJECT_NOT_FOUND；大小不一致→SIZE_MISMATCH+actual_size；一致→verified:true+etag/size/last_modified，成功响应严格 4 字段不夹带 AK）、is_not_found（从 OSS 异常提取 code/status_code，含 unwrap 内层，判定 NoSuchKey/NoSuchObject/404）。
+    · IO 注入点 ObjectHeader Protocol：head_object(bucket/region/endpoint/ak_id/ak_secret/object_key)→ObjectHead；RealObjectHeader（lazy import alibabacloud-oss-v2，StaticCredentialsProvider+HeadObjectRequest，404→exists=False，其余异常上抛由 handler 收敛 500）；get_header() 工厂供 monkeypatch。
+  - apps/fc/shared/fc_shared/errors.py：新增 HEAD_OBJECT_FAILED(500) 错误码 + OBJECT_NOT_FOUND/SIZE_MISMATCH reason 常量（注意：reason 是 200 响应体内业务原因，非 HTTP 错误码）。
+  - apps/fc/shared/fc_shared/env.py：新增 VERIFY_UPLOAD_REQUIRED_VARS=(ALIYUN_AK_ID, ALIYUN_AK_SECRET)、VerifyEnv dataclass、load_verify_env()（HeadObject 读凭证；verify-upload 不需 STS AssumeRole 变量，故与 load_sts_env 各自独立、都不进共享 DEFAULT_REQUIRED_VARS）。
+  - apps/fc/shared/fc_shared/__init__.py：导出 head 子模块 + ObjectHead/ObjectHeader/get_header/verify_upload_result/load_verify_env/VerifyEnv + 新错误码/reason 常量。
+  - apps/fc/verify_upload/handler.py：鉴权通过分支替换 US-006 占位为真实校验——load_env(shared)→authorize_request→load_verify_env→parse_size(expected_size)→object_key_for（保证 invalid-body/allowlist 在加载 verify env 前先 400/403）；再单独 try 包 head_object（任何异常→500 HEAD_OBJECT_FAILED，只记异常类名不泄漏明文）；最后 verify_upload_result + log_event(verified/reason/elapsed_ms) + 200 返回。
+  - apps/fc/verify_upload/requirements.txt：非注释行填 alibabacloud-oss-v2（deploy-fc package_function 会 install_deps 随函数打包）。
+  - apps/worker/src/soniscope_worker/latency.py（新增，AC#7 P95 能力）：percentile（NIST 线性插值）、LatencyStats、summarize、format_latency_report（P95<=阈值 PASS，默认阈值 P95_THRESHOLD_SECONDS=1.0s，空样本判 FAIL）。供 US-010 的 make test-verify-upload 复用做 P95 输出与判定；本 story 只交付可复用且已单测的统计能力，不在此实现真实云端调用循环（属 US-010）。
+- 更改的文件：apps/fc/shared/fc_shared/{head.py(新),errors.py,env.py,__init__.py}、apps/fc/verify_upload/{handler.py,requirements.txt}、apps/worker/src/soniscope_worker/latency.py(新)、apps/fc/tests/{test_head.py(新),test_verify_upload.py(新),test_fc_handlers.py}、apps/worker/tests/test_latency.py(新)、scripts/ralph/{prd.json,progress.txt}。
+- 验证：make typecheck（mypy 32 文件 0 错）、make lint（ruff apps/ 全过）、make test（249 passed，+29）全部通过。
+  test_head.py（14 用例，纯逻辑）+ test_verify_upload.py（7 用例，FakeHeader monkeypatch fc_shared.head.get_header：verified:true 4 字段、OBJECT_NOT_FOUND、SIZE_MISMATCH+actual_size、非法 fragment_id 400 不触达 HeadObject、缺 verify env 500、伪造 code 401 不暴露对象信息、HeadObject 异常 500 不泄漏 ak-secret）+ test_latency.py（9 用例）。
+  test_fc_handlers.py：移除 PLACEHOLDER_HANDLERS 与 test_handler_authorized_path（verify-upload 自本 story 起鉴权通过即执行真实 HeadObject、不再返回占位 authorized；issue-credential 自 US-007 已如此），两 handler 共有的 imports/GET/缺 env 500/非法 body 400/allowlist 403 仍参数化覆盖。
+  未跑：真实云端 make deploy-fc FUNCTION=verify-upload + make test-verify-upload（需真实 wx.login code + ALIYUN_AK + 构造 OSS 对象 + HeadObject 触网，本沙箱不具备）——属 US-010 范围。
+- **未来迭代的学习：**
+  - 上下文：US-010（verify-upload 云端闭环 make test-verify-upload）复用本处：① make deploy-fc FUNCTION=verify-upload + curl 存活（fc_deploy.deploy_one 已就绪）；② RealObjectHeader 已是真实 HeadObject 路径，部署后即可 live 验证；③ P95 统计用 soniscope_worker.latency.format_latency_report（已单测，阈值 1s），不要重复实现分位数；④ make oss-delete-obj（US-010 首交付）构造 OBJECT_NOT_FOUND 场景。
+  - 陷阱：reason 常量（OBJECT_NOT_FOUND/SIZE_MISMATCH）是 verified:false 的 200 响应体字段，不是 FcHttpError 错误码；HeadObject 真正失败（非 404）才是 500 HEAD_OBJECT_FAILED。verify-upload 成功响应严格 4 字段（verified/etag/size/last_modified），单测专门断言不夹带 AK/token。
+  - 陷阱：当一个 handler 从「占位 authorized」升级为真实业务，要同步把 test_fc_handlers.py 里基于占位响应的参数化测试（PLACEHOLDER_HANDLERS / authorized_path）收窄或移除，否则空 parametrize 或断言 status==authorized 会失败/误导；真实路径转到该 handler 的专项测试文件。
+  - 上下文：verify-upload HeadObject 用 FC 子账号长期 AK（ALIYUN_AK_ID/SECRET，与 issue-credential 的 STS AssumeRole 凭证同名 env），不走 STS；OSS v2 client 建法见 verify_prep._oss_client（StaticCredentialsProvider + region + endpoint）。
+---

@@ -9,29 +9,36 @@
 
 from __future__ import annotations
 
-from . import sts
+from . import head, sts
 from .audit import hash_openid, is_sensitive, log_event
 from .auth import AuthContext, authorize_request, check_allowlist
 from .env import (
     DEFAULT_MAX_UPLOAD_BYTES,
     DEFAULT_REQUIRED_VARS,
     ISSUE_CREDENTIAL_REQUIRED_VARS,
+    VERIFY_UPLOAD_REQUIRED_VARS,
     FcEnv,
     StsEnv,
+    VerifyEnv,
     load_env,
     load_sts_env,
+    load_verify_env,
     parse_allowlist,
 )
 from .errors import (
+    HEAD_OBJECT_FAILED,
     INVALID_CODE,
     INVALID_REQUEST,
+    OBJECT_NOT_FOUND,
     OPENID_NOT_ALLOWED,
     SERVER_MISCONFIGURED,
     SIZE_EXCEEDED,
+    SIZE_MISMATCH,
     STS_ISSUE_FAILED,
     FcConfigError,
     FcHttpError,
 )
+from .head import ObjectHead, ObjectHeader, get_header, verify_upload_result
 from .http import error_response, json_response, read_json_body, require_fields, status_line
 from .sts import (
     STS_MAX_DURATION_SECONDS,
@@ -49,33 +56,43 @@ from .wechat import code_to_openid
 __all__ = [
     "DEFAULT_MAX_UPLOAD_BYTES",
     "DEFAULT_REQUIRED_VARS",
+    "HEAD_OBJECT_FAILED",
     "INVALID_CODE",
     "INVALID_REQUEST",
     "ISSUE_CREDENTIAL_REQUIRED_VARS",
+    "OBJECT_NOT_FOUND",
     "OPENID_NOT_ALLOWED",
     "SERVER_MISCONFIGURED",
     "SIZE_EXCEEDED",
+    "SIZE_MISMATCH",
     "STS_ISSUE_FAILED",
     "STS_MAX_DURATION_SECONDS",
+    "VERIFY_UPLOAD_REQUIRED_VARS",
     "AuthContext",
     "FcConfigError",
     "FcEnv",
     "FcHttpError",
+    "ObjectHead",
+    "ObjectHeader",
     "StsCredential",
     "StsEnv",
     "StsIssuer",
+    "VerifyEnv",
     "authorize_request",
     "check_allowlist",
     "check_size",
     "code_to_openid",
     "credential_response",
     "error_response",
+    "get_header",
     "get_issuer",
     "hash_openid",
+    "head",
     "is_sensitive",
     "json_response",
     "load_env",
     "load_sts_env",
+    "load_verify_env",
     "log_event",
     "object_key_for",
     "parse_allowlist",
@@ -85,4 +102,5 @@ __all__ = [
     "single_key_policy",
     "status_line",
     "sts",
+    "verify_upload_result",
 ]

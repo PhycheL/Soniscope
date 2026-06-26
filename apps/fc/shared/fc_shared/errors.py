@@ -16,6 +16,12 @@ INVALID_REQUEST = "INVALID_REQUEST"  # 400：JSON 解析失败 / 非对象 / 字
 SIZE_EXCEEDED = "SIZE_EXCEEDED"  # 400：size 超过 MAX_UPLOAD_BYTES（US-007）
 SERVER_MISCONFIGURED = "SERVER_MISCONFIGURED"  # 500：缺必填运行时环境变量
 STS_ISSUE_FAILED = "STS_ISSUE_FAILED"  # 500：AssumeRole 签发 STS 失败（不泄漏明文，US-007）
+HEAD_OBJECT_FAILED = "HEAD_OBJECT_FAILED"  # 500：HeadObject 调用失败（不泄漏明文，US-009）
+
+# ── verify-upload 校验结果 reason（verified:false 时的 "reason" 字段，US-009）─────
+# 这些不是 HTTP 错误码，而是 200 响应体内的业务结果原因（tech-spec §4.2）。
+OBJECT_NOT_FOUND = "OBJECT_NOT_FOUND"  # 对象不存在
+SIZE_MISMATCH = "SIZE_MISMATCH"  # 对象存在但 Content-Length 与 expected_size 不一致
 
 
 class FcHttpError(Exception):
