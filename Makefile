@@ -5,7 +5,7 @@
 
 .PHONY: install check-config init-dirs verify-prep worker-run \
 	deploy-fc rollback-fc fc-logs test-fc-live test-verify-upload oss-delete-obj \
-	typecheck lint test help
+	lint-miniprogram typecheck lint test help
 .DEFAULT_GOAL := help
 
 help: ## 显示可用命令
@@ -56,8 +56,9 @@ oss-delete-obj: ## 【仅测试用】删除 OSS 对象构造缺失场景（FRAGM
 typecheck: ## mypy strict 类型检查
 	uv run mypy
 
-lint: ## ruff 静态检查（workspace 代码；遗留 scripts/ 由各自 story 收口）
+lint: ## ruff（workspace）+ 小程序源码静态检查；遗留 scripts/ 由各自 story 收口
 	uv run ruff check apps/
+	uv run python -m soniscope_worker lint-miniprogram
 
 test: ## pytest 单元测试（mock 云端依赖）
 	uv run pytest

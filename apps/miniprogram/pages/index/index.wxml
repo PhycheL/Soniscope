@@ -1,0 +1,10 @@
+<view class="container">
+  <view class="record-area">
+    <button class="record-btn {{recording ? 'record-btn--active' : ''}}" bindtap="onTapRecord">
+      {{recording ? '停止录音' : '开始录音'}}
+    </button>
+    <view class="duration">{{durationText}}</view>
+  </view>
+  <view class="hint">录音功能将在后续迭代完善（US-012+）。</view>
+  <view class="nav-link" bindtap="goUploads">查看上传列表 ›</view>
+</view>

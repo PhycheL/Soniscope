@@ -187,3 +187,8 @@ tests/audio/*.m4a
 /SoniScope/
 config.yaml
 *.env
+
+# 微信小程序开发者工具本地产物（不进 git；project.config.json 入库，private 不入库）
+apps/miniprogram/project.private.config.json
+apps/miniprogram/miniprogram_npm/
+apps/miniprogram/node_modules/

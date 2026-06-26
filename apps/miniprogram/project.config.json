@@ -1,0 +1,17 @@
+{
+  "appid": "wx3f973c7297728b0c",
+  "projectname": "soniscope-miniprogram",
+  "description": "日观声记 SoniScope 微信小程序：录音 → 草稿 → STS 上传 OSS → verify",
+  "compileType": "miniprogram",
+  "miniprogramRoot": "./",
+  "libVersion": "3.5.5",
+  "setting": {
+    "urlCheck": true,
+    "es6": true,
+    "enhance": true,
+    "postcss": true,
+    "minified": true,
+    "ignoreDevUnusedFiles": false
+  },
+  "condition": {}
+}

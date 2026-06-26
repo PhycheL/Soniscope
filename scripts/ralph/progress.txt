@@ -16,6 +16,7 @@
 - mypy strict 下测试夹具参数用 `Mapping[str, object]`（covariant），不要用裸 `dict`/`dict[str, object]`（invariant 会报 arg-type）。
 - 真实云端校验命令（live/verify-prep 类）模式：把"取数据"（IO/云 SDK）收敛到一个 `Probes` Protocol，纯校验逻辑 `check_*` 只对已取回的结构化 dataclass 做判断（无 IO，直接单测）；单测注入 `FakeProbes` 不触网，真实运行用 `RealProbes`（lazy import 云 SDK，缺失抛 `ProbeError`，由编排层 try/except 收敛为单项 fail）。云 SDK 无 stub：在根 pyproject 用 `[[tool.mypy.overrides]] module=["alibabacloud_oss_v2.*"] ignore_missing_imports=true`，lazy import 函数返回 `Any` 即可消除 attr-defined。
 - 校验报告绝不打印 AK Secret：必填字段非空检查只列字段名不列值；用 `.get_secret_value()` 仅做"是否为空"判断后丢弃。单测专门断言 secret 明文不出现在报告里。
+- 小程序（apps/miniprogram/）是 JS，不进 mypy/ruff（两者只覆盖 apps/ 下的 .py）。其静态检查走 Python CLI 子命令 `soniscope_worker.miniprogram_lint`（make lint 串联 `ruff check apps/` + `python -m soniscope_worker lint-miniprogram`），逻辑放 Worker 包内可被 mypy/ruff/pytest 覆盖；node v22 可用但未引入 npm/eslint。小程序合法域名/常量单一真实来源在 apps/miniprogram/config.js（US-012+ 一律 require 取用，勿散落硬编码）；脱敏日志在 apps/miniprogram/utils/logger.js（传对象自动按敏感键名脱敏）。WeChat DevTools 模拟器/真机类 AC 本沙箱无法自动验证，用 node --check + JSON.parse 做最大化静态验证后在进度里标注需人工复验。
 
 ---
 
@@ -308,4 +309,33 @@
   - 陷阱：ruff line-length=100 按 CJK 显示宽度计数，SKIP 文案里塞 `make test-verify-upload XXX=…` 容易超限；用「缺一次性 wx.login code」类短文案即可。
   - 上下文：US-017 的 make show-oss-object（首交付）可复用 oss_admin.object_key_for + RealOssObjectStore 模式，扩展 HeadObject 读取（exists/size/etag/last_modified/元数据）；US-029 复用 oss-delete-obj 不重复实现。
   - 上下文：verify-upload live 探针 RealOssObjectStore 用 config.yaml 长期 OSS AK 上传/删除测试对象，与 FC verify-upload 的 HeadObject（FC 子账号 AK）是两套凭证；本地 CI 无 config/无 code 时全 SKIP（伪造 code 一项也会因 FC 不可达 FAIL，故仅在能触网时跑）。
+---
+
+## 2026-06-27 08:00 - US-011
+- 实现了什么：微信小程序项目骨架 apps/miniprogram/ + 环境配置 + Python 静态检查（make lint 覆盖小程序源码）。
+  - apps/miniprogram/ 骨架（微信开发者工具可直接「导入项目」打开）：
+    · project.config.json：appid=wx3f973c7297728b0c（真实 AppID，AC#1）、miniprogramRoot=./、setting.urlCheck=true。
+    · app.json：pages=[pages/index/index, pages/uploads/uploads]（首页+上传列表，AC#4）、window、tabBar（两 tab 切换）、sitemapLocation。
+    · app.js / app.wxss / sitemap.json：入口（onLaunch/onError 用脱敏 logger）+ 全局样式 + sitemap。
+    · config.js（合法域名单一真实来源，AC#2/#3）：FC_ISSUE_CREDENTIAL_URL=https://issue-cedential-ottfirocds.cn-beijing.fcapp.run（保留少一个 r 的真实拼写，绝不修正）、FC_VERIFY_UPLOAD_URL、OSS_UPLOAD_URL=https://soniscope-audio.oss-cn-beijing.aliyuncs.com；REQUEST/UPLOAD_LEGAL_DOMAINS；CHUNK_MAX_DURATION_SECONDS=600（tech-spec §3.1 前端常量）。
+    · utils/logger.js（AC#5）：createLogger/redact/maskValue，对 access_key_secret/access_key_id/app_secret/security_token/session_key/api_key/token/password 等敏感键名递归脱敏（前后 4 位，≤8 位整体打码），非敏感字段（如 object_key）原样保留；info→console.log、warn、error。
+    · pages/index/{index.js,.json,.wxml,.wxss}（录音首页骨架，圆形按钮占位，录音逻辑留 US-012）+ pages/uploads/{...}（上传列表骨架，空态文案，八状态留 US-019）。
+    · README.md：DevTools 导入步骤 + 服务器合法域名配置表（与 config.js 一致）。
+  - apps/worker/src/soniscope_worker/miniprogram_lint.py（新增，mypy strict + ruff + pytest 覆盖，AC#6）：
+    纯函数 check_project_config（appid 校验）/ check_app_pages（pages 非空+含必需页面+四件套齐全）/ check_domains（三域名齐全 + 检测 issue-cedential 被错误修正成 issue-credential 即报错）/ scan_hardcoded_secrets（LTAI AK ID 前缀 + 敏感键赋字面量正则）；
+    编排 run_checks（遍历源码：全量 JSON 可解析 + 硬编码密钥扫描）/ format_report / run_lint_miniprogram（返回 (行, 退出码)，default_miniprogram_root=parents[4]/apps/miniprogram）。
+  - cli.py：新增 lint-miniprogram 子命令（lazy import，typer.Exit(code)）。
+  - Makefile：lint target 在 ruff 之后追加 `uv run python -m soniscope_worker lint-miniprogram`（AC#6）；.PHONY 加 lint-miniprogram。
+  - .gitignore：忽略 apps/miniprogram/project.private.config.json、miniprogram_npm/、node_modules/。
+  - apps/worker/tests/test_miniprogram_lint.py（新增 23 用例）：tmp 树构造合规/各类不合规小程序，覆盖每个 check_* pass/fail、域名错误修正检测、硬编码密钥检测、logger 正则不被误判、真实 apps/miniprogram 骨架通过校验。
+- 更改的文件：apps/miniprogram/**（全新骨架）、apps/worker/src/soniscope_worker/{miniprogram_lint.py(新),cli.py}、Makefile、.gitignore、apps/worker/tests/test_miniprogram_lint.py(新)、scripts/ralph/{prd.json,progress.txt}。
+- 验证：make typecheck（mypy 38 文件 0 错）、make lint（ruff apps/ 全过 + miniprogram lint passed）、make test（310 passed，+23）全部通过；
+  node --check 5 个 .js + JSON.parse 5 个 .json 全部 OK（AC#7 语法层面无报错）；node 实跑 logger.redact 确认凭证字段脱敏为前后 4 位、object_key 原样（AC#5）。
+  未跑：微信开发者工具模拟器真机打开首页/真机预览（本沙箱无 WeChat DevTools；AC#7「模拟器打开首页无 JS 初始化报错」需人工在 DevTools 复验）。
+- **未来迭代的学习：**
+  - 小程序源码（apps/miniprogram/）不进 mypy/ruff（mypy files=apps/worker/{src,tests}+apps/fc/shared；ruff check apps/ 只对 .py 生效）；JS 静态检查走 Python 的 miniprogram_lint（CLI 子命令），与「make 命令做成 Worker CLI 子命令」codebase pattern 一致，可被 mypy/ruff/pytest 覆盖。node v22 在本机可用，但未引入 npm/eslint 依赖（避免 CI 体积与脆性）。
+  - 合法域名单一真实来源放 apps/miniprogram/config.js；US-012+（录音/上传/verify）一律 require('../../config') 取 FC/OSS URL，不要散落硬编码。issue-cedential 少一个 r 的拼写已在 config.js + miniprogram_lint.MISCORRECTED_ISSUE_URL 双向锁定，改动时勿“修正”。
+  - 脱敏 logger 在 utils/logger.js：US-012+ 打印 STS 凭证/上传响应时用 createLogger(scope).info({...}) 传对象即自动脱敏；不要 console.log 直接打印含 secret/token 的对象。
+  - WeChat DevTools 相关 AC（模拟器打开无报错、真机预览）本沙箱无法自动验证，已用 node --check（语法）+ JSON.parse（配置）做最大化静态验证；真机/模拟器项需人工复验。
+  - default_miniprogram_root 用 Path(__file__).resolve().parents[4]/apps/miniprogram，与 fc_deploy/verify_prep 的 parents[4] 仓库根定位一致。
 ---

@@ -1,0 +1,29 @@
+.empty {
+  margin-top: 120rpx;
+  color: #888888;
+  text-align: center;
+}
+
+.list {
+  width: 100%;
+}
+
+.item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 28rpx 24rpx;
+  margin-bottom: 16rpx;
+  background-color: #ffffff;
+  border-radius: 16rpx;
+}
+
+.item-id {
+  font-size: 24rpx;
+  color: #444444;
+}
+
+.item-status {
+  font-size: 26rpx;
+  color: #1a73e8;
+}

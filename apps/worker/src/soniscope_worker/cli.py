@@ -191,3 +191,14 @@ def test_verify_upload(
     for line in lines:
         typer.echo(line, err=exit_code != 0)
     raise typer.Exit(code=exit_code)
+
+
+@app.command(name="lint-miniprogram")
+def lint_miniprogram() -> None:
+    """对 apps/miniprogram 做静态检查（配置/域名/页面/无硬编码密钥，US-011）。"""
+    from soniscope_worker.miniprogram_lint import run_lint_miniprogram
+
+    lines, code = run_lint_miniprogram()
+    for line in lines:
+        typer.echo(line, err=code != 0)
+    raise typer.Exit(code=code)

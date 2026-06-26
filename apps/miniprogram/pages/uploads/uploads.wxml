@@ -1,0 +1,11 @@
+<view class="container">
+  <view wx:if="{{items.length === 0}}" class="empty">
+    暂无录音。回到「录音」页开始第一条录音。
+  </view>
+  <view wx:else class="list">
+    <view wx:for="{{items}}" wx:key="fragmentId" class="item">
+      <text class="item-id">{{item.fragmentId}}</text>
+      <text class="item-status">{{item.statusText}}</text>
+    </view>
+  </view>
+</view>
