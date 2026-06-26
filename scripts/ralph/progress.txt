@@ -528,3 +528,22 @@
   - miniprogram_lint 硬编码密钥扫描已豁免 test/ 目录：单测需用 access_key_secret/security_token 等真实字段名构造夹具，
     生产源码（utils/pages/app.js）仍严扫；新增小程序单测放 test/ 下即可用假密钥。
 ---
+
+## 2026-06-27 15:00 - US-018
+- 实现了什么：小程序上传后 verify 回执、48 小时本地保留与手动删除二次确认（tech-spec §4.2/§6.7，AGENTS 错误处理表）。沿用「纯函数 utils + Page 薄壳」与「纯逻辑 + IO 注入」分层。
+  - apps/miniprogram/utils/verify.js（新，纯逻辑 + 注入 deps）：classifyVerifyResponse（200 verified:true→verified；200 verified:false→unverified+reason OBJECT_NOT_FOUND/SIZE_MISMATCH；5xx→retryable；4xx→fatal）；VERIFY_RETRY_DELAYS_MS=[5s,15s,45s]/MAX=3；verifyFragment 编排——每次尝试 login（一次性 code）→requestVerify(code,fragment_id,expected_size，AC#1)→verified:true 写 verifiedAt+STATUS_VERIFIED（AC#2）；unverified→STATUS_MANUAL_RETRY+reason（AC#3）；4xx→立即 STATUS_MANUAL_VERIFY 不重试；网络/5xx 按退避重试 3 次仍失败→STATUS_MANUAL_VERIFY（AC#4）。绝不打印敏感字段。
+  - apps/miniprogram/utils/retention.js（新，纯函数）：RETENTION_HOURS=48；canAutoDelete（仅 verified+未清理+verifiedAt 距今>=48h，AC#5；verifiedAt==null/'' 视为缺失，但允许 0 这类合法 epoch）；selectAutoDeletable；needsDeleteConfirmation（非 verified 需确认，AC#7）；DELETE_CONFIRM_MESSAGE（PRD/AC#7 措辞）。
+  - apps/miniprogram/pages/uploads/uploads.js：onShow 改为 _autoCleanup→_loadQueue→_driveQueue（先 _processQueue 上传，再 _processVerifyQueue verify，串行）；新增 _processVerifyQueue（_verifying 锁，pending_verify→_verifyOne）、_verifyOne（构造 wx 适配器 + _wxRequestVerify POST FC_VERIFY_UPLOAD_URL）、onTapReVerify（AC#9 手动重新 verify）、onTapDelete+_deleteItem（AC#7 needsDeleteConfirmation→wx.showModal 二次确认；verified 直接删）、_autoCleanup（selectAutoDeletable→unlink 本地文件+标记 localDeleted，保留队列记录与 OSS 对象，AC#5）、_unlinkFile（wx.getFileSystemManager().unlink best-effort）。
+  - apps/miniprogram/pages/uploads/uploads.wxml/wxss：item 改为竖排（main/meta/actions），展示 reason、本地缓存已清理 note；新增「重新 verify」（pending_verify/manual_verify）与「删除」按钮。
+  - apps/miniprogram/test/verify.test.js（新，node --test，25 用例）：classifyVerifyResponse 四类；verifyFragment verified/OBJECT_NOT_FOUND/SIZE_MISMATCH/5xx 退避 3 次（waits=[5s,15s,45s]）/网络错误/第 3 次成功/4xx 不重试；retention canAutoDelete 48h 分界/未 verified 超 7 天不删/localDeleted/缺 verifiedAt、selectAutoDeletable、needsDeleteConfirmation；Page harness（mock wx 含 getFileSystemManager/showModal，request 按 URL 路由 verify-upload）：pending_verify→verified 落盘、重新 verify→manual_retry+OBJECT_NOT_FOUND（AC#9）、_autoCleanup 48h 删/不删/未 verified 不删、手动删除确认/取消/verified 免确认。
+- 更改的文件：apps/miniprogram/utils/{verify.js(新),retention.js(新)}、apps/miniprogram/pages/uploads/{uploads.js,uploads.wxml,uploads.wxss}、apps/miniprogram/test/verify.test.js(新)、scripts/ralph/{prd.json,progress.txt}。
+- 验证：make typecheck（mypy 41 文件 0 错）、make lint（ruff apps/ 全过 + miniprogram lint passed）、make test（327 passed，JS 包装测试内部 node --test 85/85：+25 verify）全部通过；node --check 4 个改动/新增 .js 通过。
+  未跑：微信开发者工具上传短录音成功后状态为上传成功；删除 OSS 对象后点击重新 verify→待人工重传+OBJECT_NOT_FOUND（AC#9 真机/模拟器项，需真实 FC 部署 + wx.login code + 触网 OSS）——本沙箱无 WeChat DevTools/真机，需人工复验（Page 集成测试已在 node 侧等价验证 verify 成功/OBJECT_NOT_FOUND/48h 清理/手动删除确认）。
+- **未来迭代的学习：**
+  - verify 与 upload 在 uploads 页拆成两条独立循环：_processQueue（仅 queued→上传，行为不变，保 US-017 测试绿）+ _processVerifyQueue（pending_verify→verify）。关键：onShow 走 _driveQueue 串行跑两者，但 US-017 既有测试只 `await _processQueue()`，故上传循环绝不能内联 verify，否则那条「queued→待 verify」断言会被 verify 续跑覆盖成 verified/manual。新增自动后续动作时，优先拆成独立 driver 而非内联进既有循环。
+  - verified_at 落在队列项 top-level `verifiedAt`（ms epoch，retention 权威读取），概念上对应 manifest.upload.verified_at；队列项是本地状态权威（沿用 US-014/017 denormalized 字段约定），不做 manifest 嵌套写（updateQueueItem 是浅合并）。
+  - 退避/重试三态语义（与 uploader 一致但分工不同）：FC/verify 的 4xx 立即失败（uploader→manual_retry；verify→manual_verify，因上传已成功只是 verify 失败）；网络/5xx 才退避 5s/15s/45s（最多 3 次，共 4 次尝试）。verify 失败 3 次→manual_verify（待人工 verify），verified:false 业务原因→manual_retry（待人工重传）——两者状态不同，勿混。
+  - 陷阱：canAutoDelete 不能用 `if (!verifiedAt) return false` 做缺失判断（会误杀 epoch 0）；用 `== null || === ''` 判缺失 + Number.isFinite 判数值。真实 verifiedAt 来自 Date.now() 永不为 0，但单测用小值要注意。
+  - 自动清理只删本地音频缓存（unlink tempFilePath）并打 localDeleted 标记，保留队列记录（列表仍显示「上传成功」+「本地缓存已清理」），OSS 对象永不删除（AGENTS 红线）；US-019 八状态全量渲染/折叠时复用 localDeleted 展示。
+  - Page harness mock wx 新增 getFileSystemManager().unlink 与 showModal（按 scenario.confirmDelete 决定 confirm）；request 用 `url.indexOf('verify-upload')` 路由区分 issue-credential 与 verify-upload 两个 FC 调用。
+---

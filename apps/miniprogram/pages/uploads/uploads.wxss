@@ -10,12 +10,24 @@
 
 .item {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
   padding: 28rpx 24rpx;
   margin-bottom: 16rpx;
   background-color: #ffffff;
   border-radius: 16rpx;
+}
+
+.item-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 8rpx;
 }
 
 .item-id {
@@ -31,9 +43,31 @@
 .item-progress {
   font-size: 24rpx;
   color: #1a73e8;
+  margin-right: 16rpx;
 }
 
 .item-error {
   font-size: 22rpx;
+  color: #d93025;
+  margin-right: 16rpx;
+}
+
+.item-note {
+  font-size: 22rpx;
+  color: #888888;
+}
+
+.item-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12rpx;
+}
+
+.item-btn {
+  margin-left: 12rpx;
+  font-size: 22rpx;
+}
+
+.item-btn--danger {
   color: #d93025;
 }
