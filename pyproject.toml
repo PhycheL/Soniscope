@@ -31,6 +31,11 @@ files = ["apps/worker/src", "apps/worker/tests"]
 mypy_path = ["apps/worker/src"]
 explicit_package_bases = true
 
+# 云 SDK 为可选运行时依赖（lazy import，无类型 stub），verify-prep 等真实探针用到。
+[[tool.mypy.overrides]]
+module = ["alibabacloud_oss_v2.*"]
+ignore_missing_imports = true
+
 [tool.ruff]
 target-version = "py311"
 line-length = 100

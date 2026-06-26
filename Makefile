@@ -3,7 +3,7 @@
 # 命令随 story 分阶段实现。US-001 提供骨架级 install / check-config / init-dirs /
 # worker-run / typecheck / lint / test；check-config 与 init-dirs 的完整逻辑在 US-002 实现。
 
-.PHONY: install check-config init-dirs worker-run typecheck lint test help
+.PHONY: install check-config init-dirs verify-prep worker-run typecheck lint test help
 .DEFAULT_GOAL := help
 
 help: ## 显示可用命令
@@ -18,6 +18,9 @@ check-config: ## 读取 config.yaml → 校验必填字段 → 打印脱敏摘�
 
 init-dirs: ## 在 \$$SONISCOPE_HOME 下幂等创建 inbox/ inbox/failed/ fragments/ tmp/
 	uv run python -m soniscope_worker init-dirs
+
+verify-prep: ## 一键校验 US-001 人工准备产物（OSS/STS/FC/NLS/fixture/环境）
+	uv run python -m soniscope_worker verify-prep
 
 worker-run: ## 启动 Worker 主轮询
 	uv run python -m soniscope_worker run

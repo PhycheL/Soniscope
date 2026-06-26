@@ -60,3 +60,14 @@ def init_dirs() -> None:
     """在 $SONISCOPE_HOME 下幂等创建 inbox/ inbox/failed/ fragments/ tmp/。"""
     for d in init_runtime_dirs():
         typer.echo(f"ok  {d}")
+
+
+@app.command(name="verify-prep")
+def verify_prep() -> None:
+    """一键校验 US-001 人工准备产物（OSS / STS / FC / NLS / fixture / 环境）。"""
+    from soniscope_worker.verify_prep import run_verify_prep
+
+    lines, code = run_verify_prep()
+    for line in lines:
+        typer.echo(line, err=code != 0)
+    raise typer.Exit(code=code)
