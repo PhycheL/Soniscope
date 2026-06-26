@@ -17,6 +17,7 @@
 
   <view class="draft" wx:if="{{draft}}">
     <view class="draft-title">{{draft.status_label || '录音草稿'}}</view>
+    <view class="draft-row" wx:if="{{draft.is_long}}">长录音：{{draft.chunk_total}} 段（超过 10 分钟自动分片，共享同一录音）</view>
     <view class="draft-row">原始格式：{{draft.audio.original_format}}</view>
     <view class="draft-row">时长：{{draft.duration_seconds}} 秒</view>
     <view class="draft-row draft-row--mono">目标对象：{{draft.object_key_preview}}</view>

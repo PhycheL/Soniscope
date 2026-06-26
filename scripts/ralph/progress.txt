@@ -431,3 +431,30 @@
   - sha256 纯 JS 实现已对照 node crypto 验证；大文件（25min wav）主线程计算可能卡顿，AGENTS 建议 wasm-crypto，属后续性能优化；前端读字节用 wx.getFileSystemManager().readFileSync(path)→ArrayBuffer，sha256Hex 直接吃 ArrayBuffer。
   - 日志安全：logger SENSITIVE_KEY_RE 不匹配 sha256/session_id/fragment_id/deviceShortId（无 secret/token/api_key/...key 子串），可安全打印；仍只打 sha256 前 12 位前缀（非密钥但避免冗长）。
 ---
+
+## 2026-06-27 13:00 - US-016
+- 实现了什么：小程序长录音自动分片与 session 聚合元数据（tech-spec §3.1）。超过分片阈值（CHUNK_MAX_DURATION_SECONDS=600s）的录音自动切成多个 Fragment，整段共享 session_id，每片独立 fragment_id、chunk_seq 从 1 递增，最终停止后回填 chunk_total。沿用「纯函数 utils + Page 薄壳」分层。
+  - apps/miniprogram/utils/chunking.js（新增纯逻辑模块）：shouldRotateChunk(chunkElapsedSeconds>=600，AC#2/#5)、createRecordingSession(sessionId)（AC#1）、addChunk(session,record)→分配 chunk_seq 从 1 递增（AC#3）、chunkCount、resolveChunkTotal(count>1?count:null)、backfillChunkTotal(manifests)→把片数回填到所有分片 manifest（单片回填 null，AC#4）。CHUNK_MAX_DURATION_SECONDS 复用 config.js 常量。
+  - apps/miniprogram/pages/index/index.js：
+    · onLoad 新增会话状态 _session/_chunkStartedAt/_sessionElapsedMs/_userStopping/_rotating。
+    · _startRecording：录音开始即 createRecordingSession(this._nextUlid()) 分配 session_id（AC#1）；MAX_RECORD_DURATION_MS 改为 CHUNK_MAX_DURATION_SECONDS*1000。
+    · _startNextChunk：分片旋转后沿用同一 session 立即 start 下一片（AC#2）。
+    · 计时器（_startTimer）每秒计算「当前片已录秒数 + 已完成片累计时长」，显示总时长，并调 _maybeRotateChunk(chunkElapsed)：到阈值 _rotating 守卫下 stop 当前片。
+    · _stopRecording 设 _userStopping=true，区分「最终停止」与「分片边界自动 stop」。
+    · _onRecordStop 重构为路由：!interrupted && !userStop → 分片边界（addChunk + _startNextChunk）；interrupted → _finalizeInterrupted；userStop → _finalizeStopped。_captureChunkRecord 归一化 res（recordedAt 用该片 _chunkStartedAt）。
+    · _finalizeStopped：单片（chunkCount<=1）走 US-012/014 单草稿确认态（buildDraftManifest，chunk_total=null，行为不变）；多片走 _buildSessionDraft(false) 长录音聚合草稿（is_long/chunk_total/session_id/总时长）。
+    · _finalizeInterrupted：单片沿用 US-013 单槽位中断草稿落盘（buildInterruptedDraft，行为不变）；多片落盘长录音中断草稿。
+    · onTapSaveUpload：draft.is_long && 多片 → _saveLongRecording(deviceShortId)：逐片 buildFragmentId（独立 ULID）+ _computeOriginalSha256 + buildUploadManifestDraft（共享 sessionId、chunk_seq 已分配、chunk_total 暂 null）→ backfillChunkTotal 回填（AC#4）→ 逐片 buildOssMetadata + buildQueuedFragment + appendQueuedFragment 落盘；单片走原 US-015 路径（sessionId 改取 this._session.sessionId）。
+    · _cleanupDraftFile：长录音重录/删除时清理该 session 下所有分片临时文件。
+  - apps/miniprogram/pages/index/index.wxml：新增 wx:if=draft.is_long 的「长录音：N 段」展示行。
+  - apps/miniprogram/test/chunking.test.js（新增，node --test，8 用例）：纯函数（阈值分界/session 分配/chunk_seq 递增/resolveChunkTotal/backfillChunkTotal）+ Page 集成（录音开始分配 26 字符 session_id 且分片不变；25 分钟切 3 片 chunk_seq 1/2/3 共享 session、总时长 1500s、单片≤605s、确认入队 3 条独立 fragment_id+chunk_total=3+OSS meta；未达阈值单条 chunk_total=null/OSS chunk-total=0；长录音重录清理全部分片临时文件）。
+- 更改的文件：apps/miniprogram/utils/chunking.js(新)、apps/miniprogram/pages/index/{index.js,index.wxml}、apps/miniprogram/test/chunking.test.js(新)、scripts/ralph/{prd.json,progress.txt}。
+- 验证：make typecheck（mypy 39 文件 0 错）、make lint（ruff apps/ 全过 + miniprogram lint passed）、make test（311 passed；JS 包装测试内部 node --test 39/39：8 chunking + 13 ids + 9 草稿 + 9 中断）全部通过；node --check chunking.js / index.js OK。
+  未跑：微信开发者工具 / 真机录制 25 分钟生成 3 条 Fragment、三条共享 session_id、chunk_seq 1/2/3、chunk_total 3、拼接总时长约 25 分钟（AC#7/#8 真机项）——本沙箱无 WeChat DevTools/真机，需人工复验；Page 集成测试已在 node 侧用 _maybeRotateChunk 模拟分片边界做等价验证。
+- **未来迭代的学习：**
+  - 录音状态机路由口径（US-016）：onStop 用「!interrupted && !userStop」判定分片边界——既非用户最终停止也非中断的 onStop（计时器旋转 stop 或微信 RecorderManager 到达 duration 上限 600000ms 自停）一律视为分片边界，落片后自动 start 下一片。_userStopping 在 _stopRecording 设，_interrupting 在 _handleInterruption 设，两者在 _onRecordStop 顶部读取后立即复位。
+  - session_id 分配时机从 US-015 的「保存时生成」提前到「录音开始」（AC#1）：单条录音 onTapSaveUpload 改取 this._session.sessionId（回退 _nextUlid 兜底）；不影响 US-015 同秒两条 fragment_id 唯一性（仍靠单调 ULID）。
+  - 分片边界用计时器（每秒）判断 chunkElapsed>=600 触发，配合 stop→start 极小间隙单片实际 ≤601s（≤605s 满足 AC#5）；微信 recorder duration 上限恰为 600000ms，故即使计时器漏触发，recorder 自停也会被 onStop 分片边界路由兜住。
+  - 长录音确认态复用单草稿 UI：_buildSessionDraft 产出 is_long/chunk_total/session_id/聚合总时长 + 最后一片 temp_file_path（供试听）；真实分片记录始终以 this._session.chunks 为权威（含 Date 类型 recordedAt），draft 仅作展示，避免 setData 序列化 Date 问题。onTapSaveUpload 多片分支读 this._session.chunks 而非 draft。
+  - 测试模拟分片：Page 集成测试调 inst._maybeRotateChunk(600) 触发 stop，再 recorder.handlers.stop(res) 走分片边界路由 → addChunk + _startNextChunk（recorder.start++）；最终 inst.onTapRecord() 触发 _stopRecording 收尾。每次 _startTimer 起真实 setInterval，最终停止后已 _clearTimer，无需额外 onUnload，但测试结尾仍 onUnload 兜底防事件循环挂起（沿用 US-013/014 陷阱）。
+---
