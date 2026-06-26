@@ -1,0 +1,30 @@
+## Codebase Patterns
+- 单一权威优先级：产品范围看 docs/PRD_v1.md，技术实现/schema/make target 看 docs/tech-spec.md，真实云资源/URL 看 docs/runbook/cloud-setup.md，开发红线看 AGENTS.md。冲突时按此优先级。
+- Python 用 uv workspace：根 pyproject.toml 只声明 dev 工具（mypy/ruff/pytest）+ 引用本地成员 soniscope-worker，业务依赖（oss/pydantic/pyyaml/typer/nls）放 apps/worker/pyproject.toml。
+- Worker 包采用 src 布局：apps/worker/src/soniscope_worker/，hatchling 打包，`[tool.hatch.build.targets.wheel] packages = ["src/soniscope_worker"]`。
+- 顶层 Makefile 是唯一命令入口；所有命令用 `uv run ...` 执行，用户无需 cd 子目录。target 命名遵循 tech-spec §6.5。
+- 质量门：`make typecheck`（mypy strict）、`make lint`（ruff，只查 apps/）、`make test`（pytest，testpaths=apps/worker/tests）。
+- mypy/ruff/pytest 配置集中在根 pyproject.toml；mypy 用 files=apps/worker/{src,tests} + mypy_path + explicit_package_bases 适配 src 布局。
+- 运行时数据目录与 repo 分离：$SONISCOPE_HOME（默认 ~/SoniScope），由 paths.py 解析；config.yaml、运行时目录、测试音频二进制均 gitignore，不进 git。
+- 不要“修正”真实云资源里的拼写，尤其 issue-cedential-ottfirocds（少一个 r）。
+- 遗留 scripts/test_asr.py、scripts/fetch_test_fixtures.py 暂不纳入 lint（ruff 只查 apps/），由其归属 story（US-003 等）收口。
+
+---
+
+## 2026-06-27 00:20 - US-001
+- 实现了什么：建立 monorepo 骨架与 Python Worker 基础。
+  - 根 pyproject.toml：uv workspace（members=apps/worker），dev 工具组（mypy/ruff/pytest），mypy strict + ruff + pytest 配置集中于此；不直接声明 Worker 业务依赖。
+  - apps/worker/pyproject.toml：包名 soniscope-worker，src 布局，hatchling 构建，依赖 typer，CLI 脚本入口 soniscope_worker.cli:app。
+  - Worker 初始模块：__init__.py（__version__）、__main__.py（python -m soniscope_worker 入口）、cli.py（typer app，run/version 命令占位）、config.py（config_path 占位，完整 schema 留 US-002）、paths.py（soniscope_home/inbox/fragments/tmp 解析）。
+  - 顶层 Makefile：install/check-config/init-dirs/worker-run/typecheck/lint/test + help；check-config、init-dirs 为占位（完整逻辑 US-002）。
+  - apps/worker/tests/test_skeleton.py：5 个冒烟测试（版本、CLI run/version、SONISCOPE_HOME 解析与回退）。
+  - .gitignore：补充 /SoniScope/、config.yaml、*.env（build/、.env、tests/audio/*.wav|m4a 原已忽略）。
+  - uv.lock 由 make install (uv sync) 生成并纳入 git。
+- 更改的文件：pyproject.toml、apps/worker/pyproject.toml、apps/worker/src/soniscope_worker/{__init__,__main__,cli,config,paths}.py、apps/worker/tests/test_skeleton.py、Makefile、.gitignore、uv.lock、scripts/ralph/prd.json（US-001 passes=true）。
+- 验证：make typecheck（mypy 6 文件 0 错）、make lint（ruff apps/ 全过）、make test（5 passed）全部通过；`python -m soniscope_worker version/run` 正常；git check-ignore 确认 .venv 与测试音频不入库。
+- **未来迭代的学习：**
+  - 陷阱：首次 `uv sync` 较慢（解析 + 下载约十几分钟，受网络影响），后续走缓存很快；macOS 跨文件系统会有 reflink 警告，可 `export UV_LINK_MODE=copy` 抑制。
+  - 陷阱：`ruff check .` 会扫到遗留 scripts/test_asr.py 报 E501 等 12 个错；本仓库 lint 故意只查 apps/，新代码放 apps/ 下即纳入检查。
+  - 上下文：US-002 接手 config.py（Pydantic v2 schema + 脱敏加载 + 缺失字段一次列全）、check-config、init-dirs，并在 worker 依赖里加 pydantic/pyyaml；make target 命名见 tech-spec §6.5。
+  - 上下文：mypy 用 strict，新增模块需完整类型注解；typer 命令函数返回 None 要显式标注。
+---

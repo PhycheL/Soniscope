@@ -1,6 +1,6 @@
 {
   "project": "日观声记 MVP（SoniScope）",
-  "branchName": "ralph/soniscope-mvp-cloud-asr",
+  "branchName": "ralph/soniscope-mvp-claude",
   "description": "日观声记 MVP：微信小程序录音生成草稿，上传到阿里云 OSS，经 FC 3.0 签发与确认，由 Python Worker 拉取并调用阿里云 NLS 云端 ASR 转写后本地落盘。",
   "userStories": [
     {
@@ -18,7 +18,7 @@
         "Tests pass"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "retryCount": 0,
       "blocked": false

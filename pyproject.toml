@@ -1,0 +1,42 @@
+[project]
+name = "soniscope"
+version = "0.1.0"
+description = "日观声记 SoniScope monorepo workspace 根（不直接声明 Worker 业务依赖）"
+requires-python = ">=3.11"
+# 根项目只引用本地 workspace 成员，业务依赖（oss / pydantic / pyyaml / typer / nls）
+# 声明在 apps/worker/pyproject.toml，不在此处。
+dependencies = ["soniscope-worker"]
+
+[dependency-groups]
+dev = [
+    "mypy>=1.8",
+    "ruff>=0.4",
+    "pytest>=8.0",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["apps/worker"]
+
+[tool.uv.sources]
+soniscope-worker = { workspace = true }
+
+[tool.mypy]
+strict = true
+python_version = "3.11"
+files = ["apps/worker/src", "apps/worker/tests"]
+mypy_path = ["apps/worker/src"]
+explicit_package_bases = true
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["apps/worker/src", "apps/worker/tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["apps/worker/tests"]

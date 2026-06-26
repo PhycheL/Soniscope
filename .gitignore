@@ -182,3 +182,8 @@ pyrightconfig.json
 # 保留同目录的 .md 转写文本与 test_asr.py。
 tests/audio/*.wav
 tests/audio/*.m4a
+
+# SoniScope 运行时数据目录与本地明文配置（与 repo 分离，绝不进 git）
+/SoniScope/
+config.yaml
+*.env
