@@ -14,12 +14,15 @@
 
 from __future__ import annotations
 
+import datetime
+import json
 import os
 import shutil
 import sys
+import time
 import urllib.error
 import urllib.request
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol
@@ -55,6 +58,35 @@ SUCCESS_LINE = "✅ US-001 preparation verified. Ready for US-003+"
 
 # transcript.json 结构必备键（tech-spec §3.4）。
 NLS_RESULT_KEYS: tuple[str, ...] = ("segments", "language", "model", "params_version", "provider")
+
+# 部署期凭证环境变量（tech-spec §6.4）；绝不写死到代码 / git，从本地 .env 或 CI secret 注入。
+DEPLOY_AK_ID_ENV = "ALIYUN_DEPLOY_AK_ID"
+DEPLOY_AK_SECRET_ENV = "ALIYUN_DEPLOY_AK_SECRET"
+
+# OSS 测试素材在 Bucket 中的 sample/ 前缀对象（NLS 拉取用，sha256 同 tests/audio/sample-20s.wav）。
+SAMPLE_OSS_KEY = "sample/sample-20s.wav"
+
+# 过期反例：等到 STS 凭证过期后再多等的缓冲秒数。
+STS_EXPIRY_WAIT_BUFFER_SECONDS = 15
+
+# OSS 错误码分类：越权应得 AccessDenied，过期应得 ExpiredToken（或等价过期/拒绝码）。
+OSS_DENIED_CODES = frozenset({"AccessDenied", "Forbidden", "AccessForbidden"})
+OSS_EXPIRED_CODES = frozenset(
+    {
+        "ExpiredToken",
+        "SecurityTokenExpired",
+        "InvalidSecurityToken",
+        "InvalidSecurityToken.Expired",
+        "InvalidAccessKeyId",
+        "TokenExpired",
+    }
+)
+
+# 阿里云 NLS 录音文件识别（filetrans）POP 调用参数（与 scripts/test_asr.py 基线一致）。
+NLS_FILETRANS_PRODUCT = "nls-filetrans"
+NLS_FILETRANS_VERSION = "2018-08-17"
+NLS_POLL_INTERVAL_SECONDS = 5.0
+NLS_POLL_TIMEOUT_SECONDS = 300.0
 
 
 class ProbeError(Exception):
@@ -299,6 +331,58 @@ def check_nls_result(result: Mapping[str, object]) -> CheckResult:
     )
 
 
+# ── STS / NLS 纯逻辑（无 IO，直接单测）──────────────────────────────────────
+def single_key_policy(object_key: str) -> dict[str, object]:
+    """构造仅允许 PutObject 到单个 object key 的 STS policy（tech-spec §4.4，无通配符）。"""
+    return {
+        "Version": "1",
+        "Statement": [
+            {
+                "Effect": "Allow",
+                "Action": ["oss:PutObject"],
+                "Resource": [f"acs:oss:*:*:{EXPECTED_BUCKET}/{object_key}"],
+            }
+        ],
+    }
+
+
+def is_denied(error_code: str, *, expiry: bool) -> bool:
+    """OSS 操作是否如预期被拒：越权应得 AccessDenied，过期应得过期 / 拒绝码。"""
+    code = error_code.strip()
+    if not code:
+        return False
+    if expiry:
+        return code in OSS_EXPIRED_CODES or code in OSS_DENIED_CODES
+    return code in OSS_DENIED_CODES
+
+
+def nls_response_to_result(resp: Mapping[str, object], cfg: SoniScopeConfig) -> dict[str, object]:
+    """把 NLS 录音文件识别响应映射为 transcript.json schema（tech-spec §3.4）。"""
+    segments: list[dict[str, object]] = []
+    result = resp.get("Result")
+    sentences = result.get("Sentences") if isinstance(result, Mapping) else None
+    if isinstance(sentences, list):
+        for s in sentences:
+            if not isinstance(s, Mapping):
+                continue
+            begin = s.get("BeginTime")
+            end = s.get("EndTime")
+            segments.append(
+                {
+                    "start": float(begin) / 1000.0 if isinstance(begin, (int, float)) else 0.0,
+                    "end": float(end) / 1000.0 if isinstance(end, (int, float)) else 0.0,
+                    "text": str(s.get("Text", "")),
+                }
+            )
+    return {
+        "segments": segments,
+        "language": "zh",
+        "model": cfg.transcriber.model,
+        "params_version": cfg.transcriber.params_version,
+        "provider": cfg.transcriber.provider,
+    }
+
+
 # ── 编排：拉取数据 → 跑校验 → 汇总 ──────────────────────────────────────────
 @dataclass
 class VerifyContext:
@@ -442,12 +526,54 @@ class RealProbes:
             return BucketInfo(exists=False, region="", acl=f"error:{type(exc).__name__}")
 
     def sts_escape(self, cfg: SoniScopeConfig) -> Sequence[StsCase]:
-        # 真实执行需部署凭证 + STS/OSS SDK + 单 key policy；此处给出明确未就绪提示，
-        # 由 US-007/US-008 的 issue-credential 联调脚本承载完整反例（见 tech-spec §4.4）。
-        raise ProbeError(
-            "STS 越权反例需部署凭证（ALIYUN_DEPLOY_AK_ID/SECRET）与 alibabacloud-sts SDK；"
-            "请在 US-007/US-008 联调环境执行，或安装 SDK 后重跑。"
+        # 用部署凭证 AssumeRole 拿到限定单 object key 的 STS 临时凭证，再跑 4 个越权反例。
+        deploy_id = os.environ.get(DEPLOY_AK_ID_ENV, "").strip()
+        deploy_secret = os.environ.get(DEPLOY_AK_SECRET_ENV, "").strip()
+        if not deploy_id or not deploy_secret:
+            raise ProbeError(
+                f"缺少部署凭证 {DEPLOY_AK_ID_ENV}/{DEPLOY_AK_SECRET_ENV}（tech-spec §6.4）；"
+                "请在本地 .env 注入后重跑。"
+            )
+        sts = _import_sts()
+        oss = _import_oss()
+        allowed_key = _verify_prep_object_key()
+        other_key = _verify_prep_other_key()
+        region = cfg.transcriber.api_endpoint or EXPECTED_REGION
+        try:
+            cred = _assume_role_single_key(sts, deploy_id, deploy_secret, region, allowed_key)
+            client = _oss_sts_client(oss, cfg.oss.endpoint, cred)
+        except ProbeError:
+            raise
+        except Exception as exc:  # noqa: BLE001 — 任意失败都收敛为单项 fail（不泄漏明文）
+            raise ProbeError(
+                f"AssumeRole 或 OSS 客户端初始化失败：{type(exc).__name__}"
+            ) from exc
+
+        cases: list[StsCase] = []
+        # 1) 越权 PutObject 到其他 key
+        cases.append(
+            _put_case(oss, client, other_key, "越权 PutObject 到其他 key", expiry=False)
         )
+        # 2) 越权 ListBucket / ListObjects
+        list_code = _run_oss_op(
+            lambda: client.list_objects_v2(
+                oss.ListObjectsV2Request(bucket=EXPECTED_BUCKET, max_keys=1)
+            )
+        )
+        cases.append(_to_case("越权 ListObjects（列举 Bucket）", list_code, expiry=False))
+        # 3) 越权 GetObject
+        get_code = _run_oss_op(
+            lambda: client.get_object(oss.GetObjectRequest(bucket=EXPECTED_BUCKET, key=allowed_key))
+        )
+        cases.append(_to_case("越权 GetObject", get_code, expiry=False))
+        # 4) 等待超过 STS 有效期上限后 PutObject
+        wait = _seconds_until_expiry(cred) + STS_EXPIRY_WAIT_BUFFER_SECONDS
+        if wait > 0:
+            time.sleep(wait)
+        cases.append(
+            _put_case(oss, client, allowed_key, "等待超过 STS 有效期上限后 PutObject", expiry=True)
+        )
+        return cases
 
     def fc_curl(self, url: str) -> FcProbe:
         req = urllib.request.Request(url, method="GET")  # noqa: S310 — 固定 https 常量 URL
@@ -464,11 +590,12 @@ class RealProbes:
     def nls_transcribe(self, cfg: SoniScopeConfig, audio: Path) -> Mapping[str, object]:
         if not audio.is_file():
             raise ProbeError(f"测试音频缺失：{audio}（先运行 make 拉取 fixture）")
-        # 真实 NLS 调用在 US-026 CloudSpeechTranscriber 落地；此处提示在该实现就绪后联调。
-        raise ProbeError(
-            "NLS 转写探针依赖 US-026 CloudSpeechTranscriber（alibabacloud-nls）；"
-            "请在该实现就绪后通过 make test-transcribe-oss-url 联调。"
-        )
+        oss = _import_oss()
+        core = _import_nls_core()
+        # 默认走 OSS 签名 URL（有效期 1 小时）让 NLS 拉取原始 object（tech-spec §5.2）。
+        file_link = _presign_sample_url(oss, cfg)
+        resp = _nls_filetrans(core, cfg, file_link)
+        return nls_response_to_result(resp, cfg)
 
     def fixture_results(self, audio_dir: Path, manifest_path: Path) -> Sequence[CheckResult]:
         try:
@@ -522,6 +649,218 @@ def _oss_client(oss: Any, endpoint: str, ak_id: str, ak_secret: str) -> Any:
     cfg.region = EXPECTED_REGION
     cfg.endpoint = endpoint
     return oss.Client(cfg)
+
+
+# ── STS 越权反例：真实 IO 辅助 ───────────────────────────────────────────────
+def _today() -> str:
+    return datetime.date.today().isoformat()
+
+
+def _verify_prep_object_key() -> str:
+    """STS policy 允许的唯一 object key（不会真正写入，仅作 policy 资源约束）。"""
+    return f"recordings/{_today()}/verify-prep-allowed.wav"
+
+
+def _verify_prep_other_key() -> str:
+    """越权反例尝试写入的另一个 key（必须被拒）。"""
+    return f"recordings/{_today()}/verify-prep-escape.wav"
+
+
+def _import_sts() -> Any:
+    try:
+        from alibabacloud_sts20150401 import models as sts_models
+        from alibabacloud_sts20150401.client import Client as StsClient
+        from alibabacloud_tea_openapi import models as open_api_models
+
+        return StsClient, sts_models, open_api_models
+    except ImportError as exc:  # pragma: no cover - 依赖缺失路径
+        raise ProbeError(
+            "缺少依赖 alibabacloud-sts20150401 / alibabacloud-tea-openapi，请 "
+            "`uv add --package soniscope-worker alibabacloud-sts20150401 "
+            "alibabacloud-tea-openapi`。"
+        ) from exc
+
+
+def _assume_role_single_key(
+    sts: Any, ak_id: str, ak_secret: str, region: str, object_key: str
+) -> Any:
+    """用部署凭证 AssumeRole，签发仅允许 PutObject 到单 key、有效期 <= 900s 的临时凭证。"""
+    sts_client_cls, sts_models, open_api_models = sts
+    cfg = open_api_models.Config(access_key_id=ak_id, access_key_secret=ak_secret)
+    cfg.endpoint = f"sts.{region}.aliyuncs.com"
+    client = sts_client_cls(cfg)
+    req = sts_models.AssumeRoleRequest(
+        role_arn=RAM_ROLE_ARN,
+        role_session_name="soniscope-verify-prep",
+        duration_seconds=STS_MAX_DURATION_SECONDS,
+        policy=json.dumps(single_key_policy(object_key)),
+    )
+    return client.assume_role(req).body.credentials
+
+
+def _oss_sts_client(oss: Any, endpoint: str, cred: Any) -> Any:
+    cfg = oss.config.load_default()
+    cfg.credentials_provider = oss.credentials.StaticCredentialsProvider(
+        access_key_id=cred.access_key_id,
+        access_key_secret=cred.access_key_secret,
+        security_token=cred.security_token,
+    )
+    cfg.region = EXPECTED_REGION
+    cfg.endpoint = endpoint
+    return oss.Client(cfg)
+
+
+def _seconds_until_expiry(cred: Any) -> float:
+    """解析 STS 凭证 expiration（ISO8601），返回距过期的秒数；解析失败退化为有效期上限。"""
+    exp = getattr(cred, "expiration", None)
+    if isinstance(exp, str) and exp:
+        try:
+            dt = datetime.datetime.fromisoformat(exp.replace("Z", "+00:00"))
+        except ValueError:
+            return float(STS_MAX_DURATION_SECONDS)
+        now = datetime.datetime.now(datetime.UTC)
+        return (dt - now).total_seconds()
+    return float(STS_MAX_DURATION_SECONDS)
+
+
+def _oss_error_code(exc: BaseException) -> str:
+    """从 OSS SDK 异常中提取错误码（AccessDenied / ExpiredToken 等）。"""
+    for attr in ("code", "error_code", "Code"):
+        val = getattr(exc, attr, None)
+        if val:
+            return str(val)
+    unwrap = getattr(exc, "unwrap", None)
+    if callable(unwrap):
+        try:
+            inner = unwrap()
+        except Exception:  # noqa: BLE001 - unwrap 自身异常忽略
+            inner = None
+        if inner is not None and inner is not exc:
+            return _oss_error_code(inner)
+    text = str(exc)
+    for code in (*OSS_EXPIRED_CODES, *OSS_DENIED_CODES):
+        if code in text:
+            return code
+    return (text[:80] or type(exc).__name__)
+
+
+def _run_oss_op(op: Callable[[], object]) -> str:
+    """执行一个 OSS 操作，返回错误码；空串表示操作意外成功（未被拒绝）。"""
+    try:
+        op()
+    except Exception as exc:  # noqa: BLE001 - 任意 OSS 异常都视为被拒并提取错误码
+        return _oss_error_code(exc)
+    return ""
+
+
+def _to_case(name: str, error_code: str, *, expiry: bool) -> StsCase:
+    denied = is_denied(error_code, expiry=expiry)
+    return StsCase(
+        name=name,
+        denied=denied,
+        error_code=error_code or "操作意外成功（未被拒绝）",
+    )
+
+
+def _put_case(oss: Any, client: Any, key: str, name: str, *, expiry: bool) -> StsCase:
+    code = _run_oss_op(
+        lambda: client.put_object(oss.PutObjectRequest(bucket=EXPECTED_BUCKET, key=key, body=b"x"))
+    )
+    return _to_case(name, code, expiry=expiry)
+
+
+# ── NLS 录音文件识别：真实 IO 辅助 ──────────────────────────────────────────
+def _import_nls_core() -> Any:
+    try:
+        from aliyunsdkcore.client import AcsClient
+        from aliyunsdkcore.request import CommonRequest
+
+        return AcsClient, CommonRequest
+    except ImportError as exc:  # pragma: no cover - 依赖缺失路径
+        raise ProbeError(
+            "缺少依赖 aliyun-python-sdk-core，请 "
+            "`uv add --package soniscope-worker aliyun-python-sdk-core`。"
+        ) from exc
+
+
+def _presign_sample_url(oss: Any, cfg: SoniScopeConfig) -> str:
+    """为 OSS 上的 sample-20s.wav 生成有效期 1 小时的签名 GET URL（供 NLS 拉取）。"""
+    client = _oss_client(
+        oss,
+        cfg.oss.endpoint,
+        cfg.oss.access_key_id,
+        cfg.oss.access_key_secret.get_secret_value(),
+    )
+    try:
+        pre = client.presign(
+            oss.GetObjectRequest(bucket=cfg.oss.bucket, key=SAMPLE_OSS_KEY),
+            expires=datetime.timedelta(hours=1),
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise ProbeError(f"生成 OSS 签名 URL 失败：{type(exc).__name__}") from exc
+    url = getattr(pre, "url", None)
+    if not url:
+        raise ProbeError("生成 OSS 签名 URL 失败：响应无 url 字段")
+    return str(url)
+
+
+def _nls_common_request(core: Any, domain: str, action: str, method: str) -> Any:
+    _, common_request_cls = core
+    req = common_request_cls()
+    req.set_domain(domain)
+    req.set_version(NLS_FILETRANS_VERSION)
+    req.set_product(NLS_FILETRANS_PRODUCT)
+    req.set_action_name(action)
+    req.set_method(method)
+    return req
+
+
+def _nls_filetrans(core: Any, cfg: SoniScopeConfig, file_link: str) -> Mapping[str, object]:
+    """提交 NLS 录音文件识别任务并轮询结果（参考 scripts/test_asr.py 基线）。"""
+    acs_client_cls, _ = core
+    region = cfg.transcriber.api_endpoint or EXPECTED_REGION
+    domain = f"filetrans.{region}.aliyuncs.com"
+    client = acs_client_cls(
+        cfg.transcriber.access_key_id,
+        cfg.transcriber.access_key_secret.get_secret_value(),
+        region,
+    )
+    task = {
+        "appkey": cfg.transcriber.appkey.get_secret_value(),
+        "file_link": file_link,
+        "version": "4.0",
+        "enable_words": False,
+        "enable_sample_rate_adaptive": True,
+    }
+    submit = _nls_common_request(core, domain, "SubmitTask", "POST")
+    submit.add_body_params("Task", json.dumps(task, ensure_ascii=False))
+    try:
+        raw = client.do_action_with_exception(submit)
+    except Exception as exc:  # noqa: BLE001 - POP SDK 抛通用异常（4xx 立即失败）
+        raise ProbeError(f"NLS SubmitTask 失败：{type(exc).__name__}") from exc
+    submitted = json.loads(raw)
+    if submitted.get("StatusText") != "SUCCESS":
+        raise ProbeError(f"NLS SubmitTask 未成功：{submitted.get('StatusText')}")
+    task_id = submitted["TaskId"]
+
+    query = _nls_common_request(core, domain, "GetTaskResult", "GET")
+    query.add_query_param("TaskId", task_id)
+    deadline = time.monotonic() + NLS_POLL_TIMEOUT_SECONDS
+    while True:
+        try:
+            raw = client.do_action_with_exception(query)
+        except Exception as exc:  # noqa: BLE001
+            raise ProbeError(f"NLS GetTaskResult 失败：{type(exc).__name__}") from exc
+        resp: dict[str, object] = json.loads(raw)
+        status = resp.get("StatusText")
+        if status in ("RUNNING", "QUEUEING"):
+            if time.monotonic() >= deadline:
+                raise ProbeError(f"NLS 轮询超时（仍为 {status}）")
+            time.sleep(NLS_POLL_INTERVAL_SECONDS)
+            continue
+        if status != "SUCCESS":
+            raise ProbeError(f"NLS 识别未成功：{status}")
+        return resp
 
 
 # ── 顶层入口（CLI 调用）─────────────────────────────────────────────────────

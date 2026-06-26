@@ -114,3 +114,47 @@
     一旦本机装好 alibabacloud-oss-v2 且 config 有效，A/B/C/E/G 五块即可真实出结果。
   - 陷阱：ruff line-length=100 对 CJK 按显示宽度计数，含中文的长 fix_hint 容易超限；用括号续行或 if/else 表达式换行拆开。
 ---
+
+## 2026-06-27 02:10 - US-004（第 2 次：修复 STS / NLS 真实 IO 占位）
+- 背景：Validator 第 1 次判定 US-004 失败——RealProbes.sts_escape / nls_transcribe 是硬编码
+  `raise ProbeError` 占位（指向 US-007/US-026），无论云端是否就绪都不执行真实云调用，
+  导致 AC#4（STS 越权反例）/AC#6（NLS 真实转写）永远 FAIL、AC#9 末行不可达。
+- 修复（apps/worker/src/soniscope_worker/verify_prep.py）：把两个占位替换为**真实 IO**，
+  并按既有 Probes 模式把可测逻辑抽成纯函数（无 IO、已单测），IO 用 lazy import 云 SDK：
+  · RealProbes.sts_escape：读 ALIYUN_DEPLOY_AK_ID/SECRET（缺则 ProbeError）→ 用部署凭证
+    AssumeRole（alibabacloud-sts20150401 + tea-openapi）签发**单 object key、duration<=900s**
+    的临时凭证 → 用临时凭证建 OSS client（带 security_token）跑 4 个越权反例：
+    ①越权 PutObject 到其他 key ②ListObjectsV2 ③GetObject ④等到凭证过期后再 PutObject；
+    每例用 `_run_oss_op` 捕获异常并 `_oss_error_code` 提取错误码，`is_denied` 判定是否如预期
+    被拒（越权要 AccessDenied；过期要 ExpiredToken/等价过期或拒绝码）。AssumeRole/建 client
+    失败收敛为 ProbeError（仅含异常类名，不泄漏明文）。
+  · RealProbes.nls_transcribe：本地 fixture 存在性校验后，用 OSS 签名 URL（1 小时，
+    `_presign_sample_url` 对 sample/sample-20s.wav presign）→ NLS 录音文件识别 filetrans
+    POP API（aliyunsdkcore CommonRequest，SubmitTask+GetTaskResult 轮询，复用 scripts/test_asr.py
+    基线）→ `nls_response_to_result` 把 Result.Sentences 映射为 transcript.json schema
+    （segments[start/end/text]、language=zh、model/params_version/provider 取自 config）。
+  · 新增纯函数 single_key_policy / is_denied / nls_response_to_result（§4.4 / §3.4），均已单测。
+- 其它改动：pyproject.toml mypy overrides 增加 alibabacloud_sts20150401.* / alibabacloud_tea_openapi.*
+  / aliyunsdkcore.*（lazy import 云 SDK 无 stub）。test_verify_prep.py 新增 8 用例：
+  policy 单 key 无通配符、is_denied 分类、NLS 响应映射（通过/空 segments）、RealProbes 缺部署凭证
+  →ProbeError、缺 SDK→ProbeError（不抛裸异常）、缺音频→ProbeError、STS duration<=900。
+- 更改的文件：apps/worker/src/soniscope_worker/verify_prep.py、apps/worker/tests/test_verify_prep.py、
+  pyproject.toml、scripts/ralph/{prd.json,progress.txt}。
+- 验证：make typecheck（mypy 11 文件 0 错）、make lint（ruff 全过）、make test（74 passed）全部通过。
+  真实跑 `make verify-prep`（临时 config + 假部署凭证、本机未装云 SDK）：13/16 通过，STS/NLS/OSS
+  三项 FAIL 均为「缺少依赖 …（环境）」——证明已是**真实 IO 路径**（STS 越过部署凭证门控进到
+  AssumeRole 的 SDK lazy import；NLS 进到 OSS presign），不再是指向 US-007/US-026 的逻辑占位；
+  报告 0 处密钥明文泄漏。未跑：真实云端全绿（需在 Worker 主机装 alibabacloud-oss-v2/
+  alibabacloud-sts20150401/aliyun-python-sdk-core + 有效 AK/部署凭证，本沙箱不具备）。
+- **未来迭代的学习：**
+  - 云 SDK 一律 lazy import + 缺失抛 ProbeError（不进 hard deps），与已被验收接受的 OSS 探针一致；
+    真实主机按 verify-prep 输出的 `uv add --package soniscope-worker <pkg>` 提示安装即可全绿。
+  - STS 过期反例（AC#4 第 4 例）会真实 `time.sleep` 到凭证过期（AssumeRole 最短 900s）+缓冲，
+    因此真实 `make verify-prep` 的 D 块至少耗时 ~15 分钟；这是 AC 要求的真实过期校验，单测用
+    FakeProbes 不触发该 sleep。
+  - NLS 录音文件识别用的是 filetrans POP API（aliyunsdkcore，version 2018-08-17，product
+    nls-filetrans），不是 tech-spec §6.3 字面列的 alibabacloud-nls20180628（那是实时流式 SDK）；
+    录音文件识别的可用基线脚本是 scripts/test_asr.py，US-026 的 CloudSpeechTranscriber 可复用本处
+    nls_response_to_result 映射逻辑。
+  - OSS v2 临时凭证客户端：StaticCredentialsProvider 必须带 security_token，否则 STS 凭证无效。
+---

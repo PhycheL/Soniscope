@@ -17,15 +17,19 @@ from typer.testing import CliRunner
 from soniscope_worker.cli import app
 from soniscope_worker.config import SoniScopeConfig
 from soniscope_worker.verify_prep import (
+    DEPLOY_AK_ID_ENV,
+    DEPLOY_AK_SECRET_ENV,
     EXPECTED_BUCKET,
     EXPECTED_REGION,
     MIN_DISK_BYTES,
+    STS_MAX_DURATION_SECONDS,
     SUCCESS_LINE,
     BucketInfo,
     CheckResult,
     EnvInfo,
     FcProbe,
     ProbeError,
+    RealProbes,
     RepoLayout,
     StsCase,
     all_passed,
@@ -36,7 +40,10 @@ from soniscope_worker.verify_prep import (
     check_oss_bucket,
     check_sts_escape,
     format_report,
+    is_denied,
+    nls_response_to_result,
     run_verify_prep,
+    single_key_policy,
 )
 
 runner = CliRunner()
@@ -352,3 +359,80 @@ def test_cli_verify_prep_missing_config_exits_nonzero(
     monkeypatch.setenv("SONISCOPE_HOME", str(tmp_path))
     result = runner.invoke(app, ["verify-prep"])
     assert result.exit_code == 1
+
+
+# --- STS / NLS 纯逻辑 ----------------------------------------------------------
+def test_single_key_policy_is_single_key_putobject_only() -> None:
+    key = "recordings/2026-06-27/x.wav"
+    policy = single_key_policy(key)
+    stmts = policy["Statement"]
+    assert isinstance(stmts, list) and len(stmts) == 1
+    stmt = stmts[0]
+    assert stmt["Action"] == ["oss:PutObject"]
+    resource = stmt["Resource"]
+    assert resource == [f"acs:oss:*:*:{EXPECTED_BUCKET}/{key}"]
+    # 必须精确到单 key，不能含通配符（tech-spec §4.4）。
+    assert "*" not in resource[0].split(EXPECTED_BUCKET + "/", 1)[1]
+
+
+def test_is_denied_classification() -> None:
+    assert is_denied("AccessDenied", expiry=False)
+    assert not is_denied("", expiry=False)
+    assert not is_denied("NoSuchKey", expiry=False)
+    # 过期场景接受过期码与拒绝码。
+    assert is_denied("ExpiredToken", expiry=True)
+    assert is_denied("SecurityTokenExpired", expiry=True)
+    assert is_denied("AccessDenied", expiry=True)
+    # 越权（非过期）场景不接受过期码（过期码不代表权限边界被正确执行）。
+    assert not is_denied("ExpiredToken", expiry=False)
+
+
+def test_nls_response_to_result_maps_segments() -> None:
+    resp: dict[str, object] = {
+        "StatusText": "SUCCESS",
+        "Result": {
+            "Sentences": [
+                {"BeginTime": 0, "EndTime": 2500, "Text": "今天天气不错"},
+                {"BeginTime": 2500, "EndTime": 5100, "Text": "我准备去公园跑步"},
+            ]
+        },
+    }
+    result = nls_response_to_result(resp, _cfg())
+    assert result["language"] == "zh"
+    assert result["provider"] == "aliyun-nls"
+    segments = result["segments"]
+    assert isinstance(segments, list) and len(segments) == 2
+    assert segments[0] == {"start": 0.0, "end": 2.5, "text": "今天天气不错"}
+    # 映射结果必须能通过结构校验。
+    assert check_nls_result(result).ok
+
+
+def test_nls_response_to_result_empty_when_no_sentences() -> None:
+    result = nls_response_to_result({"StatusText": "SUCCESS"}, _cfg())
+    assert result["segments"] == []
+    assert not check_nls_result(result).ok  # 空 segments 应判失败
+
+
+# --- RealProbes 真实 IO 错误路径（不触网）-------------------------------------
+def test_real_probes_sts_escape_requires_deploy_creds(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv(DEPLOY_AK_ID_ENV, raising=False)
+    monkeypatch.delenv(DEPLOY_AK_SECRET_ENV, raising=False)
+    with pytest.raises(ProbeError, match="部署凭证"):
+        RealProbes().sts_escape(_cfg())
+
+
+def test_real_probes_sts_escape_missing_sdk_is_probe_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    # 有部署凭证但本环境未安装 STS/OSS SDK → 收敛为 ProbeError（不抛裸异常）。
+    monkeypatch.setenv(DEPLOY_AK_ID_ENV, "deployIdPlaceholder")
+    monkeypatch.setenv(DEPLOY_AK_SECRET_ENV, "deploySecretPlaceholder")
+    with pytest.raises(ProbeError):
+        RealProbes().sts_escape(_cfg())
+
+
+def test_real_probes_nls_missing_audio_is_probe_error(tmp_path: Path) -> None:
+    with pytest.raises(ProbeError, match="测试音频缺失"):
+        RealProbes().nls_transcribe(_cfg(), tmp_path / "missing.wav")
+
+
+def test_sts_max_duration_within_limit() -> None:
+    assert STS_MAX_DURATION_SECONDS <= 900

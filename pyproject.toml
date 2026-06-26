@@ -33,7 +33,12 @@ explicit_package_bases = true
 
 # 云 SDK 为可选运行时依赖（lazy import，无类型 stub），verify-prep 等真实探针用到。
 [[tool.mypy.overrides]]
-module = ["alibabacloud_oss_v2.*"]
+module = [
+    "alibabacloud_oss_v2.*",
+    "alibabacloud_sts20150401.*",
+    "alibabacloud_tea_openapi.*",
+    "aliyunsdkcore.*",
+]
 ignore_missing_imports = true
 
 [tool.ruff]
