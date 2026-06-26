@@ -362,3 +362,22 @@
   - US-012 的 fragment_id 是 pending 占位（仅 object key 预览用），US-015 才正式生成 device_short_id（4-8 字符持久化）+ ULID 并写 manifest 草案的 session_id/chunk_seq/chunk_total/sha256 等；US-014 接草稿确认态（试听/重录/删除/保存并上传）会复用本处 buildDraftManifest 产出的 draft。
   - original_format 探测口径：前端只能拿临时文件扩展名（AC#5「扩展名不可靠时用探测结果」）；微信端无 ffprobe，真正的格式探测在 Worker（US-022 ffprobe）。前端 detectOriginalFormat 已对 mp3/aac/m4a/amr/wav 等做扩展名→回退请求格式两级兜底。
 ---
+
+## 2026-06-27 10:00 - US-013
+- 实现了什么：小程序录音中断保护与草稿恢复提示（AC#1-#7；锁屏/来电/切后台中断自动停止并落盘草稿，回前台提示保留/丢弃/继续新录）。
+  - apps/miniprogram/utils/draft.js（新增纯逻辑模块，复用 audio.buildDraftManifest）：STATUS_DRAFT_INTERRUPTED='draft_interrupted' + 标签 '草稿（被中断保存）'（AC#3）；INTERRUPT_DRAFT_STORAGE_KEY 单槽位（AC#6 天然去重）；RECOVERY_MESSAGE（AC#4 措辞与 PRD 一致）；buildInterruptedDraft（叠加 status/status_label/interrupted/interrupt_reason，保证含 duration_seconds）；buildRecoveryPrompt；dedupeInterruptedDraft（单槽位最后状态胜出）。
+  - apps/miniprogram/pages/index/index.js：onLoad 绑定 recorder.onInterruptionBegin/onInterruptionEnd（AC#1）+ Page onHide 作为等价切后台中断（AC#1）+ onShow 读 storage 展示恢复提示（AC#4）；_handleInterruption(reason)（录音中触发自动 recorder.stop，_interruptHandled 同一次录音去重 AC#2/#6）；_onRecordStop 按 _interrupting 分流：中断走 _saveInterruptedDraft（buildInterruptedDraft→wx.setStorageSync 落盘 AC#2，duration 缺失时回退计时差 AC#3），普通走 US-012 草稿路径；onKeepDraft/onDiscardDraft/onRestartRecording 三动作（AC#5：保留草稿/清文件+记录/清理并重新录），_cleanupDraftFile 用 wx.getFileSystemManager().unlink best-effort，_clearInterruptStorage 清槽位。_startRecording 重置去重标志。
+  - apps/miniprogram/pages/index/index.wxml：新增 recovery 提示面板（message + 保留/丢弃/继续新录三按钮）；draft 标题改用 status_label（中断草稿显示「草稿（被中断保存）」）；hint 用 wx:elif 避免与 recovery 同时出现。
+  - apps/miniprogram/pages/index/index.wxss：新增 .recovery/.recovery-msg/.recovery-actions/.recovery-btn（keep 蓝/discard 红/restart 绿）。
+  - apps/miniprogram/test/interruption.test.js（新增，node 内置 test runner + 手写 wx/Page mock，9 用例）：覆盖中断回调注册（AC#1）、中断时停止录音（AC#2）、落盘+标记+含时长（AC#2/#3）、连续两次中断去重（AC#6）、onHide 切后台中断、未录音空操作、onShow 恢复提示（AC#4）、保留/丢弃/继续新录三迁移（AC#5）、dedupe 纯函数。
+  - apps/worker/tests/test_miniprogram_js.py（新增）：pytest 子进程跑 `node --test`，把小程序 JS 单测纳入 make test 统一质量门（node 缺失则 skip）。
+- 更改的文件：apps/miniprogram/utils/draft.js(新)、apps/miniprogram/pages/index/{index.js,index.wxml,index.wxss}、apps/miniprogram/test/interruption.test.js(新)、apps/worker/tests/test_miniprogram_js.py(新)、scripts/ralph/{prd.json,progress.txt}。
+- 验证：make typecheck（mypy 39 文件 0 错）、make lint（ruff apps/ 全过 + miniprogram lint passed）、make test（311 passed，+1 即 JS 包装测试，内部跑 9 个 node 子测试全过）全部通过；node --check 三个改动 .js 通过；node --test 直接跑 9/9 通过。
+  未跑：微信开发者工具模拟器 / 真机锁屏中断完整流程（AC#8）——本沙箱无 WeChat DevTools/真机，需人工在 DevTools + 真机 vConsole 复验「锁屏后解锁草稿存在、时长接近、无未捕获异常」。
+- **未来迭代的学习：**
+  - 小程序 JS 单测方案：用 node v22 内置 `node --test` + 手写 wx/Page mock（test_miniprogram_js.py 以 pytest 子进程纳入 make test）。关键陷阱①该 node 版本 `node --test <目录>` 会把目录当模块加载报 MODULE_NOT_FOUND，必须传显式 *.test.js 文件清单（Python 端 glob）；②Page 测试 harness：global.Page 捕获配置对象、global.wx 注入 mock、delete require.cache 后 require 重新执行；实例化用 Object.assign + 深拷贝 data + setData 浅合并。
+  - 陷阱：Page._startTimer 用真实 setInterval，测试里走「继续新录」分支后录音态会留下未清的 interval 挂住 node 事件循环（命令疑似卡死/后台化）；凡测试结束仍处录音态，必须显式 inst.onUnload() 清 timer。中断/停止路径已在 _handleInterruption/_stopRecording 里 _clearTimer，无需额外处理。
+  - 中断去重口径（AC#6）：双保险——_interruptHandled 标志（同一次录音内第二次中断 no-op）+ INTERRUPT_DRAFT_STORAGE_KEY 单槽位（后到草稿覆盖前一份）；_startRecording 重置标志，使新录音可再次响应中断。
+  - 上下文：US-014（草稿确认态：试听/重录/删除/保存并上传）会复用本处 draft（含 status_label）与 recovery 流程；中断草稿与普通草稿都进入同一草稿确认态。onShow 恢复提示与 US-014 的草稿确认 UI 需协调（本期 recovery 面板与 draft 卡片并存）。
+  - 上下文：中断「本地落盘」本期 = wx.setStorageSync 单槽位；真正的草稿/Fragment 持久化与上传队列在 US-015/US-017 落地，届时草稿存储模型可能从单槽位升级为按 fragment_id 的列表。
+---
