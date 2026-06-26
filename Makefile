@@ -4,7 +4,8 @@
 # worker-run / typecheck / lint / test；check-config 与 init-dirs 的完整逻辑在 US-002 实现。
 
 .PHONY: install check-config init-dirs verify-prep worker-run \
-	deploy-fc rollback-fc fc-logs test-fc-live typecheck lint test help
+	deploy-fc rollback-fc fc-logs test-fc-live test-verify-upload oss-delete-obj \
+	typecheck lint test help
 .DEFAULT_GOAL := help
 
 help: ## 显示可用命令
@@ -41,6 +42,16 @@ test-fc-live: ## issue-credential 云端联调（CODE= CODE_NOT_ALLOWED= SIZE_CO
 		$(if $(strip $(CODE_NOT_ALLOWED)),--code-not-allowed $(CODE_NOT_ALLOWED),) \
 		$(if $(strip $(SIZE_CODE)),--size-code $(SIZE_CODE),) \
 		$(if $(strip $(SKIP_EXPIRY)),--skip-expiry,)
+
+test-verify-upload: ## verify-upload 云端闭环（VERIFIED_CODE= NOT_FOUND_CODE= MISMATCH_CODE=）
+	uv run python -m soniscope_worker test-verify-upload \
+		$(if $(strip $(VERIFIED_CODE)),--verified-code $(VERIFIED_CODE),) \
+		$(if $(strip $(NOT_FOUND_CODE)),--not-found-code $(NOT_FOUND_CODE),) \
+		$(if $(strip $(MISMATCH_CODE)),--mismatch-code $(MISMATCH_CODE),)
+
+oss-delete-obj: ## 【仅测试用】删除 OSS 对象构造缺失场景（FRAGMENT_ID=<id> YES=1 或 SONISCOPE_ALLOW_OSS_DELETE=1）
+	uv run python -m soniscope_worker oss-delete-obj --fragment-id $(FRAGMENT_ID) \
+		$(if $(strip $(YES)),--yes,)
 
 typecheck: ## mypy strict 类型检查
 	uv run mypy

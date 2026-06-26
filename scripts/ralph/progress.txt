@@ -284,3 +284,28 @@
   - 陷阱：当一个 handler 从「占位 authorized」升级为真实业务，要同步把 test_fc_handlers.py 里基于占位响应的参数化测试（PLACEHOLDER_HANDLERS / authorized_path）收窄或移除，否则空 parametrize 或断言 status==authorized 会失败/误导；真实路径转到该 handler 的专项测试文件。
   - 上下文：verify-upload HeadObject 用 FC 子账号长期 AK（ALIYUN_AK_ID/SECRET，与 issue-credential 的 STS AssumeRole 凭证同名 env），不走 STS；OSS v2 client 建法见 verify_prep._oss_client（StaticCredentialsProvider + region + endpoint）。
 ---
+
+## 2026-06-27 07:00 - US-010
+- 实现了什么：verify-upload 云端闭环测试 `make test-verify-upload` + 仅测试用 `make oss-delete-obj`（tech-spec §4.2/§6.5）。沿用 fc_live 的「纯断言逻辑 + IO Protocol」模式。
+  - apps/worker/src/soniscope_worker/oss_admin.py（新增，US-010 首交付 oss-delete-obj，US-017/US-029 复用）：
+    · object_key_for（_FRAGMENT_ID_RE 解析 → recordings/<YYYY-MM-DD>/<id>.wav，格式/日期非法抛 OssAdminError）。
+    · delete_allowed（删除门控：--yes 或 SONISCOPE_ALLOW_OSS_DELETE=1，AGENTS 安全红线）。
+    · OssObjectStore Protocol（put/delete 注入点）+ RealOssObjectStore（复用 verify_prep._import_oss/_oss_client，用 config.yaml OSS AK，lazy import）。
+    · run_oss_delete_obj（未授权拒绝 exit1 / 非法 fragment_id / 删除异常收敛只记类名不泄漏明文 / 成功）。仅测试用、绝不进 Worker 业务路径。
+  - apps/worker/src/soniscope_worker/verify_upload_live.py（新增，make test-verify-upload）：
+    · 纯断言 assert_auth_failure（400/401 + 鉴权失败不泄露对象信息 etag/size/last_modified/actual_size/verified=true，AC#6）、assert_verified_true（200+4 字段齐全+size 一致，AC#3）、assert_object_not_found（AC#4）、assert_size_mismatch（actual_size 真实大小，AC#5）、make_fragment_id（合法 fragment_id）。
+    · 编排 run_checks：A 伪造 code→400/401（始终可跑）；B 上传对象+verify→true→清理；C 上传后删除→OBJECT_NOT_FOUND；D 100 字节 expected=200→SIZE_MISMATCH。每个真实 code 一次性，缺失即 SKIP（本地 CI exit 0）。
+    · all_passed/format_report：无 FAIL + 至少跑一项 + P95 达标（复用 latency.format_latency_report，阈值 1s，AC#7）；绝不打印 AK Secret。
+    · VerifyLiveProbes Protocol + RealVerifyUploadProbes（urllib POST FC_VERIFY_URL + RealOssObjectStore，缺失/不可达抛 ProbeError，构造无副作用调用才触网）。
+  - cli.py：新增 oss-delete-obj（--fragment-id/--yes）+ test-verify-upload（--verified-code/--not-found-code/--mismatch-code）两个 typer 子命令。
+  - Makefile：新增 oss-delete-obj（FRAGMENT_ID= YES=）+ test-verify-upload（VERIFIED_CODE= NOT_FOUND_CODE= MISMATCH_CODE=）target + .PHONY。
+  - apps/worker/tests/test_oss_admin.py（14 用例）+ test_verify_upload_live.py（24 用例，FakeProbes 注入全程不触网）。
+- 更改的文件：apps/worker/src/soniscope_worker/{oss_admin.py(新),verify_upload_live.py(新),cli.py}、Makefile、apps/worker/tests/{test_oss_admin.py(新),test_verify_upload_live.py(新)}、scripts/ralph/{prd.json,progress.txt}。
+- 验证：make typecheck（mypy 36 文件 0 错）、make lint（ruff apps/ 全过）、make test（287 passed，+38）全部通过；CLI --help 显示两命令；oss-delete-obj 未授权时拒绝并 exit 1。
+  未跑：真实 make deploy-fc FUNCTION=verify-upload + make test-verify-upload CODE=…（需真实 wx.login 一次性 code + ALIYUN_AK + 构造 OSS 对象 + HeadObject 触网，本沙箱不具备）。AC#1 部署 curl 存活复用 US-005 deploy_one；AC#8 日志复用 make fc-logs FUNCTION=verify-upload。
+- **未来迭代的学习：**
+  - AC#9「Worker 源码中不存在 DeleteObject 调用」的口径：按 AGENTS.md 权威解读为 **Worker 业务路径**（轮询/下载/转写/落盘，US-021+）绝不删除；oss-delete-obj 是**仅测试用**能力，按既有「make 命令做成 Worker CLI 子命令」的 codebase pattern 落在 worker 包内（便于 mypy/ruff/pytest 覆盖），但重度标注仅测试用 + --yes/env 双重门控。delete_object 当前只出现在 3 个 test/live 模块（oss_admin / verify_upload_live / fc_live），无业务路径调用。US-029 的 verify-oss-retention 扫日志校验也以此为准。
+  - 陷阱：ruff line-length=100 按 CJK 显示宽度计数，SKIP 文案里塞 `make test-verify-upload XXX=…` 容易超限；用「缺一次性 wx.login code」类短文案即可。
+  - 上下文：US-017 的 make show-oss-object（首交付）可复用 oss_admin.object_key_for + RealOssObjectStore 模式，扩展 HeadObject 读取（exists/size/etag/last_modified/元数据）；US-029 复用 oss-delete-obj 不重复实现。
+  - 上下文：verify-upload live 探针 RealOssObjectStore 用 config.yaml 长期 OSS AK 上传/删除测试对象，与 FC verify-upload 的 HeadObject（FC 子账号 AK）是两套凭证；本地 CI 无 config/无 code 时全 SKIP（伪造 code 一项也会因 FC 不可达 FAIL，故仅在能触网时跑）。
+---

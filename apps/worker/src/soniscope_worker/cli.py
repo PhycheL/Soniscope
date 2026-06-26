@@ -140,3 +140,54 @@ def test_fc_live(
     for line in lines:
         typer.echo(line, err=exit_code != 0)
     raise typer.Exit(code=exit_code)
+
+
+@app.command(name="oss-delete-obj")
+def oss_delete_obj(
+    fragment_id: str = typer.Option("", "--fragment-id", help="目标 fragment_id"),
+    yes: bool = typer.Option(False, "--yes", help="确认删除（仅测试用）"),
+) -> None:
+    """⚠️ 仅测试用：删除指定 fragment 的 OSS 对象（构造 verify 失败场景）。
+
+    需 --yes 或环境变量 SONISCOPE_ALLOW_OSS_DELETE=1；Worker 业务路径绝不删除 OSS。
+    """
+    import os
+
+    from soniscope_worker.oss_admin import run_oss_delete_obj
+
+    if not fragment_id.strip():
+        typer.echo("缺少 --fragment-id（make oss-delete-obj FRAGMENT_ID=<id>）", err=True)
+        raise typer.Exit(code=1)
+    lines, code = run_oss_delete_obj(fragment_id, confirmed=yes, env=os.environ)
+    for line in lines:
+        typer.echo(line, err=code != 0)
+    raise typer.Exit(code=code)
+
+
+@app.command(name="test-verify-upload")
+def test_verify_upload(
+    verified_code: str = typer.Option(
+        "", "--verified-code", help="verified:true 场景的一次性 code（AC#3）"
+    ),
+    not_found_code: str = typer.Option(
+        "", "--not-found-code", help="OBJECT_NOT_FOUND 场景的一次性 code（AC#4）"
+    ),
+    mismatch_code: str = typer.Option(
+        "", "--mismatch-code", help="SIZE_MISMATCH 场景的一次性 code（AC#5）"
+    ),
+) -> None:
+    """verify-upload 云端闭环联调（verified / 对象缺失 / 大小不一致 / 鉴权失败 + P95）。"""
+    from soniscope_worker.verify_upload_live import (
+        VerifyLiveOptions,
+        run_test_verify_upload,
+    )
+
+    opts = VerifyLiveOptions(
+        verified_code=verified_code,
+        not_found_code=not_found_code,
+        mismatch_code=mismatch_code,
+    )
+    lines, exit_code = run_test_verify_upload(opts)
+    for line in lines:
+        typer.echo(line, err=exit_code != 0)
+    raise typer.Exit(code=exit_code)
