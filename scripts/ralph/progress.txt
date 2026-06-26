@@ -339,3 +339,26 @@
   - WeChat DevTools 相关 AC（模拟器打开无报错、真机预览）本沙箱无法自动验证，已用 node --check（语法）+ JSON.parse（配置）做最大化静态验证；真机/模拟器项需人工复验。
   - default_miniprogram_root 用 Path(__file__).resolve().parents[4]/apps/miniprogram，与 fc_deploy/verify_prep 的 parents[4] 仓库根定位一致。
 ---
+
+## 2026-06-27 09:00 - US-012
+- 实现了什么：小程序首页录音开始/停止 + mm:ss 计时 + 停止后生成保留原始格式的本地草稿（tech-spec §5.1/ADR-1）。
+  - apps/miniprogram/utils/audio.js（新增纯函数模块，不依赖 wx 运行时，便于 node --check 与后续单测复用）：
+    · formatDuration（秒→mm:ss，floor + 负值兜底）；extensionOf（路径取小写扩展名）；
+    · detectOriginalFormat（优先临时文件扩展名，扩展名缺失/不可识别时回退录音请求格式，再回退 unknown）；
+      KNOWN_FORMATS=wav/mp3/aac/m4a/amr/pcm/silk/ogg。
+    · objectKeyDate（本地 <YYYY-MM-DD>）、fragmentTimestamp（本地 <YYYYMMDDTHHMMSS>）、toIso（ISO8601 带本地时区偏移）；
+    · previewFragmentId（US-012 仅预览：deviceShortId+ULID 用 pending 占位，US-015 正式生成）；
+    · buildObjectKeyPreview（recordings/<date>/<id>.wav，始终 .wav 目标扩展名，OSS_OBJECT_KEY_EXT 来自 config.js）；
+    · buildDraftManifest（US-012 范围草稿：recorded_at/duration_seconds/temp_file_path/audio.original_format/audio.size_bytes/object_key_preview；session_id/chunk_seq/sha256 等留 US-015）。
+  - apps/miniprogram/pages/index/index.js：从骨架升级为真实录音逻辑——onLoad 取 wx.getRecorderManager() 并 onStart/onStop/onError 绑定；onTapRecord 切换开始/停止；_startRecording 用 format=mp3 + duration=600000ms（长录音分片留 US-016）start()，setInterval 每秒按 Date.now() 实时差刷新 mm:ss；_onRecordStop 用 res.tempFilePath/duration/fileSize 构造草稿、setData(draft) 并 logger.info 打印 original_format/duration/temp_file_path/object_key_preview；_onRecordError 清计时+toast；onUnload 清计时防泄漏。
+  - apps/miniprogram/pages/index/index.wxml：草稿确认前用 hint，停止后 wx:if=draft 显示原始格式/时长/目标对象 key 预览 + “前端不转码”说明（试听/重录/上传留 US-014）。
+  - apps/miniprogram/pages/index/index.wxss：新增 .draft/.draft-row(--mono)/.draft-note/.hint 样式（圆形录音按钮 + active 红色已在 US-011）。
+- 更改的文件：apps/miniprogram/utils/audio.js（新）、apps/miniprogram/pages/index/{index.js,index.wxml,index.wxss}、scripts/ralph/{prd.json,progress.txt}。
+- 验证：make typecheck（mypy 38 文件 0 错）、make lint（ruff apps/ 全过 + miniprogram lint passed）、make test（310 passed，无回归）全部通过；node --check 两个 .js 通过；node 实跑 audio.js 纯函数确认 formatDuration（00:00/00:03/01:15）、detectOriginalFormat（mp3 路径=mp3、无扩展名回退 aac、空=unknown）、buildObjectKeyPreview/.buildDraftManifest（object key 为 recordings/<date>/<id>.wav、original_format=mp3、duration_seconds=3.2）正确。
+  未跑：微信开发者工具模拟器录音 3 秒（AC#7）/ 真机授权录音权限完整流程（AC#8）——本沙箱无 WeChat DevTools/真机，需人工在 DevTools + 真机 vConsole 复验 original_format 日志。
+- **未来迭代的学习：**
+  - 小程序录音用纯函数（utils/audio.js）+ Page 薄壳分层：可静态校验/可单测的逻辑（时长格式化、格式探测、object key/草稿构造）抽进 utils/，Page 只做 wx API 绑定与 setData；与 fc_shared/verify_prep 的「纯逻辑 + IO 注入」一脉相承，但小程序侧 IO 是 wx.getRecorderManager()，无法在沙箱跑。
+  - RecorderManager 回调（onStart/onStop/onError）应在 onLoad 一次性绑定，不要每次 start 重复绑定（会叠加多次触发）；计时用 Date.now() 差值而非 tick 累加，避免 setInterval 漂移；onUnload 必须 clearInterval 防泄漏。
+  - US-012 的 fragment_id 是 pending 占位（仅 object key 预览用），US-015 才正式生成 device_short_id（4-8 字符持久化）+ ULID 并写 manifest 草案的 session_id/chunk_seq/chunk_total/sha256 等；US-014 接草稿确认态（试听/重录/删除/保存并上传）会复用本处 buildDraftManifest 产出的 draft。
+  - original_format 探测口径：前端只能拿临时文件扩展名（AC#5「扩展名不可靠时用探测结果」）；微信端无 ffprobe，真正的格式探测在 Worker（US-022 ffprobe）。前端 detectOriginalFormat 已对 mp3/aac/m4a/amr/wav 等做扩展名→回退请求格式两级兜底。
+---

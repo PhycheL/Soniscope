@@ -5,6 +5,16 @@
     </button>
     <view class="duration">{{durationText}}</view>
   </view>
-  <view class="hint">录音功能将在后续迭代完善（US-012+）。</view>
+
+  <view class="draft" wx:if="{{draft}}">
+    <view class="draft-title">录音草稿</view>
+    <view class="draft-row">原始格式：{{draft.audio.original_format}}</view>
+    <view class="draft-row">时长：{{draft.duration_seconds}} 秒</view>
+    <view class="draft-row draft-row--mono">目标对象：{{draft.object_key_preview}}</view>
+    <view class="draft-note">前端不转码；object key 仅为 Worker 标准化目标（.wav）。试听 / 重录 / 上传在后续迭代。</view>
+  </view>
+
+  <view class="hint" wx:else>点击按钮开始录音；停止后会生成保留原始格式的本地草稿。</view>
+
   <view class="nav-link" bindtap="goUploads">查看上传列表 ›</view>
 </view>

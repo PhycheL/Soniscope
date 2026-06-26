@@ -28,6 +28,44 @@
   font-variant-numeric: tabular-nums;
 }
 
+.draft {
+  margin: 56rpx 32rpx 0;
+  padding: 28rpx 32rpx;
+  background-color: #f1f3f4;
+  border-radius: 16rpx;
+}
+
+.draft-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  margin-bottom: 16rpx;
+}
+
+.draft-row {
+  font-size: 26rpx;
+  color: #3c4043;
+  line-height: 1.8;
+}
+
+.draft-row--mono {
+  font-family: "SFMono-Regular", Menlo, monospace;
+  word-break: break-all;
+}
+
+.draft-note {
+  margin-top: 16rpx;
+  font-size: 22rpx;
+  color: #80868b;
+  line-height: 1.5;
+}
+
+.hint {
+  margin: 56rpx 32rpx 0;
+  font-size: 26rpx;
+  color: #80868b;
+  text-align: center;
+}
+
 .nav-link {
   margin-top: 64rpx;
   color: #1a73e8;
