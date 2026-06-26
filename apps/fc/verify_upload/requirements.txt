@@ -1,0 +1,4 @@
+# verify-upload 运行依赖（US-005 基线占位）。
+# 真实依赖在 US-006 / US-009 补全，例如：
+#   alibabacloud-oss-v2
+# 当前占位处理器无第三方依赖；deploy-fc 打包时遇到非注释行才会安装运行依赖。

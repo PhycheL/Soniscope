@@ -37,6 +37,7 @@ module = [
     "alibabacloud_oss_v2.*",
     "alibabacloud_sts20150401.*",
     "alibabacloud_tea_openapi.*",
+    "alibabacloud_fc20230330.*",
     "aliyunsdkcore.*",
 ]
 ignore_missing_imports = true

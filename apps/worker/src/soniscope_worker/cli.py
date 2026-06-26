@@ -71,3 +71,42 @@ def verify_prep() -> None:
     for line in lines:
         typer.echo(line, err=code != 0)
     raise typer.Exit(code=code)
+
+
+@app.command(name="deploy-fc")
+def deploy_fc(
+    function: str = typer.Option("", "--function", "-f", help="云端函数名（不传则部署全部）"),
+) -> None:
+    """打包 + 备份 + 部署 FC 函数（不传 --function 时部署 issue-credential 与 verify-upload）。"""
+    from soniscope_worker.fc_deploy import run_deploy
+
+    lines, code = run_deploy(function or None)
+    for line in lines:
+        typer.echo(line, err=code != 0)
+    raise typer.Exit(code=code)
+
+
+@app.command(name="rollback-fc")
+def rollback_fc(
+    function: str = typer.Option("", "--function", "-f", help="云端函数名"),
+) -> None:
+    """从最新备份恢复指定 FC 函数代码。"""
+    from soniscope_worker.fc_deploy import run_rollback
+
+    lines, code = run_rollback(function)
+    for line in lines:
+        typer.echo(line, err=code != 0)
+    raise typer.Exit(code=code)
+
+
+@app.command(name="fc-logs")
+def fc_logs(
+    function: str = typer.Option("", "--function", "-f", help="云端函数名"),
+) -> None:
+    """拉取指定 FC 函数近 1 小时日志（日志服务未配置时输出明确诊断）。"""
+    from soniscope_worker.fc_deploy import run_fc_logs
+
+    lines, code = run_fc_logs(function)
+    for line in lines:
+        typer.echo(line, err=code != 0)
+    raise typer.Exit(code=code)

@@ -158,3 +158,45 @@
     nls_response_to_result 映射逻辑。
   - OSS v2 临时凭证客户端：StaticCredentialsProvider 必须带 security_token，否则 STS 凭证无效。
 ---
+
+## 2026-06-27 02:45 - US-005
+- 实现了什么：FC 3.0 函数工程目录约定 + 打包/备份/部署/回滚/日志脚本基线（make deploy-fc / rollback-fc / fc-logs）。
+  - apps/fc/ 目录约定（AC#1）：issue_credential/ 与 verify_upload/ 各含占位 WSGI handler.py（真实逻辑 US-006/007/009）
+    + requirements.txt 占位（注释行不触发依赖安装）+ apps/fc/README.md（云端名 kebab ↔ 代码目录 snake 映射表、真实 URL）。
+  - apps/worker/src/soniscope_worker/fc_deploy.py（新增，mypy strict + ruff + pytest 覆盖）：沿用 verify_prep 的
+    「纯逻辑 + IO Protocol」模式。
+    · 纯逻辑（无 IO，直接单测）：source_dir_name（kebab→snake）、resolve_functions（None→两个函数 AC#6；未知报错）、
+      function_url（含 issue-cedential 少一个 r 的真实拼写）、read_requirements、zip_dir（确定性 zip + sha256）、
+      package_function（打包代码+运行依赖到 build/fc/<name>/ + 同名 .zip，AC#2）、find_latest_backup（按时间戳目录字典序）、
+      curl_ok、format_deploy_log（函数名/zip sha256/上传耗时/curl 结果，AC#5）、format_report。
+    · 编排：deploy_one（备份 best-effort → 打包 → 仅 update_code → curl 存活验证；首次部署无备份不阻断）、
+      rollback_one（最新备份恢复 AC#7）、run_deploy/run_rollback/run_fc_logs。
+    · IO 注入点 FcApi Protocol：download_code/env_var_names/install_deps/update_code/curl/fetch_logs；
+      _write_backup 仅记录环境变量名、绝不记录值（AC#4 + 安全红线）。
+    · RealFcApi（lazy import alibabacloud-fc20230330，缺 SDK/凭证抛 FcApiError）：update_code 只传 code、
+      不传 environment_variables/triggers/运行规格（AC#3 不改环境变量/触发器/规格/URL）；fetch_logs 检查 SLS
+      project/logstore，未配置时给明确诊断（AC#8）。
+  - cli.py：新增 deploy-fc / rollback-fc / fc-logs 三个 typer 子命令（lazy import，typer.Exit(code)）。
+  - Makefile：新增 deploy-fc（FUNCTION 可选，不传部署两个）、rollback-fc、fc-logs 三个 target + .PHONY。
+  - pyproject.toml：mypy overrides 增加 alibabacloud_fc20230330.*（云 SDK 无 stub）。
+  - apps/worker/tests/test_fc_deploy.py（新增 44 用例）：FakeFcApi 注入全程不触网，覆盖命名映射、resolve、
+    打包（含 __pycache__ 排除 / 依赖安装 / 源码缺失）、备份只记名不记值、find_latest_backup、deploy_one
+    四条路径（happy / 首次无备份 / 上传失败 / curl 5xx）、rollback、日志/报告渲染、run_* 入口与退出码。
+- 更改的文件：apps/fc/{issue_credential,verify_upload}/{handler.py,requirements.txt}、apps/fc/README.md、
+  apps/worker/src/soniscope_worker/{fc_deploy.py(新),cli.py}、Makefile、pyproject.toml、
+  apps/worker/tests/test_fc_deploy.py(新)、scripts/ralph/{prd.json,progress.txt}。
+- 验证：make typecheck（mypy 13 文件 0 错）、make lint（ruff apps/ 全过）、make test（110 passed，+44）全部通过；
+  CLI --help 显示三命令；deploy-fc 未知函数 / rollback-fc 空 FUNCTION 均非零退出；build/ 已 gitignore。
+  未跑：真实 make deploy-fc 全链路（需 ALIYUN_DEPLOY_AK_ID/SECRET + alibabacloud-fc20230330 + 触网，本沙箱不具备）。
+- **未来迭代的学习：**
+  - apps/fc/ 会被 ruff（ruff check apps/）扫描但**不**被 mypy（files=apps/worker/{src,tests}）检查；
+    FC handler 占位代码要通过 ruff（E/F/I/UP/B），无需 mypy 注解，但建议仍写类型便于 US-006+ 接手。
+  - FC SDK alibabacloud-fc20230330 仅部署脚本用、不随函数代码打包（tech-spec §6.4 依赖隔离）；lazy import + 缺失
+    抛 FcApiError，与 verify_prep 的云 SDK 处理一致；真实主机按报错提示 uv add 即可。
+  - US-008（issue-credential 云端联调）落地时：① 把 RealFcApi.fetch_logs 接到 aliyun-log-python-sdk 真实拉 SLS 日志
+    （当前是诊断占位）；② make test-fc-live 复用本处 deploy_one/curl 存活验证。verify_prep 的 FC 块（check_fc）也可在
+    函数真实部署后转绿。
+  - US-006/007/009 实现 FC 真实逻辑时：替换 apps/fc/*/handler.py 占位，并在对应 requirements.txt 填真实依赖
+    （非注释行会触发 package_function → api.install_deps 用 uv pip install --target 装进暂存目录一起打包）。
+  - oss-delete-obj（US-010 首交付）/ show-oss-object（US-017 首交付）不属于 US-005，未实现。
+---
