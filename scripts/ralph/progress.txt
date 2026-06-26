@@ -381,3 +381,32 @@
   - 上下文：US-014（草稿确认态：试听/重录/删除/保存并上传）会复用本处 draft（含 status_label）与 recovery 流程；中断草稿与普通草稿都进入同一草稿确认态。onShow 恢复提示与 US-014 的草稿确认 UI 需协调（本期 recovery 面板与 draft 卡片并存）。
   - 上下文：中断「本地落盘」本期 = wx.setStorageSync 单槽位；真正的草稿/Fragment 持久化与上传队列在 US-015/US-017 落地，届时草稿存储模型可能从单槽位升级为按 fragment_id 的列表。
 ---
+
+## 2026-06-27 11:00 - US-014
+- 实现了什么：小程序草稿确认态（停止录音后先进入确认态：试听 / 暂停 / 重录 / 删除 / 保存并上传），满意后晋升为「待上传」上传队列项（AC#1-#6）。
+  - apps/miniprogram/utils/upload_queue.js（新增纯逻辑模块，复用 codebase「纯函数 utils + Page 薄壳」分层）：
+    · STATUS_QUEUED/STATUS_UPLOADING + STATUS_TEXT（待上传 / 上传中，tech-spec §6.7 八状态前两态；其余 US-019）+ statusText()。
+    · UPLOAD_QUEUE_STORAGE_KEY='soniscope:upload_queue'（uploads 页读取渲染的本地落盘槽位）。
+    · fragmentIdFromObjectKey（从 recordings/<date>/<id>.wav 反推 id，去目录去扩展名；US-014 复用草稿 object key 预览作展示/去重键，US-015 落地正式 fragment_id 后替换）。
+    · buildQueuedFragment（草稿→队列项：fragmentId/status/statusText/durationSeconds/originalFormat/objectKeyPreview/tempFilePath）。
+    · appendQueuedFragment（同一 fragmentId 已存在则不重复追加，AC#5 去重双保险）。
+  - apps/miniprogram/pages/index/index.js：在 US-012/013 草稿基础上加草稿确认态动作——
+    · data 加 playing；onLoad 初始化 this._audio=null。
+    · onTapPlay（AC#2）：懒创建 wx.createInnerAudioContext()，绑定 onEnded/onError 复位 playing，设 src=draft.temp_file_path 后 play()，setData playing=true。onTapPause（AC#2）：pause() + playing=false。
+    · onReRecord（AC#3）：_destroyAudio + _cleanupDraftFile + 清中断槽位 + 清草稿 → _startRecording() 重新录音。
+    · onDeleteDraft（AC#4）：_destroyAudio + _cleanupDraftFile + 清中断槽位 + 清草稿回初始态，不入队、不生成 Fragment。
+    · onTapSaveUpload（AC#5）：draft.frozen 守卫防重复点击；buildQueuedFragment→appendQueuedFragment→wx.setStorageSync 落盘；冻结草稿（Object.assign frozen:true，禁用确认态按钮）；toast。
+    · _destroyAudio（stop+destroy best-effort，复位 playing）；_startRecording/onUnload 调 _destroyAudio。
+  - apps/miniprogram/pages/index/index.wxml：draft 卡片加 draft-actions（!draft.frozen && !recovery 时显示 5 个按钮：试听/暂停 wx:if 切换、重录、删除、保存并上传）+ draft.frozen 时显示「已加入上传队列」提示。
+  - apps/miniprogram/pages/index/index.wxss：新增 .draft-actions/.draft-btn/.draft-btn--primary/.draft-btn--danger/.draft-frozen。
+  - apps/miniprogram/pages/uploads/uploads.js：onShow 读 UPLOAD_QUEUE_STORAGE_KEY 渲染队列项（uploads.wxml 已用 item.fragmentId/item.statusText，无需改）。
+  - apps/miniprogram/test/draft_confirm.test.js（新增，node --test + 手写 wx/Page mock，含 createInnerAudioContext mock，10 用例）：草稿确认态、试听创建+播放、暂停、播放结束复位、重录清理+重录、删除清理不入队、保存并上传冻结+落盘、重复点击去重、buildQueuedFragment、appendQueuedFragment 去重。
+- 更改的文件：apps/miniprogram/utils/upload_queue.js(新)、apps/miniprogram/pages/index/{index.js,index.wxml,index.wxss}、apps/miniprogram/pages/uploads/uploads.js、apps/miniprogram/test/draft_confirm.test.js(新)、scripts/ralph/{prd.json,progress.txt}。
+- 验证：make typecheck（mypy 39 文件 0 错）、make lint（ruff apps/ 全过 + miniprogram lint passed）、make test（311 passed，JS 包装测试内部 node --test 18/18：9 中断 + 9 草稿确认）全部通过；node --check 4 个改动/新增 .js 通过。
+  未跑：微信开发者工具录音 5 秒试听播放/重录删除文件消失/保存上传列表出现记录（AC#6）+ 真机三分支切换（AC#7）——本沙箱无 WeChat DevTools/真机，需人工在 DevTools + 真机 vConsole 复验。
+- **未来迭代的学习：**
+  - 上传队列本地落盘单一真实来源 utils/upload_queue.js（UPLOAD_QUEUE_STORAGE_KEY）：US-014 只落「待上传」；US-015 把队列项 fragmentId 换成正式 fragment_id + manifest 草案；US-017 静默登录/STS/OSS 直传把 queued→uploading→pending_verify；US-018 verify；US-019 八状态全量渲染与折叠。uploads 页 onShow 读队列，新增状态时扩展 STATUS_TEXT 即可。
+  - 草稿确认态与 US-013 中断恢复提示并存协调：draft-actions 用 `wx:if="{{!draft.frozen && !recovery}}"` 门控——recovery 提示（保留/丢弃/继续新录）显示时不出确认态按钮；用户「保留」后 recovery=null，中断草稿即进入同一确认态可试听/上传。
+  - innerAudioContext 懒创建于 onTapPlay 并存 this._audio；重录/删除/保存上传/_startRecording/onUnload 都要 _destroyAudio（stop+destroy）防止播放泄漏与残留；测试里凡留录音态（onReRecord 后）必须 inst.onUnload() 清计时器+音频，避免 node 事件循环挂起（沿用 US-013 陷阱）。
+  - 防重复 Fragment 双保险：Page 侧 draft.frozen 守卫（按钮 wx:if 隐藏 + 函数早返回）+ upload_queue.appendQueuedFragment 按 fragmentId 去重；onDiscardDraft（US-013 中断「丢弃」）与 onDeleteDraft（US-014 确认态「删除」）是两个独立 handler，勿混用。
+---

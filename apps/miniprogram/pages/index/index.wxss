@@ -59,6 +59,36 @@
   line-height: 1.5;
 }
 
+.draft-actions {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: 24rpx;
+}
+
+.draft-btn {
+  flex: 1 1 30%;
+  margin: 8rpx;
+  font-size: 26rpx;
+  color: #3c4043;
+  background-color: #ffffff;
+}
+
+.draft-btn--primary {
+  flex-basis: 100%;
+  color: #ffffff;
+  background-color: #1a73e8;
+}
+
+.draft-btn--danger {
+  color: #d93025;
+}
+
+.draft-frozen {
+  margin-top: 24rpx;
+  font-size: 24rpx;
+  color: #188038;
+}
+
 .recovery {
   margin: 56rpx 32rpx 0;
   padding: 28rpx 32rpx;

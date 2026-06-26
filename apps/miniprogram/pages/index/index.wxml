@@ -20,7 +20,16 @@
     <view class="draft-row">原始格式：{{draft.audio.original_format}}</view>
     <view class="draft-row">时长：{{draft.duration_seconds}} 秒</view>
     <view class="draft-row draft-row--mono">目标对象：{{draft.object_key_preview}}</view>
-    <view class="draft-note">前端不转码；object key 仅为 Worker 标准化目标（.wav）。试听 / 重录 / 上传在后续迭代。</view>
+    <view class="draft-note">前端不转码；object key 仅为 Worker 标准化目标（.wav）。</view>
+
+    <view class="draft-actions" wx:if="{{!draft.frozen && !recovery}}">
+      <button class="draft-btn" bindtap="onTapPlay" wx:if="{{!playing}}">试听</button>
+      <button class="draft-btn" bindtap="onTapPause" wx:else>暂停</button>
+      <button class="draft-btn" bindtap="onReRecord">重录</button>
+      <button class="draft-btn draft-btn--danger" bindtap="onDeleteDraft">删除</button>
+      <button class="draft-btn draft-btn--primary" bindtap="onTapSaveUpload">保存并上传</button>
+    </view>
+    <view class="draft-frozen" wx:elif="{{draft.frozen}}">已加入上传队列，前往「上传列表」查看进度。</view>
   </view>
 
   <view class="hint" wx:elif="{{!recovery}}">点击按钮开始录音；停止后会生成保留原始格式的本地草稿。</view>

@@ -12,6 +12,11 @@ const {
   buildInterruptedDraft,
   buildRecoveryPrompt,
 } = require('../../utils/draft')
+const {
+  UPLOAD_QUEUE_STORAGE_KEY,
+  buildQueuedFragment,
+  appendQueuedFragment,
+} = require('../../utils/upload_queue')
 
 const logger = createLogger('index')
 
@@ -25,8 +30,10 @@ Page({
     recording: false,
     durationText: '00:00',
     draft: null,
-    // 中断恢复提示（AC#4）：非空时渲染保留 / 丢弃 / 继续新录三个按钮。
+    // 中断恢复提示（US-013 AC#4）：非空时渲染保留 / 丢弃 / 继续新录三个按钮。
     recovery: null,
+    // 草稿试听播放状态（US-014 AC#2）：true 时试听按钮显示「暂停」语义。
+    playing: false,
   },
 
   onLoad() {
@@ -38,6 +45,8 @@ Page({
     // 当前 onStop 是否由中断触发，决定走中断草稿落盘路径还是普通草稿路径。
     this._interrupting = false
     this._interruptReason = ''
+    // 草稿试听播放器（懒创建于 onTapPlay，US-014）。
+    this._audio = null
     this._bindRecorder()
     logger.info('index page loaded')
   },
@@ -54,6 +63,7 @@ Page({
 
   onUnload() {
     this._clearTimer()
+    this._destroyAudio()
   },
 
   _bindRecorder() {
@@ -105,7 +115,14 @@ Page({
     this.startedAt = Date.now()
     this._interruptHandled = false
     this._interrupting = false
-    this.setData({ recording: true, durationText: '00:00', draft: null, recovery: null })
+    this._destroyAudio()
+    this.setData({
+      recording: true,
+      durationText: '00:00',
+      draft: null,
+      recovery: null,
+      playing: false,
+    })
     this._startTimer()
     // start() 会触发录音权限申请；用户拒绝或失败时进入 onError。
     this.recorder.start({
@@ -216,6 +233,106 @@ Page({
       wx.removeStorageSync(INTERRUPT_DRAFT_STORAGE_KEY)
     } catch (e) {
       // best effort
+    }
+  },
+
+  // ---- US-014 草稿确认态：试听 / 暂停 / 重录 / 删除 / 保存并上传 ----
+
+  // 试听（AC#2）：用 wx.createInnerAudioContext 播放本地草稿临时音频。
+  onTapPlay() {
+    const draft = this.data.draft
+    if (!draft || !draft.temp_file_path) {
+      wx.showToast({ title: '无可试听音频', icon: 'none' })
+      return
+    }
+    if (!this._audio) {
+      const self = this
+      this._audio = wx.createInnerAudioContext()
+      this._audio.onEnded(function () {
+        self.setData({ playing: false })
+      })
+      this._audio.onError(function (err) {
+        self.setData({ playing: false })
+        logger.error('audition error', { errMsg: err && err.errMsg })
+      })
+    }
+    this._audio.src = draft.temp_file_path
+    this._audio.play()
+    this.setData({ playing: true })
+    logger.info('audition play', { temp_file_path: draft.temp_file_path })
+  },
+
+  // 暂停（AC#2）：暂停试听播放。
+  onTapPause() {
+    if (this._audio) {
+      this._audio.pause()
+    }
+    this.setData({ playing: false })
+    logger.info('audition pause')
+  },
+
+  // 重录（AC#3）：清理当前草稿本地文件与记录，回到录音初始态并立即开始新录音。
+  onReRecord() {
+    this._destroyAudio()
+    this._cleanupDraftFile(this.data.draft)
+    this._clearInterruptStorage()
+    this.setData({ draft: null, recovery: null })
+    logger.info('draft re-record')
+    this._startRecording()
+  },
+
+  // 删除（AC#4）：清理当前草稿本地文件与记录，不生成 Fragment、不触发上传，回到初始态。
+  onDeleteDraft() {
+    this._destroyAudio()
+    this._cleanupDraftFile(this.data.draft)
+    this._clearInterruptStorage()
+    this.setData({ draft: null, recovery: null, durationText: '00:00' })
+    logger.info('draft deleted')
+  },
+
+  // 保存并上传（AC#5）：冻结草稿、晋升为「待上传」队列项并落盘；防重复点击生成重复 Fragment。
+  onTapSaveUpload() {
+    const draft = this.data.draft
+    if (!draft || draft.frozen) {
+      return
+    }
+    const item = buildQueuedFragment(draft)
+    let queue = []
+    try {
+      queue = wx.getStorageSync(UPLOAD_QUEUE_STORAGE_KEY) || []
+    } catch (e) {
+      queue = []
+    }
+    queue = appendQueuedFragment(queue, item)
+    wx.setStorageSync(UPLOAD_QUEUE_STORAGE_KEY, queue)
+    // 草稿已晋升 Fragment：清掉中断槽位，冻结当前草稿（禁用确认态按钮）。
+    this._clearInterruptStorage()
+    this._destroyAudio()
+    const frozen = Object.assign({}, draft, { frozen: true })
+    this.setData({ draft: frozen })
+    logger.info('draft saved & queued for upload', {
+      fragmentId: item.fragmentId,
+      status: item.status,
+    })
+    wx.showToast({ title: '已加入上传队列', icon: 'success' })
+  },
+
+  _destroyAudio() {
+    if (this._audio) {
+      try {
+        if (this._audio.stop) {
+          this._audio.stop()
+        }
+        if (this._audio.destroy) {
+          this._audio.destroy()
+        }
+      } catch (e) {
+        // best effort
+      }
+      this._audio = null
+    }
+    if (this.data.playing) {
+      this.setData({ playing: false })
     }
   },
 
