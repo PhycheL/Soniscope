@@ -811,3 +811,22 @@
   - fragment 目录名合法性校验复用 poller.fragment_id_from_key：用 id 自身日期前缀构造 recordings/<date>/<id>.wav 往返（_fragment_id_valid），与 ops.count_local_fragments「含 .done/audio.wav/manifest.json 之一即计」口径不同——e2e.discover 更严（必须目录名是合法 fragment_id），适合验收完整性场景。
   - Makefile 条件传参用 $(if $(DATE),--date $(DATE),)：DATE 为空时不传 --date（CLI --date 默认 "" → date=None 扫全部日期），EXPECTED 同理默认 100。US-031（test-e2e-*）/US-032（runbook checklist）直接复用这三 verify 命令。
 ---
+
+## 2026-06-27 05:30 - US-031
+- 实现了什么：E2E 崩溃恢复 / 显式重转 / 安全反例三个编排 make target（test-e2e-crash-recovery / test-e2e-retranscribe / test-e2e-security），把已分别落地并单测过的关键异常路径**组合**为可读 pass/fail 的 E2E 入口，不要求用户开阿里云/微信控制台（AC#7），失败时输出复现命令（AC#6）。
+  - apps/worker/src/soniscope_worker/e2e_scenarios.py（新增，mypy strict + ruff + pytest 覆盖）：
+    · 统一 ScenarioResult（name/status PASS|FAIL|SKIP/detail/repro）+ format_e2e_report（汇总 + 任一 FAIL 非零退出）+ _wrap_subrun（把自包含子 runner 的 (lines,code) 收敛为 ScenarioResult，FAIL 时抽取以 "FAIL" 开头的行作 detail）。
+    · run_test_e2e_crash_recovery（AC#1）：3 种场景完整跑通——下载中断（inbox 残留 .part）/ 转码中断（.wav.tmp）经 recovery.recover 清理，转写中断复用 recovery.run_test_crash_recovery（清 tmp + 重转补齐 transcript.json/.done）。全程临时目录自包含、不触云端。
+    · run_test_e2e_retranscribe（AC#2/#3）：复用 retranscribe.run_test_cli_upgrade（--upgrade 仅重转旧 params_version）+ run_test_no_auto_retranscribe（改配置后普通轮询不自动重转已 .done）。
+    · run_test_e2e_security（AC#4/#5）：复用 fc_live（FAKE_CODE→401 INVALID_CODE 且不返回 STS；可选 CODE_NOT_ALLOWED→403）+ sts_escape.run_checks（合法 STS 越权 PutObject 其他 key→AccessDenied）。fc_probes/sts_probes 可注入便于单测；无云端凭证/不可达时 SKIP（不阻断），绝不打印 AK Secret/SecurityToken 明文。E2eSecurityOptions(code, not_allowed_code)。
+  - cli.py：新增 test-e2e-crash-recovery / test-e2e-retranscribe / test-e2e-security 三个 typer 子命令（security 带 --code / --code-not-allowed）。
+  - Makefile：新增三 target + .PHONY；test-e2e-security 透传 CODE= / CODE_NOT_ALLOWED=。
+  - apps/worker/tests/test_e2e_scenarios.py（新增 13 用例）：FakeFcProbes/FakeStsProbes 注入不触网，覆盖汇总渲染（PASS/FAIL+复现/SKIP）、崩溃恢复 3 PASS、重转 2 PASS、安全全 PASS、缺 not_allowed_code SKIP、拒绝场景泄漏 STS 字段→FAIL、越权未被拒→FAIL、FC 不可达→SKIP、不泄漏明文、code 透传 sts_escape。
+- 更改的文件：apps/worker/src/soniscope_worker/{e2e_scenarios.py(新),cli.py}、Makefile、apps/worker/tests/test_e2e_scenarios.py(新)、scripts/ralph/{prd.json,progress.txt}。
+- 验证：make typecheck（mypy 65 文件 0 错）、make lint（ruff + miniprogram 全过）、make test（560 passed，+13）全部通过。真实跑三 target：crash-recovery 3 PASS、retranscribe 2 PASS、security 1 PASS（FAKE_CODE 实际触达真实 FC 拿到 401 INVALID_CODE）/ 2 SKIP（未提供 allowlist 外 code + 无部署凭证），均 exit 0。
+- **未来迭代的学习：**
+  - US-031 本质是「编排已有自包含 story 逻辑」而非新写云调用：crash-recovery 复用 recovery.recover/run_test_crash_recovery，retranscribe 复用 retranscribe.run_test_cli_upgrade/run_test_no_auto_retranscribe，security 复用 fc_live.assert_status_error+RealFcLiveProbes 与 sts_escape.run_checks+RealStsEscapeProbes。优先组合、勿重复实现。
+  - 陷阱：测试里给 FcLiveProbes 协议写 Fake 时，oss_escape_ops 签名必须**精确**匹配协议（cred: IssuedCredential、返回 Sequence[OssOpResult]），用 object/泛化类型会被 mypy strict 判 incompatible（Protocol 成员签名不变型）。
+  - 上下文：FAKE_CODE（fc_live）在有网环境会真实触达 FC issue-credential 拿 401，是「测试夹具不需真实 wx.login 即可验证鉴权拒绝」的关键；无网时收敛为 SKIP。security E2E 的 STS 越权反例需 ALIYUN_DEPLOY_AK_ID/SECRET（AssumeRole 等价测试凭证）或 CODE=（走 FC），否则 SKIP。
+  - 上下文：仅剩 US-032（MVP 最终验收 runbook 文档，只需 Typecheck，无 Tests），是纯文档 story，引用本 story 的 make verify-e2e-* / test-e2e-* 命令。
+---
