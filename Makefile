@@ -15,6 +15,7 @@
 	test-cli-retranscribe test-cli-upgrade \
 	list-oss-objects verify-no-stale verify-oss-retention \
 	verify-e2e-integrity verify-e2e-sha256 verify-e2e-fields \
+	test-e2e-crash-recovery test-e2e-retranscribe test-e2e-security \
 	lint-miniprogram typecheck lint test help
 .DEFAULT_GOAL := help
 
@@ -147,6 +148,17 @@ verify-e2e-sha256: ## 按 §3.3 校验 WAV 直通 / 非 WAV 转码 sha256 一致
 
 verify-e2e-fields: ## 校验每条 manifest.upload.verified_at / transcription.completed_at 非空（DATE=可选）
 	uv run python -m soniscope_worker verify-e2e-fields $(if $(DATE),--date $(DATE),)
+
+test-e2e-crash-recovery: ## E2E 崩溃恢复：3 种场景重启补齐 transcript.json 与 .done（自包含）
+	uv run python -m soniscope_worker test-e2e-crash-recovery
+
+test-e2e-retranscribe: ## E2E 显式重转：--upgrade 只重转旧版本 + 普通轮询不自动重转（自包含）
+	uv run python -m soniscope_worker test-e2e-retranscribe
+
+test-e2e-security: ## E2E 安全反例：FC 鉴权拒绝不返回 STS + STS 越权必被拒（CODE= CODE_NOT_ALLOWED= 可选）
+	uv run python -m soniscope_worker test-e2e-security \
+		$(if $(strip $(CODE)),--code $(CODE),) \
+		$(if $(strip $(CODE_NOT_ALLOWED)),--code-not-allowed $(CODE_NOT_ALLOWED),)
 
 typecheck: ## mypy strict 类型检查
 	uv run mypy

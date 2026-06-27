@@ -543,6 +543,47 @@ def verify_e2e_fields(
     raise typer.Exit(code=code)
 
 
+@app.command(name="test-e2e-crash-recovery")
+def test_e2e_crash_recovery() -> None:
+    """E2E 崩溃恢复：3 种场景（下载/转码/转写中断）重启补齐 transcript.json 与 .done（US-031）。"""
+    from soniscope_worker.e2e_scenarios import run_test_e2e_crash_recovery
+
+    lines, code = run_test_e2e_crash_recovery()
+    for line in lines:
+        typer.echo(line, err=code != 0)
+    raise typer.Exit(code=code)
+
+
+@app.command(name="test-e2e-retranscribe")
+def test_e2e_retranscribe() -> None:
+    """E2E 显式重转：--upgrade 只重转旧版本 + 普通轮询不自动重转已 .done（US-031）。"""
+    from soniscope_worker.e2e_scenarios import run_test_e2e_retranscribe
+
+    lines, code = run_test_e2e_retranscribe()
+    for line in lines:
+        typer.echo(line, err=code != 0)
+    raise typer.Exit(code=code)
+
+
+@app.command(name="test-e2e-security")
+def test_e2e_security(
+    code: str = typer.Option(
+        "", "--code", help="可选：allowlist 内一次性 wx.login code（走 FC 真实签发 STS）"
+    ),
+    code_not_allowed: str = typer.Option(
+        "", "--code-not-allowed", help="可选：真实但不在 allowlist 的一次性 code（403 路径）"
+    ),
+) -> None:
+    """E2E 安全反例：FC 鉴权拒绝不返回 STS + STS 越权 PutObject 必被 OSS 拒（US-031）。"""
+    from soniscope_worker.e2e_scenarios import E2eSecurityOptions, run_test_e2e_security
+
+    opts = E2eSecurityOptions(code=code, not_allowed_code=code_not_allowed)
+    lines, code_exit = run_test_e2e_security(opts)
+    for line in lines:
+        typer.echo(line, err=code_exit != 0)
+    raise typer.Exit(code=code_exit)
+
+
 @app.command(name="lint-miniprogram")
 def lint_miniprogram() -> None:
     """对 apps/miniprogram 做静态检查（配置/域名/页面/无硬编码密钥，US-011）。"""
