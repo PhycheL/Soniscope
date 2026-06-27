@@ -681,3 +681,20 @@
   - 落盘顺序硬约束（§3.5）：write_fragment_outputs 内 manifest.json → transcript.json（经 tmp）→ transcript.txt → .done 最后（0 字节）。audio.wav 由上游 audio.standardize 落盘，本函数只校验存在；US-027 把 standardize→build_manifest→write_fragment_outputs 串起，真实转写结果替换本处 _stub_transcript_result。
   - 本 story 只做「manifest/transcript 组装+落盘」单元，未接入 poller.poll_once 主循环（那是 US-027）。make test 用 audio.standardize 真实跑 .part→audio.wav 直通验证端到端，转写结果用确定性 stub（真实 NLS 在 US-026）。
 ---
+
+## 2026-06-27 05:30 - US-025
+- 实现了什么：Transcriber 抽象接口、工厂方法与本地占位实现（§5.3）。
+  - apps/worker/src/soniscope_worker/transcriber.py（新增，mypy strict + ruff + pytest 全覆盖）：
+    · Segment dataclass（start/end/text + as_dict）；TranscriptResult dataclass（segments/language/model/params_version/provider/duration，含 transcript_json() 派生五字段落盘 dict 剔除 duration、as_result_dict() 含 duration 兼容 manifest.transcript_json_from_result）。
+    · Transcriber Protocol（@runtime_checkable，方法签名 transcribe(fragment_id, audio_path: Path, oss_key) -> TranscriptResult，§5.3）。
+    · CloudSpeechTranscriber（持 config，transcribe 占位 raise NotImplementedError 指向 US-026——真实 NLS 调用属 US-026，避免未 live 验证塞云代码）。
+    · WhisperLocalTranscriber（占位，transcribe raise NotImplementedError 提示「本期不部署本地 Whisper」，AC#5）。
+    · create_transcriber(config) 工厂：cloud-speech/whisper-local 分发；未知 name 抛 TranscriberError 并列出 SUPPORTED_TRANSCRIBERS（AC#6）。业务侧只依赖 Transcriber 接口（AC#7）。
+  - apps/worker/tests/test_transcriber.py（新增 11 用例）：工厂返回 cloud/whisper 实例且 isinstance(Transcriber)、未知 name 报错含支持值、whisper-local transcribe 抛 NotImplementedError、cloud transcribe 占位指向 US-026、transcript_json 剔除 duration + 字段映射、as_result_dict 含 duration、与 manifest.transcript_json_from_result 兼容、Segment.as_dict。
+- 更改的文件：apps/worker/src/soniscope_worker/transcriber.py（新）、apps/worker/tests/test_transcriber.py（新）、scripts/ralph/{prd.json,progress.txt}。
+- 验证：make typecheck（mypy 51 文件 0 错）、make lint（ruff apps/ + 小程序 lint 全过）、make test（429 passed，+11）全部通过。
+- **未来迭代的学习：**
+  - 陷阱：测试构造 TranscriberConfig 时，appkey/access_key_secret 字段类型是 MaskedSecret，直接传 str 会被 mypy 报 arg-type；用 TranscriberConfig.model_validate({...}) 让 Pydantic 在运行时把 str 强转成 MaskedSecret（与 load_config 路径一致），mypy 也满意。
+  - 上下文：US-026 的 CloudSpeechTranscriber 应在本处骨架上接入真实 NLS（复用 verify_prep.nls_response_to_result 的 Sentences→segments 映射 + scripts/test_asr.py 的 filetrans POP 基线）；返回 TranscriptResult 后用 .transcript_json()/.as_result_dict() 落盘。manifest.transcript_json_from_result 已能接受含 duration 的 dict。
+  - 上下文：业务流程（US-027 集成流水线）只 import create_transcriber + Transcriber/TranscriptResult，不要直接 import 具体 provider 类（AC#7 已用 isinstance(Transcriber) 断言守住）。
+---
