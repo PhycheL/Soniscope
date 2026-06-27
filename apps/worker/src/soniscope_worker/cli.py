@@ -23,8 +23,10 @@ app = typer.Typer(
 
 @app.command()
 def run() -> None:
-    """启动 Worker 主轮询循环（占位，主逻辑在 US-021+ 实现）。"""
-    typer.echo("soniscope-worker: 主轮询尚未实现（将在 US-021+ 交付）")
+    """启动 Worker 主轮询循环（轮询 OSS recordings/、HeadObject 元数据、安全下载，US-021）。"""
+    from soniscope_worker.poller import run_worker_run
+
+    run_worker_run(log=typer.echo)
 
 
 @app.command()
@@ -223,6 +225,23 @@ def test_sts_escape(
     for line in lines:
         typer.echo(line, err=exit_code != 0)
     raise typer.Exit(code=exit_code)
+
+
+@app.command(name="test-poll-interval")
+def test_poll_interval(
+    expected: int = typer.Option(
+        30, "--expected", help="期望的 poll.interval_seconds（默认 30，AC#8）"
+    ),
+    iterations: int = typer.Option(3, "--iterations", help="实际扫描轮数（用于观测间隔）"),
+) -> None:
+    """验证 Worker 按 config.yaml 的 poll.interval_seconds 周期扫描 OSS（US-021 AC#8）。"""
+    from soniscope_worker.poller import PollIntervalOptions, run_test_poll_interval
+
+    opts = PollIntervalOptions(expected_interval=expected, iterations=iterations)
+    lines, code = run_test_poll_interval(opts)
+    for line in lines:
+        typer.echo(line, err=code != 0)
+    raise typer.Exit(code=code)
 
 
 @app.command(name="lint-miniprogram")

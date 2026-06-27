@@ -5,7 +5,7 @@
 
 .PHONY: install check-config init-dirs verify-prep worker-run \
 	deploy-fc rollback-fc fc-logs test-fc-live test-verify-upload oss-delete-obj \
-	show-oss-object test-sts-escape \
+	show-oss-object test-sts-escape test-poll-interval \
 	lint-miniprogram typecheck lint test help
 .DEFAULT_GOAL := help
 
@@ -60,6 +60,11 @@ show-oss-object: ## 查看 OSS 对象详情（FRAGMENT_ID=<id>：存在性/size/
 test-sts-escape: ## STS 单 key 越权验证：写其他 key 必须 AccessDenied（CODE= 可选走 FC）
 	uv run python -m soniscope_worker test-sts-escape \
 		$(if $(strip $(CODE)),--code $(CODE),)
+
+test-poll-interval: ## 验证 Worker 按 poll.interval_seconds 周期扫描（EXPECTED=30 ITERATIONS=3）
+	uv run python -m soniscope_worker test-poll-interval \
+		$(if $(strip $(EXPECTED)),--expected $(EXPECTED),) \
+		$(if $(strip $(ITERATIONS)),--iterations $(ITERATIONS),)
 
 typecheck: ## mypy strict 类型检查
 	uv run mypy

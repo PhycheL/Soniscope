@@ -593,3 +593,27 @@
   - 故障注入效果落在 uploads 页的三个请求适配器（_isOnline/_wxRequestSts/_wxRequestVerify），不改 uploader/verify 纯逻辑，保 US-017/018 既有测试绿；mock-fc-url-broken 同时作用于 issue-credential 与 verify-upload 两类 FC 请求（reject）。
   - 陷阱：navigateTo 目标 dev 页不是 tabBar 页（tabBar 只有 index/uploads），故用 wx.navigateTo 而非 switchTab。
 ---
+
+## 2026-06-27 16:00 - US-021
+- 实现了什么：Worker OSS 轮询、HeadObject 元数据读取与安全下载（tech-spec §3.2/§5；Worker 主流水线入口）。沿用既有「纯逻辑（无 IO，直接单测）+ IO 用 OssSource Protocol 注入」分层，单测注入 FakeSource 全程不触网。
+  - apps/worker/src/soniscope_worker/poller.py（新增，mypy strict + ruff + pytest 全覆盖）：
+    · 纯逻辑：fragment_id_from_key（OSS key↔fragment_id 往返校验 object_key_for(fid)==key，一并验格式/日期合法/路径日期一致，AC#1；非 .wav/非 recordings/ 前缀/非法 id/日期不一致均 None）、date_of、fragment_dir/done_marker_path/part_path（本地路径推导）、normalize_metadata（小写+去 x-oss-meta- 前缀，兼容 SDK 两种返回）、metadata_to_draft（x-oss-meta-* → ManifestDraft：session_id/chunk_seq/chunk_total/recorded_at/duration_seconds/original_format/original_sha256；chunk-total "0"→None 遵 §3.2，AC#5）、plan_downloads（list 结果按 .done 拆 to_download/skipped_done/ignored_keys，AC#2）、check_scan_intervals（相邻扫描间隔 ±5s 容差校验，AC#8）。
+    · IO 注入点 OssSource Protocol：**只暴露 list_recordings/head_metadata/download，刻意不含任何 delete 方法**（AGENTS 红线 AC#7）。RealOssSource（lazy import OSS SDK，复用 verify_prep._import_oss/_oss_client，用 config.yaml OSS 只读 AK）：list_objects_v2 分页列举 recordings/ 前缀、head_object 读 metadata、get_object_to_file 下载；构造时加载 config（缺失抛 ConfigError）、调用才触网。
+    · process_plan（AC#3/#4）：下载到 inbox/<fragment_id>.part → sha256_of 计算 → head_metadata 读 x-oss-meta-sha256 比对；不一致 part.unlink（删**本地** .part 非 OSS）返回 sha256_mismatch 等下一轮重下；下载/读元数据异常收敛为 error（不中断整轮）。
+    · cleanup_parts（AC#6）：删 inbox 残留 *.part（崩溃残留），下一轮重下，不污染 fragments/。
+    · poll_once（列举→计划→逐个处理，已 .done 跳过不下载不转写）；poll_loop（启动先 cleanup_parts→每 interval 扫描；注入 sleep/monotonic/on_scan/max_iterations/stop 便于确定性单测与时间戳采集）。
+    · run_worker_run（make worker-run：读 config interval 无限轮询，config 缺失打印诊断返回）；run_test_poll_interval（make test-poll-interval：读 config interval、--expected 断言、跑 N 轮校验扫描间隔；缺 config/SDK 优雅 SKIP exit 0，AC#8）。
+  - cli.py：run 子命令从占位改为调 run_worker_run；新增 test-poll-interval（--expected 默认 30 / --iterations 默认 3）。
+  - Makefile：worker-run 已存在（指向 run）；新增 test-poll-interval target（EXPECTED= ITERATIONS=）+ .PHONY。
+  - apps/worker/tests/test_poller.py（新增 26 用例，FakeSource 内存 dict 全程不触网）：覆盖 key 解析五分支、元数据归一化/映射（含 chunk-total 0→None、OSS 前缀键、非法值→None）、plan_downloads 三分类、process_plan（sha 匹配下载/sha 不匹配删 .part/下载异常收敛/无 sha 元数据仍下载）、cleanup_parts、poll_once（.done 跳过零下载 + 新对象下载）、poll_loop（注入时钟跑 3 轮+启动清 .part+末轮不 sleep+stop 回调）、check_scan_intervals 容差/不足、run_test_poll_interval（pass/expected 不符 FAIL/无 config SKIP）、**安全断言 OssSource/RealOssSource 无任何 delete 方法（AC#7）**。
+- 更改的文件：apps/worker/src/soniscope_worker/{poller.py(新),cli.py}、Makefile、apps/worker/tests/test_poller.py(新)、scripts/ralph/{prd.json,progress.txt}。
+- 验证：make typecheck（mypy 43 文件 0 错）、make lint（ruff apps/ 全过 + miniprogram lint passed）、make test（356 passed，+26）全部通过；CLI --help 显示 test-poll-interval；`run` 在无 config 时优雅打印诊断返回（不触网）；grep 确认 poller.py 业务路径无任何 delete_object/DeleteObject 调用（仅红线注释提及）。
+  未跑：真实 make worker-run / make test-poll-interval 全链路（需真实 config.yaml OSS 只读 AK + alibabacloud-oss-v2 + 触网列举/下载，且 test-poll-interval 真实需等 ~30s×3 轮，本沙箱不具备）——AC#1/#6/#8 真实云端项需在 Worker 主机复验。
+- **未来迭代的学习：**
+  - Worker 主流水线入口在 poller.py：US-022（ffprobe 格式检测/WAV 直通/转码）接 process_plan 下载成功后的 .part → audio.wav；US-023（启动恢复扫描）扩展 cleanup_parts（当前只清 *.part）到 *.wav.tmp / tmp/*.transcript.json.tmp + fragments 目录状态恢复；US-024（manifest schema）落盘 ManifestDraft（本处只产内存草稿，已含 OSS 元数据映射字段）；US-027（完整流水线）把「下载→标准化→转写→manifest→.done」串起并实现「.done 不重下」幂等（US-021 standalone 每轮对无 .done 对象都会重下，是有意为之，整合在 US-027）。
+  - OSS key↔fragment_id 用 object_key_for 往返校验（fragment_id_from_key）：复用 oss_admin.object_key_for（_FRAGMENT_ID_RE + 日期合法性），一次校验格式/日期/路径一致，避免再写一份正则。改 fragment_id 正则务必同步 fc_shared/sts.py、前端 audio.FRAGMENT_ID_RE、oss_admin。
+  - x-oss-meta-chunk-total 语义：OSS 端非分片存 "0"，metadata_to_draft 映射为 manifest chunk_total=None（与前端 buildOssMetadata 镜像，§3.2）；chunk_total<=0 一律 None。
+  - 安全红线落实方式：OssSource Protocol **不定义** delete 方法（结构化协议层面禁止），RealOssSource 不实现 delete_*；单测断言 `dir(OssSource)` 公开成员恰为 {list_recordings, head_metadata, download} + RealOssSource 无 delete 属性。删除能力只在 oss_admin（仅测试用，双门控）。US-029 verify-oss-retention 扫日志也以「业务路径无 DeleteObject」为准。
+  - .part 是下载中间态：sha256 不符删 .part（本地，非 OSS）等下一轮重下（AC#4）；崩溃残留 .part 启动 cleanup_parts 清理重下（AC#6）。「删 .part」与「删 OSS 对象」是两件事，前者随处可做、后者业务路径绝不做。
+  - 轮询循环可测性与守护进程健壮性：poll_loop 注入 sleep/monotonic/on_scan/max_iterations/stop——单测用假时钟跑固定轮数+采集时间戳验间隔，真实 run_worker_run 用默认 time.sleep/time.monotonic 无限循环。**poll_loop 把每轮 poll_once 包在 try/except 里**：单轮扫描失败（如 list_recordings OSS 不可达）只记日志不杀死守护进程，下一轮重试——故 make test-poll-interval 即便 OSS 暂不可达也能维持 ~30s 节奏（每轮记错误后继续）；本地无 config 仍优雅 SKIP exit 0。process_plan 自身另有 try/except 收敛单对象失败为 error，两层互补。
+---
