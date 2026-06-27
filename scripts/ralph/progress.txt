@@ -790,3 +790,24 @@
   - inbox/failed/ 是 US-022 转码失败的有意留档，verify-no-stale 用 glob（非递归）只查 inbox 顶层故天然排除；改残留扫描时勿误用 rglob 把 failed/ 留档当残留。
   - US-030（verify-e2e-integrity/sha256/fields）可复用 ops.count_local_fragments 数 Fragment 目录、poller.fragment_id_from_key 校验 key；US-031（test-e2e-security）的 STS 越权反例已在 sts_escape/fc_live 就绪。US-029 为最后一批运维命令收口，剩 US-030/031/032。
 ---
+
+## 2026-06-27 23:00 - US-030
+- 实现了什么：E2E 完整性 / sha256 / 关键字段校验脚本（make verify-e2e-integrity / verify-e2e-sha256 / verify-e2e-fields，tech-spec §4.1/§3.3）。只读真实 $SONISCOPE_HOME/fragments，不 mock、不修改产物，失败非零退出。沿用「纯逻辑（无 IO，直接单测）」分层。
+  - apps/worker/src/soniscope_worker/e2e.py（新增，mypy strict + ruff + pytest 全覆盖）：
+    · discover_fragments(fragments_root, date?)：只读扫描 fragments/<date>/<id>/，date 给定只扫该日否则全部；仅纳入目录名为合法 fragment_id 的子目录（_fragment_id_valid 用 id 自身日期前缀构造 key 经 poller.fragment_id_from_key 往返校验），按 (date, id) 排序。
+    · check_integrity(frag)：校验 REQUIRED_FILES 五产物（audio.wav/manifest.json/transcript.json/transcript.txt/.done）齐全。run_verify_e2e_integrity(date?, expected=100)：发现数==expected（expected<=0 跳过数量断言）+ 每条五产物齐全，任一不满足非零退出，逐条列失败 fragment_id+缺失产物（AC#1）。
+    · check_sha256(manifest, fid)（§3.3）：四字段（audio.sha256/size_bytes、upload.original_sha256/original_size_bytes）非空（不允许 null）；original_format=='wav'→直通规则 audio.sha256==upload.original_sha256 且 size 相等；非 wav→两 sha256 非空即可（§3.3「通常不同」不强制不等）。run_verify_e2e_sha256(date?)：读每条 manifest（缺失/损坏记 FAIL）逐条校验（AC#2）。
+    · check_fields(manifest, fid)：upload.verified_at 与 transcription.completed_at 非空（_is_empty 判 None/空白串）。run_verify_e2e_fields(date?)（AC#3）。
+    · 统一 _summarize：通过数/失败数/共计 + 逐条 FAIL — <fragment_id>：<字段路径或产物名>（AC#4）；_get_path 嵌套键安全取值。所有输出只含 fragment_id/字段路径/文件名，绝不打印 AK Secret（manifest 本不含密钥）。
+  - cli.py：新增 verify-e2e-integrity（--date/--expected）、verify-e2e-sha256（--date）、verify-e2e-fields（--date）三子命令（lazy import，typer.Exit(code)）。
+  - Makefile：新增同名三 target（DATE= 可选、EXPECTED= 默认 100，用 $(if $(DATE),--date $(DATE),) 条件传参）+ .PHONY。
+  - apps/worker/tests/test_e2e.py（新增 22 用例）：tmp_path 下构造**真实** Fragment 目录（非 mock）；覆盖 discover（空根/过滤非法目录名/按日期）、integrity（齐全/缺文件/数量匹配/数量不符 FAIL/不完整 FAIL/expected<=0 跳过）、sha256（wav 直通 OK/sha 不符/size 不符/转码不同 OK/null 拒绝/损坏 manifest FAIL）、fields（OK/缺 verified_at/空白 completed_at/缺 manifest FAIL/报告 fragment_id）。
+- 更改的文件：apps/worker/src/soniscope_worker/{e2e.py(新),cli.py}、Makefile、apps/worker/tests/test_e2e.py(新)、scripts/ralph/{prd.json,progress.txt}。
+- 验证：make typecheck（mypy 63 文件 0 错）、make lint（ruff apps/ 全过 + miniprogram lint passed）、make test（548 passed，+22）全部通过；**实跑三命令于临时 SONISCOPE_HOME（真实落盘 fragment 目录）全部正确**：integrity expected=1 PASS exit0 / expected=100 FAIL exit1（数量不符）、sha256 PASS exit0、fields PASS exit0。
+  未跑：真实 100 条录音全链路 verify-e2e-*（需真机录满 100 条 + Worker 落盘 100 个 fragment，属 US-032 真机验收 checklist；本 story 交付的是脚本本身，逻辑已用真实临时 fragment 目录全覆盖）。
+- **未来迭代的学习：**
+  - 校验脚本「不 mock」≠「不能用临时目录」：单测在 tmp_path 下写**真实** fragment 目录/文件/manifest.json，verify 逻辑读真实文件即满足 AC「不使用 mock」；与云端 IO 类 story 的 FakeProbes 不同——这里没有云 IO，纯本地只读文件系统。
+  - §3.3 sha256 规则落地口径：WAV（original_format=='wav'，本 codebase audio.standardize 对 WAV 一律直通见 US-022）强制 audio.sha256==upload.original_sha256 且 size 相等；非 WAV 只要求两 sha256 真实非空、**不强制不等**（§3.3 原文「通常不同」是描述非约束，避免误判罕见相同）；两路径都禁止 null。
+  - fragment 目录名合法性校验复用 poller.fragment_id_from_key：用 id 自身日期前缀构造 recordings/<date>/<id>.wav 往返（_fragment_id_valid），与 ops.count_local_fragments「含 .done/audio.wav/manifest.json 之一即计」口径不同——e2e.discover 更严（必须目录名是合法 fragment_id），适合验收完整性场景。
+  - Makefile 条件传参用 $(if $(DATE),--date $(DATE),)：DATE 为空时不传 --date（CLI --date 默认 "" → date=None 扫全部日期），EXPECTED 同理默认 100。US-031（test-e2e-*）/US-032（runbook checklist）直接复用这三 verify 命令。
+---

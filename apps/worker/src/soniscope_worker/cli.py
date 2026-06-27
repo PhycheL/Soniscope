@@ -499,6 +499,50 @@ def verify_oss_retention() -> None:
     raise typer.Exit(code=code)
 
 
+@app.command(name="verify-e2e-integrity")
+def verify_e2e_integrity(
+    date: str = typer.Option("", "--date", help="目标日期 YYYY-MM-DD（空=全部日期）"),
+    expected: int = typer.Option(
+        100, "--expected", help="期望 Fragment 目录数（<=0 跳过数量断言）"
+    ),
+) -> None:
+    """确认目标日期有 EXPECTED 个 Fragment 目录且每条五产物齐全（US-030）。"""
+    from soniscope_worker.e2e import run_verify_e2e_integrity
+
+    lines, code = run_verify_e2e_integrity(
+        date=date.strip() or None, expected=expected
+    )
+    for line in lines:
+        typer.echo(line, err=code != 0)
+    raise typer.Exit(code=code)
+
+
+@app.command(name="verify-e2e-sha256")
+def verify_e2e_sha256(
+    date: str = typer.Option("", "--date", help="目标日期 YYYY-MM-DD（空=全部日期）"),
+) -> None:
+    """按 §3.3 校验每条 Fragment 的 WAV 直通 / 非 WAV 转码 sha256 一致性（US-030）。"""
+    from soniscope_worker.e2e import run_verify_e2e_sha256
+
+    lines, code = run_verify_e2e_sha256(date=date.strip() or None)
+    for line in lines:
+        typer.echo(line, err=code != 0)
+    raise typer.Exit(code=code)
+
+
+@app.command(name="verify-e2e-fields")
+def verify_e2e_fields(
+    date: str = typer.Option("", "--date", help="目标日期 YYYY-MM-DD（空=全部日期）"),
+) -> None:
+    """确认每条 manifest.upload.verified_at 与 transcription.completed_at 非空（US-030）。"""
+    from soniscope_worker.e2e import run_verify_e2e_fields
+
+    lines, code = run_verify_e2e_fields(date=date.strip() or None)
+    for line in lines:
+        typer.echo(line, err=code != 0)
+    raise typer.Exit(code=code)
+
+
 @app.command(name="lint-miniprogram")
 def lint_miniprogram() -> None:
     """对 apps/miniprogram 做静态检查（配置/域名/页面/无硬编码密钥，US-011）。"""

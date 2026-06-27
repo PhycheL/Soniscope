@@ -14,6 +14,7 @@
 	retranscribe test-idempotent-skip test-no-auto-retranscribe \
 	test-cli-retranscribe test-cli-upgrade \
 	list-oss-objects verify-no-stale verify-oss-retention \
+	verify-e2e-integrity verify-e2e-sha256 verify-e2e-fields \
 	lint-miniprogram typecheck lint test help
 .DEFAULT_GOAL := help
 
@@ -137,6 +138,15 @@ verify-no-stale: ## 检查 inbox 无 .part/.wav.tmp、tmp 无 .transcript.json.t
 
 verify-oss-retention: ## 对比 OSS 对象数与本地 fragments 数 + 确认无 DeleteObject（红线 R-07）
 	uv run python -m soniscope_worker verify-oss-retention
+
+verify-e2e-integrity: ## 校验目标日期 Fragment 目录数 + 五产物齐全（DATE= EXPECTED=100）
+	uv run python -m soniscope_worker verify-e2e-integrity $(if $(DATE),--date $(DATE),) $(if $(EXPECTED),--expected $(EXPECTED),)
+
+verify-e2e-sha256: ## 按 §3.3 校验 WAV 直通 / 非 WAV 转码 sha256 一致性（DATE=可选）
+	uv run python -m soniscope_worker verify-e2e-sha256 $(if $(DATE),--date $(DATE),)
+
+verify-e2e-fields: ## 校验每条 manifest.upload.verified_at / transcription.completed_at 非空（DATE=可选）
+	uv run python -m soniscope_worker verify-e2e-fields $(if $(DATE),--date $(DATE),)
 
 typecheck: ## mypy strict 类型检查
 	uv run mypy
