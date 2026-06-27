@@ -453,29 +453,15 @@ class RealOssSource:
 
 # ── make worker-run：真实主轮询入口 ────────────────────────────────────────
 def run_worker_run(log: Callable[[str], None] = print) -> None:
-    """启动真实 Worker 主轮询（make worker-run / python -m soniscope_worker run）。
+    """启动真实 Worker 主流水线（make worker-run / python -m soniscope_worker run）。
 
-    读取 config.yaml 的 ``poll.interval_seconds`` 无限轮询；config 缺失时打印诊断并返回。
+    委托给 :func:`pipeline.run_worker_pipeline`：完整的「发现 → 下载 → 标准化 → 转写 →
+    manifest/transcript 落盘 → ``.done``」幂等流水线（US-027），含启动恢复扫描。
+    config 缺失时打印诊断并返回。
     """
-    try:
-        cfg = load_config(config_path())
-    except ConfigError as exc:
-        log(f"[poll] 无法启动主轮询：{exc}")
-        return
-    interval = cfg.poll.interval_seconds
-    log(f"[poll] Worker 主轮询启动，间隔 {interval}s，bucket={cfg.oss.bucket}")
-    # 启动恢复扫描（US-023 §3.6）：清理 inbox/tmp 中间态残留，按文件状态恢复 fragment。
-    from soniscope_worker.recovery import recover_runtime
+    from soniscope_worker.pipeline import run_worker_pipeline
 
-    recover_runtime(log=log)
-    source = RealOssSource(cfg)
-    poll_loop(
-        source,
-        interval,
-        inbox_root=inbox_dir(),
-        fragments_root=fragments_dir(),
-        log=log,
-    )
+    run_worker_pipeline(log=log)
 
 
 # ── make test-poll-interval：验证扫描间隔 ──────────────────────────────────

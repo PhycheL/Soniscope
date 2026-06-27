@@ -723,3 +723,27 @@
   - 成本日志（§6.8）当日累计计数由 CloudSpeechTranscriber 实例持有的 DailyCounter 跨 transcribe 调用累加，跨日自动归零、不持久化（重启归零）；US-027 串流水线时一个 Transcriber 实例贯穿整轮即可天然累计。
   - 错误分类红线：NlsTranscribeError.error_code 只含稳定错误码/HTTP_<code>/异常类名，绝不含 AK/appkey/token 明文；RealNlsBackend._classify_exception 用 getattr 读 http_status/error_code 容错（POP SDK 用 get_http_status()/get_error_code()，urllib 用 .code）。
 ---
+
+## 2026-06-27 21:00 - US-027
+- 实现了什么：集成 Worker 轮询到落盘完整处理流水线（tech-spec §1.1/§3.5/§3.6/§3.7）。把 US-021~026 的各单元串成一条幂等流水线。沿用「IO 用 OssSource/Transcriber 注入 + 纯逻辑可单测」分层。
+  - apps/worker/src/soniscope_worker/pipeline.py（新增，mypy strict + ruff + pytest 全覆盖）：
+    · process_part（从下载好的 .part 跑完整一条，AC#1 严格顺序）：standardize（.part→audio.wav）→ 写 manifest 初稿（transcription.started_at 已填、completed_at 待回填）→ 调 Transcriber → 写 transcript.json（经 tmp）+ transcript.txt → 回填 manifest.transcription 终稿 → **最后**创建 0 字节 .done。任一阶段失败都不创建 .done、返回 FragmentResult(failed, stage)、日志带 fragment_id+失败阶段（AC#2）。可注入 now_iso/monotonic/probe/transcode 便于单测。
+    · process_pending（启动恢复重转写，§3.6 第三段）：对「有 audio.wav 无 .done」的 Fragment 读已有 manifest 初稿 → 转写现有 audio.wav → 回填 transcription + .done；缺 manifest 初稿（更早崩溃）跳过留待 OSS 轮询重下补全（对象永不删除）。
+    · run_pipeline_once（一轮）：list → plan_downloads（已 .done 跳过，AC#3）→ 逐对象 process_plan（下载+sha256 校验）→ process_part；用 seen 集合对同 object key 在一轮内只处理一次（AC#4 不产生重复目录）。
+    · run_pipeline_loop（完整主循环）：启动先 recover()（清 inbox/tmp 残留）+ 对 pending 列表 process_pending 补齐，随后每 interval 跑 run_pipeline_once；单轮异常只记日志不杀进程（AC#5 按硬盘文件状态恢复，不依赖内存）。
+    · run_worker_pipeline（make worker-run 真实入口）：读 config → RealOssSource + create_transcriber → run_pipeline_loop。
+    · make test 入口：run_test_download_interrupt（AC#6 自包含：FixtureSource 首次下载写部分字节后抛错→残留 .part→recover 清理→第二轮完整下载跑通五产物；stub 转写器+真实 ffprobe 直通）、run_test_no_redownload（AC#7 跑两轮，断言第二轮 .done 跳过、download 计数==1）、run_test_transcribe（AC#8 真实 Transcriber+config，oss_key=sample/sample-20s.wav 让 oss-url NLS 拉取真实 sample，校验五产物+transcript.txt 含 §5.4 基线「选择/优先级」；缺 config/ffprobe/SDK/网络优雅 SKIP）。
+  - poller.run_worker_run：从「仅下载 poll_loop」改为委托 pipeline.run_worker_pipeline（完整流水线）；poll_loop/poll_once 保留不动（make test-poll-interval 仍用，US-021 测试不受影响）。
+  - cli.py：新增 test-download-interrupt / test-no-redownload / test-transcribe 三子命令。
+  - Makefile：新增同名三 target + .PHONY。
+  - apps/worker/tests/test_pipeline.py（新增 13 用例，fake probe 直通+stub 转写器+内存 OssSource，全程不触网/ffprobe/云端）：完整成功五产物+transcript.txt 拼接+transcript.json 剔 duration+oss_key 传递、manifest.transcription 字段+计时（注入 now_iso/monotonic）+直通 sha 相等、转写失败不创建 .done（初稿在但 completed_at 空）、标准化失败留档 inbox/failed 不建目录、幂等跳过 download 计数 1、同 key 去重单目录、sha 不符不 .done 且删 .part、process_pending 补齐/缺 manifest 跳过/转写失败不 .done、loop 恢复 pending+清残留 .part、loop list 异常续跑、三 make 入口缺 fixture SKIP。
+- 更改的文件：apps/worker/src/soniscope_worker/{pipeline.py(新),poller.py,cli.py}、Makefile、apps/worker/tests/test_pipeline.py(新)、scripts/ralph/{prd.json,progress.txt}。
+- 验证：make typecheck（mypy 55 文件 0 错）、make lint（ruff apps/ 全过 + miniprogram lint passed）、make test（464 passed，+13）全部通过；**本机真实 ffprobe + 真实 fixtures 实跑两 make target 全绿**：test-download-interrupt（中断残留 .part→recover 清理→重下完成五产物）、test-no-redownload（download 计数 1，第二轮 .done 跳过）；make test-transcribe 在无 config 时优雅 SKIP exit 0；`python -m soniscope_worker run` 无 config 优雅诊断返回。
+  未跑：真实 make test-transcribe 全链路（需真实 config.yaml NLS appkey/AK + alibabacloud-oss-v2/aliyun-python-sdk-core + 触网拉取 sample 转写，本沙箱不具备）——AC#8 真实云端项需 Worker 主机复验；完整编排/幂等/去重/失败隔离/恢复逻辑已用 fake 全单测覆盖。
+- **未来迭代的学习：**
+  - 流水线落盘顺序是 AC#1 硬约束：audio.wav → manifest 初稿（started_at 填、completed_at 空）→ transcribe → transcript.json/txt → manifest 终稿（回填 transcription）→ .done 最后。process_part 没复用 manifest.write_fragment_outputs（那个一次性写 manifest+transcript+done），而是拆成「初稿 atomic_write_json → 转写 → transcript 落盘 → 终稿 atomic_write_json → create_done_marker」以插入转写步骤并满足「初稿在转写前」。
+  - 幂等只看 .done（§3.7）：plan_downloads 的 done_check=done_marker_path.exists()。pending（无 .done 有 audio.wav）有两条恢复路径——① 启动 recover 后 process_pending 直接转写现有 audio.wav（省一次下载+ASR）；② 即便不处理，下一轮 OSS 轮询也会因无 .done 重下重跑（对象永不删除）。两者都正确，process_pending 是优化路径。
+  - 同 object key 一轮内去重用 run_pipeline_once 的 seen 集合（AC#4）：plan_downloads 对同 key 会产出两个 PollPlan（同 fid），seen 保证只处理一次，不产生重复目录。跨轮去重靠 .done。
+  - poller.run_worker_run 已改为委托 pipeline.run_worker_pipeline；US-028（retranscribe CLI / file lock 防并发）应在 pipeline 之上加显式重转入口（--force/--upgrade/--all-from），并用 file lock 保证主轮询 process_part 与 retranscribe 不并发转同一 fragment_id（§3.7）。manifest.transcription 已记录 started_at/completed_at/elapsed_seconds/transcriber/model/params_version/provider/upload_mode 八字段（US-028 AC#2 可直接复用 _transcription_block / TranscriptionInfo）。
+  - make test-transcribe 用真实 Transcriber 但 oss_key 传 runbook 真实 sample 对象（sample/sample-20s.wav），使 oss-url 模式 NLS 能拉到音频；fragment_id 用合法合成值（standardize 据此推 date/目录）。这是「真实云调用 + 本地 fixture 喂 standardize」的混合验证模式，沿用 nls.run_test_transcribe_* 的 SKIP 约定（缺 config/SDK/网络/ffprobe → exit 0）。
+---

@@ -359,6 +359,39 @@ def test_transcribe_perf() -> None:
     raise typer.Exit(code=code)
 
 
+@app.command(name="test-download-interrupt")
+def test_download_interrupt() -> None:
+    """下载中 kill -9 → 重启恢复后最终完成该 Fragment（US-027）。"""
+    from soniscope_worker.pipeline import run_test_download_interrupt
+
+    lines, code = run_test_download_interrupt()
+    for line in lines:
+        typer.echo(line, err=code != 0)
+    raise typer.Exit(code=code)
+
+
+@app.command(name="test-no-redownload")
+def test_no_redownload() -> None:
+    """证明已 .done 的 Fragment 不会被重新下载（US-027）。"""
+    from soniscope_worker.pipeline import run_test_no_redownload
+
+    lines, code = run_test_no_redownload()
+    for line in lines:
+        typer.echo(line, err=code != 0)
+    raise typer.Exit(code=code)
+
+
+@app.command(name="test-transcribe")
+def test_transcribe() -> None:
+    """用 sample-20s.wav 跑完整 Worker 转写，五产物齐全且 transcript.txt 含基线主干（US-027）。"""
+    from soniscope_worker.pipeline import run_test_transcribe
+
+    lines, code = run_test_transcribe()
+    for line in lines:
+        typer.echo(line, err=code != 0)
+    raise typer.Exit(code=code)
+
+
 @app.command(name="lint-miniprogram")
 def lint_miniprogram() -> None:
     """对 apps/miniprogram 做静态检查（配置/域名/页面/无硬编码密钥，US-011）。"""

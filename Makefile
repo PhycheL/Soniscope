@@ -10,6 +10,7 @@
 	test-crash-recovery simulate-worker-crash \
 	test-fragment-integrity test-manifest-idempotent \
 	test-transcribe-oss-url test-transcribe-direct test-transcribe-perf \
+	test-download-interrupt test-no-redownload test-transcribe \
 	lint-miniprogram typecheck lint test help
 .DEFAULT_GOAL := help
 
@@ -100,6 +101,15 @@ test-transcribe-direct: ## direct 模式转写 sample-20s.wav，校验 mode=dire
 
 test-transcribe-perf: ## 约 1 分钟音频端到端耗时与 P-01 基线阈值比较
 	uv run python -m soniscope_worker test-transcribe-perf
+
+test-download-interrupt: ## 下载中 kill -9 → 重启恢复后最终完成该 Fragment
+	uv run python -m soniscope_worker test-download-interrupt
+
+test-no-redownload: ## 证明已 .done Fragment 不会重新下载
+	uv run python -m soniscope_worker test-no-redownload
+
+test-transcribe: ## 用 sample-20s.wav 跑完整 Worker 转写，校验五产物与基线主干
+	uv run python -m soniscope_worker test-transcribe
 
 typecheck: ## mypy strict 类型检查
 	uv run mypy
