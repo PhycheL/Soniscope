@@ -11,6 +11,8 @@
 	test-fragment-integrity test-manifest-idempotent \
 	test-transcribe-oss-url test-transcribe-direct test-transcribe-perf \
 	test-download-interrupt test-no-redownload test-transcribe \
+	retranscribe test-idempotent-skip test-no-auto-retranscribe \
+	test-cli-retranscribe test-cli-upgrade \
 	lint-miniprogram typecheck lint test help
 .DEFAULT_GOAL := help
 
@@ -110,6 +112,21 @@ test-no-redownload: ## 证明已 .done Fragment 不会重新下载
 
 test-transcribe: ## 用 sample-20s.wav 跑完整 Worker 转写，校验五产物与基线主干
 	uv run python -m soniscope_worker test-transcribe
+
+retranscribe: ## 显式重转（FRAGMENT_ID=<id> 单条；或 ARGS="--all-from <date> --upgrade" 批量）
+	uv run python -m soniscope_worker retranscribe $(if $(strip $(FRAGMENT_ID)),$(FRAGMENT_ID),) $(ARGS)
+
+test-idempotent-skip: ## 无 flag + .done 存在 → retranscribe 跳过且不改写产物
+	uv run python -m soniscope_worker test-idempotent-skip
+
+test-no-auto-retranscribe: ## 模型/参数变化时普通轮询不自动重转已 .done Fragment
+	uv run python -m soniscope_worker test-no-auto-retranscribe
+
+test-cli-retranscribe: ## --force 无条件重转并原子覆盖 transcript.json/txt
+	uv run python -m soniscope_worker test-cli-retranscribe
+
+test-cli-upgrade: ## --upgrade 只重转 model/params_version 不同的 Fragment
+	uv run python -m soniscope_worker test-cli-upgrade
 
 typecheck: ## mypy strict 类型检查
 	uv run mypy

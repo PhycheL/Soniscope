@@ -392,6 +392,75 @@ def test_transcribe() -> None:
     raise typer.Exit(code=code)
 
 
+@app.command(name="retranscribe")
+def retranscribe(
+    fragment_id: str = typer.Argument("", help="要重转的 fragment_id（单条；批量用 --all-from）"),
+    all_from: str = typer.Option(
+        "", "--all-from", help="批量重转该日期（YYYY-MM-DD）及之后的所有 Fragment"
+    ),
+    upgrade: bool = typer.Option(
+        False, "--upgrade", help="仅对 manifest 中 model/params_version 与当前配置不同的重转"
+    ),
+    force: bool = typer.Option(False, "--force", help="无条件重转，原子覆盖 transcript"),
+) -> None:
+    """显式重转 Fragment（US-028，§3.7）：正常轮询只看 .done，本命令是唯一存量重转入口。"""
+    from soniscope_worker.retranscribe import run_retranscribe
+
+    lines, code = run_retranscribe(
+        fragment_id=fragment_id or None,
+        all_from=all_from or None,
+        upgrade=upgrade,
+        force=force,
+    )
+    for line in lines:
+        typer.echo(line, err=code != 0)
+    raise typer.Exit(code=code)
+
+
+@app.command(name="test-idempotent-skip")
+def test_idempotent_skip() -> None:
+    """无 flag + .done 存在时 retranscribe 跳过且不改写产物（US-028 AC#5）。"""
+    from soniscope_worker.retranscribe import run_test_idempotent_skip
+
+    lines, code = run_test_idempotent_skip()
+    for line in lines:
+        typer.echo(line, err=code != 0)
+    raise typer.Exit(code=code)
+
+
+@app.command(name="test-no-auto-retranscribe")
+def test_no_auto_retranscribe() -> None:
+    """模型/参数变化时普通轮询不自动重转已 .done 的 Fragment（US-028 AC#1）。"""
+    from soniscope_worker.retranscribe import run_test_no_auto_retranscribe
+
+    lines, code = run_test_no_auto_retranscribe()
+    for line in lines:
+        typer.echo(line, err=code != 0)
+    raise typer.Exit(code=code)
+
+
+@app.command(name="test-cli-retranscribe")
+def test_cli_retranscribe() -> None:
+    """--force 无条件重转并原子覆盖 transcript.json/txt（US-028 AC#6）。"""
+    from soniscope_worker.retranscribe import run_test_cli_retranscribe
+
+    lines, code = run_test_cli_retranscribe()
+    for line in lines:
+        typer.echo(line, err=code != 0)
+    raise typer.Exit(code=code)
+
+
+@app.command(name="test-cli-upgrade")
+def test_cli_upgrade() -> None:
+    """--upgrade 只重转 model/params_version 与当前配置不同的 Fragment（US-028 AC#7）。"""
+    from soniscope_worker.retranscribe import run_test_cli_upgrade
+
+    lines, code = run_test_cli_upgrade()
+    for line in lines:
+        typer.echo(line, err=code != 0)
+    raise typer.Exit(code=code)
+
+
 @app.command(name="lint-miniprogram")
 def lint_miniprogram() -> None:
     """对 apps/miniprogram 做静态检查（配置/域名/页面/无硬编码密钥，US-011）。"""

@@ -37,6 +37,7 @@ from typing import Any
 from soniscope_worker.audio import ffmpeg_to_wav, standardize
 from soniscope_worker.config import TranscriberConfig
 from soniscope_worker.fixtures import MediaInfo, probe_media
+from soniscope_worker.locks import fragment_lock
 from soniscope_worker.manifest import (
     TranscriptionInfo,
     UploadInfo,
@@ -214,57 +215,63 @@ def process_part(
         )
     log(f"[pipeline] {fragment_id} manifest 初稿写入：{manifest_path}")
 
-    # 阶段 3：调用 Transcriber（云端 ASR）。
-    try:
-        result = transcriber.transcribe(fragment_id, std.audio_path, object_key)
-    except Exception as exc:  # noqa: BLE001 - 转写失败不创建 .done，收敛为单项 failed（AC#2）
-        log(f"[pipeline] {fragment_id} 失败于阶段 {STAGE_TRANSCRIBE}：{type(exc).__name__}: {exc}")
-        return FragmentResult(
-            fragment_id,
-            STATUS_FAILED,
-            STAGE_TRANSCRIBE,
-            fragment_dir=frag_dir,
-            detail=f"{type(exc).__name__}: {exc}",
-        )
-    completed_at = resolve_now()
-    elapsed = round(resolve_mono() - t0, 3)
+    # 阶段 3-6 在 fragment 粒度文件锁内执行（§3.7：与 retranscribe 互斥，绝不并发转同一条）。
+    with fragment_lock(tmp_root, fragment_id):
+        # 阶段 3：调用 Transcriber（云端 ASR）。
+        try:
+            result = transcriber.transcribe(fragment_id, std.audio_path, object_key)
+        except Exception as exc:  # noqa: BLE001 - 转写失败不创建 .done，收敛为单项 failed（AC#2）
+            log(
+                f"[pipeline] {fragment_id} 失败于阶段 {STAGE_TRANSCRIBE}："
+                f"{type(exc).__name__}: {exc}"
+            )
+            return FragmentResult(
+                fragment_id,
+                STATUS_FAILED,
+                STAGE_TRANSCRIBE,
+                fragment_dir=frag_dir,
+                detail=f"{type(exc).__name__}: {exc}",
+            )
+        completed_at = resolve_now()
+        elapsed = round(resolve_mono() - t0, 3)
 
-    # 阶段 4：transcript.json + transcript.txt 落盘。
-    try:
-        _write_transcript_outputs(frag_dir, fragment_id, result, tmp_root=tmp_root)
-    except OSError as exc:
-        log(f"[pipeline] {fragment_id} 失败于阶段 {STAGE_TRANSCRIPT}：{exc}")
-        return FragmentResult(
-            fragment_id, STATUS_FAILED, STAGE_TRANSCRIPT, fragment_dir=frag_dir, detail=str(exc)
-        )
+        # 阶段 4：transcript.json + transcript.txt 落盘。
+        try:
+            _write_transcript_outputs(frag_dir, fragment_id, result, tmp_root=tmp_root)
+        except OSError as exc:
+            log(f"[pipeline] {fragment_id} 失败于阶段 {STAGE_TRANSCRIPT}：{exc}")
+            return FragmentResult(
+                fragment_id, STATUS_FAILED, STAGE_TRANSCRIPT, fragment_dir=frag_dir, detail=str(exc)
+            )
 
-    # 阶段 5：manifest 终稿（回填 transcription 四元组 + 计时）。
-    final_manifest = build_manifest(
-        fragment_id=fragment_id,
-        draft=draft,
-        std=std,
-        upload=UploadInfo(),
-        transcription=TranscriptionInfo(
-            started_at=started_at,
-            completed_at=completed_at,
-            elapsed_seconds=elapsed,
-            transcriber=config.name,
-            model=result.model,
-            params_version=result.params_version,
-            provider=result.provider,
-            upload_mode=config.upload_mode,
-        ),
-    )
-    try:
-        atomic_write_json(manifest_path, final_manifest)
-    except OSError as exc:
-        log(f"[pipeline] {fragment_id} 失败于阶段 {STAGE_MANIFEST_FINAL}：{exc}")
-        return FragmentResult(
-            fragment_id, STATUS_FAILED, STAGE_MANIFEST_FINAL, fragment_dir=frag_dir, detail=str(exc)
+        # 阶段 5：manifest 终稿（回填 transcription 四元组 + 计时）。
+        final_manifest = build_manifest(
+            fragment_id=fragment_id,
+            draft=draft,
+            std=std,
+            upload=UploadInfo(),
+            transcription=TranscriptionInfo(
+                started_at=started_at,
+                completed_at=completed_at,
+                elapsed_seconds=elapsed,
+                transcriber=config.name,
+                model=result.model,
+                params_version=result.params_version,
+                provider=result.provider,
+                upload_mode=config.upload_mode,
+            ),
         )
+        try:
+            atomic_write_json(manifest_path, final_manifest)
+        except OSError as exc:
+            log(f"[pipeline] {fragment_id} 失败于阶段 {STAGE_MANIFEST_FINAL}：{exc}")
+            return FragmentResult(
+                fragment_id, STATUS_FAILED, STAGE_MANIFEST_FINAL,
+                fragment_dir=frag_dir, detail=str(exc),
+            )
 
-    # 阶段 6：最后创建 .done（0 字节）。
-    done = create_done_marker(frag_dir)
+        # 阶段 6：最后创建 .done（0 字节）。
+        done = create_done_marker(frag_dir)
     log(f"[pipeline] {fragment_id} 处理完成：五产物齐全，.done 已创建（耗时 {elapsed}s）")
     return FragmentResult(
         fragment_id, STATUS_COMPLETED, STAGE_DONE, fragment_dir=frag_dir, done_marker=done
@@ -326,36 +333,38 @@ def process_pending(
 
     started_at = resolve_now()
     t0 = resolve_mono()
-    try:
-        result = transcriber.transcribe(fragment_id, audio_path, object_key)
-    except Exception as exc:  # noqa: BLE001 - 恢复转写失败不创建 .done（AC#2）
-        log(
-            f"[pipeline] {fragment_id} 恢复转写失败于阶段 {STAGE_TRANSCRIBE}："
-            f"{type(exc).__name__}: {exc}"
-        )
-        return FragmentResult(
-            fragment_id,
-            STATUS_FAILED,
-            STAGE_TRANSCRIBE,
-            fragment_dir=frag_dir,
-            detail=f"{type(exc).__name__}: {exc}",
-        )
-    completed_at = resolve_now()
-    elapsed = round(resolve_mono() - t0, 3)
+    # 恢复转写同样在 fragment 粒度文件锁内执行（§3.7：与 retranscribe 互斥）。
+    with fragment_lock(tmp_root, fragment_id):
+        try:
+            result = transcriber.transcribe(fragment_id, audio_path, object_key)
+        except Exception as exc:  # noqa: BLE001 - 恢复转写失败不创建 .done（AC#2）
+            log(
+                f"[pipeline] {fragment_id} 恢复转写失败于阶段 {STAGE_TRANSCRIBE}："
+                f"{type(exc).__name__}: {exc}"
+            )
+            return FragmentResult(
+                fragment_id,
+                STATUS_FAILED,
+                STAGE_TRANSCRIBE,
+                fragment_dir=frag_dir,
+                detail=f"{type(exc).__name__}: {exc}",
+            )
+        completed_at = resolve_now()
+        elapsed = round(resolve_mono() - t0, 3)
 
-    try:
-        _write_transcript_outputs(frag_dir, fragment_id, result, tmp_root=tmp_root)
-        manifest["transcription"] = _transcription_block(
-            config, result,
-            started_at=started_at, completed_at=completed_at, elapsed_seconds=elapsed,
-        )
-        atomic_write_json(manifest_path, manifest)
-    except OSError as exc:
-        log(f"[pipeline] {fragment_id} 恢复转写落盘失败：{exc}")
-        return FragmentResult(
-            fragment_id, STATUS_FAILED, STAGE_TRANSCRIPT, fragment_dir=frag_dir, detail=str(exc)
-        )
-    done = create_done_marker(frag_dir)
+        try:
+            _write_transcript_outputs(frag_dir, fragment_id, result, tmp_root=tmp_root)
+            manifest["transcription"] = _transcription_block(
+                config, result,
+                started_at=started_at, completed_at=completed_at, elapsed_seconds=elapsed,
+            )
+            atomic_write_json(manifest_path, manifest)
+        except OSError as exc:
+            log(f"[pipeline] {fragment_id} 恢复转写落盘失败：{exc}")
+            return FragmentResult(
+                fragment_id, STATUS_FAILED, STAGE_TRANSCRIPT, fragment_dir=frag_dir, detail=str(exc)
+            )
+        done = create_done_marker(frag_dir)
     log(f"[pipeline] {fragment_id} 恢复转写完成，.done 已补回（耗时 {elapsed}s）")
     return FragmentResult(
         fragment_id, STATUS_COMPLETED, STAGE_DONE, fragment_dir=frag_dir, done_marker=done
