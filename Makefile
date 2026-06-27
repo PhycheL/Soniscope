@@ -8,6 +8,7 @@
 	show-oss-object test-sts-escape test-poll-interval \
 	test-wav-passthrough test-audio-transcode-to-wav test-transcode-fail \
 	test-crash-recovery simulate-worker-crash \
+	test-fragment-integrity test-manifest-idempotent \
 	lint-miniprogram typecheck lint test help
 .DEFAULT_GOAL := help
 
@@ -83,6 +84,12 @@ test-crash-recovery: ## 转写中 kill -9 → 重启清理 tmp 并重新转写�
 simulate-worker-crash: ## 注入崩溃场景（CASE=missing-done|stale-part FRAGMENT_ID=<id>）
 	uv run python -m soniscope_worker simulate-worker-crash \
 		--case "$(CASE)" --fragment-id "$(FRAGMENT_ID)"
+
+test-fragment-integrity: ## 跑完一条 Fragment 校验五产物齐全（audio/manifest/transcript.json/txt/.done）
+	uv run python -m soniscope_worker test-fragment-integrity
+
+test-manifest-idempotent: ## 同一固定 WAV 跑两次，除时间戳外 manifest 完全一致
+	uv run python -m soniscope_worker test-manifest-idempotent
 
 typecheck: ## mypy strict 类型检查
 	uv run mypy

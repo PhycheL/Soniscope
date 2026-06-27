@@ -661,3 +661,23 @@
   - simulate-worker-crash 是「故障注入器」而非「恢复器」：它只删 .done / 造残留 .part，真正的修复由重启后的 recover_runtime + 主循环完成。单测注入 inbox_root/fragments_root 即可在 tempdir 验证注入效果，不碰真实 $SONISCOPE_HOME。
   - mypy strict 下 atomic_write_json 的 obj 参数用 Any（json.dumps 接受任意），dataclass 字段用 list[FragmentState]=field(default_factory=list)；tempfile.mkstemp 返回 (fd, str)，用 os.fdopen(fd,...) 包装写入避免 fd 泄漏。
 ---
+
+## 2026-06-27 19:00 - US-024
+- 实现了什么：manifest.json schema 组装、transcript.json/txt 落盘与 Fragment 完整性检查（tech-spec §3.3/§3.4/§3.5）。沿用「纯逻辑（无 IO，直接单测）+ make test 端到端用真实 fixtures」分层。
+  - apps/worker/src/soniscope_worker/manifest.py（新增，mypy strict + ruff + pytest 全覆盖）：
+    · 纯逻辑：device_id_of（从 fragment_id 中间段解析 deviceShortId，先经 object_key_for 校验格式/日期，非法抛 ManifestError）、build_manifest（按 §3.3 字段来源拼 manifest dict：fragment_id/device_id 从 id 解析；session_id/chunk_seq/chunk_total/recorded_at/duration_seconds/audio.original_format/upload.original_sha256 来自 ManifestDraft(OSS 元数据)；audio.sha256/size_bytes/format + upload.original_size_bytes 来自 StandardizeResult；upload.* 时间戳/transcription.* 流程填入。original_format 元数据缺失时用 std 探测兜底）、transcript_json_from_result（只留 segments/language/model/params_version/provider，**剔除内存态 duration**，§3.4）、manifest_without_timestamps（深拷贝剔除 TIMESTAMP_FIELD_PATHS：upload.uploaded_at/verified_at + transcription.started_at/completed_at/elapsed_seconds，供 idempotent 比对）。
+    · 数据类 UploadInfo（uploaded_at/verified_at/verify_method=fc-head-object）、TranscriptionInfo（started_at/completed_at/elapsed_seconds/transcriber/model/params_version/provider/upload_mode）。
+    · 落盘 write_fragment_outputs（§3.5 三段式，复用 recovery 原子写入）：① atomic_write_json manifest.json → ② write_transcript_json（经 tmp/<id>.transcript.json.tmp）→ ③ atomic_write_text transcript.txt（segments[].text 顺序拼接）→ ④ create_done_marker **.done 最后、0 字节**。任一步失败不创建 .done。
+    · make test 入口 run_test_fragment_integrity（AC#7：sample-20s.wav 走 audio.standardize 直通 → 组装 manifest → 落盘 → 断言 audio.wav/manifest.json/transcript.json/transcript.txt/.done 五产物齐全 + .done 0 字节 + transcript.json 无 duration + transcript.txt 派生正确 + device_id=devm01）、run_test_manifest_idempotent（AC#8：同一 WAV 跑两次、刻意用不同时间戳/计时，断言 manifest_without_timestamps 两次完全一致且时间戳确实不同）；缺 fixture 优雅 SKIP exit 0。
+  - cli.py：新增 test-fragment-integrity / test-manifest-idempotent 两子命令（lazy import，typer.Exit(code)）。
+  - Makefile：新增同名两 target + .PHONY。
+  - apps/worker/tests/test_manifest.py（新增 17 用例，全内存构造 StandardizeResult/ManifestDraft 不触系统工具/云端）：device_id_of 三分支、build_manifest 顶层/audio/upload/transcription 块 + sha 一致性直通(相等)/转码(不同非 null) + original_format 兜底、transcript_json_from_result 剔 duration/缺 segments、manifest_without_timestamps 只剔时间戳+不改原对象+跨时间戳差异相等、write_fragment_outputs 五产物+.done 0 字节+txt 拼接+tmp 清理、两 make 入口缺 fixture SKIP。
+- 更改的文件：apps/worker/src/soniscope_worker/{manifest.py(新),cli.py}、Makefile、apps/worker/tests/test_manifest.py(新)、scripts/ralph/{prd.json,progress.txt}。
+- 验证：make typecheck（mypy 49 文件 0 错）、make lint（ruff apps/ 全过 + miniprogram lint passed）、make test（418 passed，+17）全部通过；**本机真实 fixtures + ffmpeg/ffprobe 实跑两 make target 全绿**：test-fragment-integrity（sample-20s.wav 直通 audio.sha256=b07dee76… 与 runbook 基线一致，五产物齐全）、test-manifest-idempotent（两次不同时间戳但剔除后 manifest 完全一致、audio.sha256 两次相同）。
+- **未来迭代的学习：**
+  - manifest 字段来源三分割（§3.3「字段来源」务必照搬，别凭空填）：① fragment_id/device_id 从 id 解析（device_id=fragment_id.split("_")[1]，先 object_key_for 校验）；② session_id/chunk_seq/chunk_total/recorded_at/duration_seconds/audio.original_format/upload.original_sha256 来自 OSS 元数据（poller.ManifestDraft，已含全部映射）；③ audio.sha256/size/format + upload.original_size_bytes 来自 audio.StandardizeResult（直通时 audio.sha256==original_sha256，转码时不同且都非 null）。US-027 串流水线时直接组装这三者即可，勿重复造字段。
+  - transcript.json **不落盘 duration**（§3.4 硬约束）：TranscriptResult 内存含 duration（时长），但 transcript.json 只写 segments/language/model/params_version/provider；用 transcript_json_from_result 过滤，US-026/027 落 transcript 一律走它。transcript.txt 走 recovery.transcript_txt_from_segments（segments[].text 顺序拼接）。
+  - idempotent 比对剔除的「时间戳字段」是 upload.uploaded_at/verified_at + transcription.started_at/completed_at/elapsed_seconds（见 TIMESTAMP_FIELD_PATHS）；**recorded_at 不剔**（来自固定 OSS 元数据，是真实幂等字段，跟 audio.sha256 一样应跨运行相同）。新增随运行变化的字段务必加进 TIMESTAMP_FIELD_PATHS，否则 test-manifest-idempotent 会误判。
+  - 落盘顺序硬约束（§3.5）：write_fragment_outputs 内 manifest.json → transcript.json（经 tmp）→ transcript.txt → .done 最后（0 字节）。audio.wav 由上游 audio.standardize 落盘，本函数只校验存在；US-027 把 standardize→build_manifest→write_fragment_outputs 串起，真实转写结果替换本处 _stub_transcript_result。
+  - 本 story 只做「manifest/transcript 组装+落盘」单元，未接入 poller.poll_once 主循环（那是 US-027）。make test 用 audio.standardize 真实跑 .part→audio.wav 直通验证端到端，转写结果用确定性 stub（真实 NLS 在 US-026）。
+---

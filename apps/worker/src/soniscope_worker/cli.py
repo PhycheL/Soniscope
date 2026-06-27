@@ -304,6 +304,28 @@ def simulate_worker_crash(
     raise typer.Exit(code=code)
 
 
+@app.command(name="test-fragment-integrity")
+def test_fragment_integrity() -> None:
+    """跑完一条 Fragment 后校验 audio.wav/manifest/transcript.json/transcript.txt/.done 齐全。"""
+    from soniscope_worker.manifest import run_test_fragment_integrity
+
+    lines, code = run_test_fragment_integrity()
+    for line in lines:
+        typer.echo(line, err=code != 0)
+    raise typer.Exit(code=code)
+
+
+@app.command(name="test-manifest-idempotent")
+def test_manifest_idempotent() -> None:
+    """同一段固定 WAV 跑两次，校验除时间戳字段外 manifest 其他字段完全一致。"""
+    from soniscope_worker.manifest import run_test_manifest_idempotent
+
+    lines, code = run_test_manifest_idempotent()
+    for line in lines:
+        typer.echo(line, err=code != 0)
+    raise typer.Exit(code=code)
+
+
 @app.command(name="lint-miniprogram")
 def lint_miniprogram() -> None:
     """对 apps/miniprogram 做静态检查（配置/域名/页面/无硬编码密钥，US-011）。"""
