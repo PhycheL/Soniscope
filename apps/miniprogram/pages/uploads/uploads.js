@@ -4,7 +4,7 @@
 //   静默登录 → 获取单文件 STS → OSS 直传，按状态机迁移 uploading → 待 verify / 待人工重传。
 // US-018 起 onShow 再驱动 pending_verify 项的 verify 回执（待 verify → 上传成功 /
 //   待人工重传 / 待人工 verify），并执行 48 小时本地缓存自动清理与手动删除二次确认。
-// 八种状态全量展示、离线积压提示、长录音折叠在 US-019。
+// US-019 起渲染八种状态中文文案、顶部离线积压提示、长录音折叠卡片，并提供手动重传入口。
 
 const { createLogger } = require('../../utils/logger')
 const config = require('../../config')
@@ -21,12 +21,16 @@ const {
   needsDeleteConfirmation,
   DELETE_CONFIRM_MESSAGE,
 } = require('../../utils/retention')
+const { buildCards, buildBanner } = require('../../utils/uploads_view')
 
 const logger = createLogger('uploads')
 
 Page({
   data: {
-    items: [],
+    cards: [],
+    banner: { visible: false, count: 0, hours: 0, text: '' },
+    // 展开的长录音 session_id 集合（AC#8：展开后才显示每个 chunk）。
+    expanded: {},
   },
 
   onLoad() {
@@ -50,7 +54,26 @@ Page({
   },
 
   _loadQueue() {
-    this.setData({ items: this._readQueue() })
+    this._render(this._readQueue())
+  },
+
+  // 把扁平队列渲染为视图模型：折叠卡片（AC#6-#8）+ 顶部积压提示（AC#4）。
+  _render(queue) {
+    this.setData({
+      cards: buildCards(queue),
+      banner: buildBanner(queue, Date.now()),
+    })
+  },
+
+  // AC#8：展开 / 收起某条长录音卡片，显示其各 chunk。
+  onToggleSession(e) {
+    const sessionId = e && e.currentTarget && e.currentTarget.dataset.sid
+    if (!sessionId) {
+      return
+    }
+    const expanded = Object.assign({}, this.data.expanded)
+    expanded[sessionId] = !expanded[sessionId]
+    this.setData({ expanded: expanded })
   },
 
   _readQueue() {
@@ -63,7 +86,7 @@ Page({
 
   _writeQueue(queue) {
     wx.setStorageSync(UPLOAD_QUEUE_STORAGE_KEY, queue)
-    this.setData({ items: queue })
+    this._render(queue)
   },
 
   // 依次处理所有 queued 项（US-017 AC#1：网络可用进入上传中）。
@@ -175,13 +198,35 @@ Page({
     await verifyFragment(item, deps)
   },
 
-  // 手动重新 verify（AC#9：待 verify / 待人工 verify 记录可点击重试 verify）。
+  // 手动重新 verify（待 verify / 待人工 verify / verified 记录可点击重试 verify）。
   async onTapReVerify(e) {
     const fragmentId = e && e.currentTarget && e.currentTarget.dataset.fid
     if (!fragmentId) {
       return
     }
     await this._verifyOne(fragmentId)
+  },
+
+  // 手动重传（US-019 AC#2/#3）：重置该 Fragment / chunk 的重试计数（清错误码、状态回 queued），
+  // 重新执行 获取 STS → OSS 上传 → verify 流程；只影响该条，不触碰同 session 其它 chunk（AC#8）。
+  async onTapManualRetry(e) {
+    const fragmentId = e && e.currentTarget && e.currentTarget.dataset.fid
+    if (!fragmentId) {
+      return
+    }
+    this._patchItem(fragmentId, {
+      status: STATUS_QUEUED,
+      errorCode: '',
+      reason: '',
+      progress: 0,
+    })
+    logger.info('manual retry requested', { fragmentId: fragmentId })
+    await this._uploadOne(fragmentId)
+    const after = this._readQueue().find((it) => it && it.fragmentId === fragmentId)
+    if (after && after.status === STATUS_PENDING_VERIFY) {
+      await this._verifyOne(fragmentId)
+    }
+    this._loadQueue()
   },
 
   // 手动删除（AC#7：未 verify 通过的记录二次确认；verified 记录可直接删除）。

@@ -71,3 +71,93 @@
 .item-btn--danger {
   color: #d93025;
 }
+
+.item-btn--retry {
+  color: #d93025;
+}
+
+/* AC#4：离线积压红色提示。 */
+.banner {
+  padding: 20rpx 24rpx;
+  margin-bottom: 16rpx;
+  background-color: #fce8e6;
+  color: #d93025;
+  border-radius: 16rpx;
+  font-size: 24rpx;
+}
+
+/* AC#2/#7：失败记录红色标记。 */
+.item--failed {
+  border-left: 8rpx solid #d93025;
+}
+
+.item-status--failed {
+  color: #d93025;
+}
+
+/* AC#6：长录音折叠卡片。 */
+.session {
+  display: flex;
+  flex-direction: column;
+  padding: 28rpx 24rpx;
+  margin-bottom: 16rpx;
+  background-color: #ffffff;
+  border-radius: 16rpx;
+}
+
+.session--failed {
+  border-left: 8rpx solid #d93025;
+}
+
+.session-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.session-main {
+  display: flex;
+  flex-direction: column;
+}
+
+.session-summary {
+  font-size: 28rpx;
+  color: #222222;
+}
+
+.session-status {
+  margin-top: 6rpx;
+  font-size: 24rpx;
+  color: #1a73e8;
+}
+
+.session-status--done {
+  color: #188038;
+}
+
+.session-status--failed {
+  color: #d93025;
+}
+
+.session-toggle {
+  font-size: 24rpx;
+  color: #1a73e8;
+}
+
+.session-chunks {
+  margin-top: 16rpx;
+}
+
+.chunk {
+  display: flex;
+  flex-direction: column;
+  padding: 20rpx 16rpx;
+  margin-top: 12rpx;
+  background-color: #f7f7f7;
+  border-radius: 12rpx;
+}
+
+.chunk-seq {
+  font-size: 24rpx;
+  color: #444444;
+}

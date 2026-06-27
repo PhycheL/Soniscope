@@ -1,34 +1,101 @@
 <view class="container">
-  <view wx:if="{{items.length === 0}}" class="empty">
+  <!-- AC#4：存在待上传 / 上传失败 / 待人工重传 / 待人工 verify 时显示离线积压红色提示。 -->
+  <view wx:if="{{banner.visible}}" class="banner">{{banner.text}}</view>
+
+  <view wx:if="{{cards.length === 0}}" class="empty">
     暂无录音。回到「录音」页开始第一条录音。
   </view>
+
   <view wx:else class="list">
-    <view wx:for="{{items}}" wx:key="fragmentId" class="item">
-      <view class="item-main">
-        <text class="item-id">{{item.fragmentId}}</text>
-        <text class="item-status">{{item.statusText}}</text>
+    <block wx:for="{{cards}}" wx:key="*this" wx:for-item="card">
+      <!-- 单条 Fragment 卡片 -->
+      <view wx:if="{{card.type === 'single'}}" class="item {{card.isFailed ? 'item--failed' : ''}}">
+        <view class="item-main">
+          <text class="item-id">{{card.fragmentId}}</text>
+          <text class="item-status {{card.isFailed ? 'item-status--failed' : ''}}">{{card.statusText}}</text>
+        </view>
+        <view class="item-meta">
+          <text wx:if="{{card.status === 'uploading'}}" class="item-progress">{{card.progress || 0}}%</text>
+          <text wx:if="{{card.errorCode}}" class="item-error">{{card.errorCode}}</text>
+          <text wx:if="{{card.reason}}" class="item-error">{{card.reason}}</text>
+          <text wx:if="{{card.localDeleted}}" class="item-note">本地缓存已清理（OSS 仍保留）</text>
+        </view>
+        <view class="item-actions">
+          <button
+            wx:if="{{card.canManualRetry}}"
+            class="item-btn item-btn--retry"
+            size="mini"
+            data-fid="{{card.fragmentId}}"
+            bindtap="onTapManualRetry"
+          >手动重传</button>
+          <button
+            wx:if="{{card.canReVerify}}"
+            class="item-btn"
+            size="mini"
+            data-fid="{{card.fragmentId}}"
+            bindtap="onTapReVerify"
+          >重新 verify</button>
+          <button
+            class="item-btn item-btn--danger"
+            size="mini"
+            data-fid="{{card.fragmentId}}"
+            bindtap="onTapDelete"
+          >删除</button>
+        </view>
       </view>
-      <view class="item-meta">
-        <text wx:if="{{item.status === 'uploading'}}" class="item-progress">{{item.progress || 0}}%</text>
-        <text wx:if="{{item.errorCode}}" class="item-error">{{item.errorCode}}</text>
-        <text wx:if="{{item.reason}}" class="item-error">{{item.reason}}</text>
-        <text wx:if="{{item.localDeleted}}" class="item-note">本地缓存已清理（OSS 仍保留）</text>
+
+      <!-- AC#6/#7/#8：长录音折叠卡片（同一 session 的多 chunk 聚合） -->
+      <view wx:else class="session {{card.aggregateKind === 'failed' ? 'session--failed' : ''}}">
+        <view class="session-head" data-sid="{{card.sessionId}}" bindtap="onToggleSession">
+          <view class="session-main">
+            <text class="session-summary">{{card.summaryText}}</text>
+            <text class="session-status session-status--{{card.aggregateKind}}">{{card.aggregateText}}</text>
+          </view>
+          <text class="session-toggle">{{expanded[card.sessionId] ? '收起' : '展开'}}</text>
+        </view>
+
+        <view wx:if="{{expanded[card.sessionId]}}" class="session-chunks">
+          <view
+            wx:for="{{card.chunks}}"
+            wx:key="fragmentId"
+            wx:for-item="chunk"
+            class="chunk {{chunk.isFailed ? 'item--failed' : ''}}"
+          >
+            <view class="item-main">
+              <text class="chunk-seq">第 {{chunk.chunkSeq}} 段</text>
+              <text class="item-status {{chunk.isFailed ? 'item-status--failed' : ''}}">{{chunk.statusText}}</text>
+            </view>
+            <view class="item-meta">
+              <text wx:if="{{chunk.status === 'uploading'}}" class="item-progress">{{chunk.progress || 0}}%</text>
+              <text wx:if="{{chunk.errorCode}}" class="item-error">{{chunk.errorCode}}</text>
+              <text wx:if="{{chunk.reason}}" class="item-error">{{chunk.reason}}</text>
+              <text wx:if="{{chunk.localDeleted}}" class="item-note">本地缓存已清理（OSS 仍保留）</text>
+            </view>
+            <view class="item-actions">
+              <button
+                wx:if="{{chunk.canManualRetry}}"
+                class="item-btn item-btn--retry"
+                size="mini"
+                data-fid="{{chunk.fragmentId}}"
+                bindtap="onTapManualRetry"
+              >手动重传</button>
+              <button
+                wx:if="{{chunk.canReVerify}}"
+                class="item-btn"
+                size="mini"
+                data-fid="{{chunk.fragmentId}}"
+                bindtap="onTapReVerify"
+              >重新 verify</button>
+              <button
+                class="item-btn item-btn--danger"
+                size="mini"
+                data-fid="{{chunk.fragmentId}}"
+                bindtap="onTapDelete"
+              >删除</button>
+            </view>
+          </view>
+        </view>
       </view>
-      <view class="item-actions">
-        <button
-          wx:if="{{item.status === 'pending_verify' || item.status === 'manual_verify'}}"
-          class="item-btn"
-          size="mini"
-          data-fid="{{item.fragmentId}}"
-          bindtap="onTapReVerify"
-        >重新 verify</button>
-        <button
-          class="item-btn item-btn--danger"
-          size="mini"
-          data-fid="{{item.fragmentId}}"
-          bindtap="onTapDelete"
-        >删除</button>
-      </view>
-    </view>
+    </block>
   </view>
 </view>

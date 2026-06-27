@@ -6,6 +6,7 @@
 
 // 上传状态（tech-spec §6.7 八状态）。US-014 落地前两态；US-017 增加上传中→待 verify
 // 与失败→待人工重传；八态全量渲染 / 折叠在 US-019。
+const STATUS_DRAFT = 'draft'
 const STATUS_QUEUED = 'queued'
 const STATUS_UPLOADING = 'uploading'
 const STATUS_PENDING_VERIFY = 'pending_verify'
@@ -100,6 +101,7 @@ function updateQueueItem(queue, fragmentId, patch) {
 }
 
 module.exports = {
+  STATUS_DRAFT: STATUS_DRAFT,
   STATUS_QUEUED: STATUS_QUEUED,
   STATUS_UPLOADING: STATUS_UPLOADING,
   STATUS_PENDING_VERIFY: STATUS_PENDING_VERIFY,

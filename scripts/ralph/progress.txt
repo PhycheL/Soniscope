@@ -547,3 +547,24 @@
   - 自动清理只删本地音频缓存（unlink tempFilePath）并打 localDeleted 标记，保留队列记录（列表仍显示「上传成功」+「本地缓存已清理」），OSS 对象永不删除（AGENTS 红线）；US-019 八状态全量渲染/折叠时复用 localDeleted 展示。
   - Page harness mock wx 新增 getFileSystemManager().unlink 与 showModal（按 scenario.confirmDelete 决定 confirm）；request 用 `url.indexOf('verify-upload')` 路由区分 issue-credential 与 verify-upload 两个 FC 调用。
 ---
+
+## 2026-06-27 07:00 - US-019
+- 实现了什么：上传列表页八种状态全量渲染、顶部离线积压提示、长录音折叠卡片与手动重传入口（tech-spec §6.7 / ADR-4）。沿用小程序「纯逻辑模块 + Page 薄 IO 壳」分层。
+  - apps/miniprogram/utils/uploads_view.js（新增，纯函数，node --test 覆盖）：
+    · 状态归类：BACKLOG_STATUSES（queued/upload_failed/manual_retry/manual_verify，AC#4 计数集）、FAILED_STATUSES（红色标记/聚合失败）、MANUAL_RETRY_STATUSES（upload_failed/manual_retry，AC#2/#3）、RE_VERIFY_STATUSES（pending_verify/manual_verify/verified）；canManualRetry/canReVerify/isFailed/isBacklog。
+    · buildBanner(queue, nowMs)（AC#4）：有积压时返回「未上传 N 条，距离最早录音已 X 小时」；N 按单 chunk 计数；X=最早积压 manifest.recorded_at 到 now 的整小时（hoursBetween 向下取整不为负，earliestBacklogMs 仅算积压项）。
+    · buildCards(queue)（AC#6/#7/#8）：按 manifest.session_id 折叠——同 session ≥2 chunk → session 卡片（chunk 按 chunk_seq 升序、summaryText="mm:ss · N 段"、aggregateStatus：任一失败→"X / N 失败"、全 verified→"已完成"、其余→"M / N 已完成"）；单条/无 session_id → single 卡片。toChunkView 统一产出 statusText/durationText/canManualRetry/canReVerify/isFailed 等。
+  - apps/miniprogram/utils/upload_queue.js：导出 STATUS_DRAFT 常量（八态齐全）。
+  - pages/uploads/uploads.js：data 由 items 改为 { cards, banner, expanded }；_render(queue) 统一经 buildCards/buildBanner 渲染（_writeQueue/_loadQueue 复用）；新增 onToggleSession（AC#8 展开/收起）、onTapManualRetry（AC#2/#3：清 errorCode/reason、状态回 queued 重置重试计数 → _uploadOne → 若 pending_verify 再 _verifyOne；只影响该条不触其它 chunk）。
+  - pages/uploads/uploads.wxml：重写为 banner + single 卡片 + session 折叠卡片（展开后逐 chunk 显示 chunk_seq/状态/独立手动重传+重新 verify+删除按钮）。
+  - pages/uploads/uploads.wxss：新增 .banner（红色积压提示）、.item--failed/.item-status--failed（红色标记）、.session/.session-* 折叠卡片样式、.item-btn--retry。
+  - test/uploads_view.test.js（新增 17 用例）：八态文案、归类、countBacklog/hoursBetween/buildBanner、buildCards 单条/折叠/排序/聚合三态/多 session 顺序；Page harness：手动重传跑到 verified、onShow 渲染折叠卡片+banner、onToggleSession 切换。
+- 更改的文件：apps/miniprogram/utils/{uploads_view.js(新),upload_queue.js}、pages/uploads/{uploads.js,uploads.wxml,uploads.wxss}、test/uploads_view.test.js(新)、scripts/ralph/{prd.json,progress.txt}。
+- 验证：make typecheck（mypy 41 文件 0 错）、make lint（ruff + miniprogram lint 全过）、make test（pytest 327 passed）全部通过；node --test test/*.test.js（102 passed，+17）。
+  未自动验证（需人工）：AC#9 DevTools 构造本地状态看八态文案、AC#10 真机飞行模式离线积压与红色提示、网络恢复自动流转——本沙箱无 WeChat DevTools/真机，已用 node Page harness + mock wx 最大化覆盖。
+- **未来迭代的学习：**
+  - 离线 → queued（待上传/离线排队）的状态在 US-014/US-017 已落地（保存即 queued，onShow 离线时 _processQueue 跳过、网络恢复自动上传）；US-019 只负责「展示 + 手动重传」，无需改入队逻辑。
+  - 折叠依据是 manifest.session_id（US-016 长录音各 chunk 共享）；单条录音 session_id 也存在但只有一片，故按「≥2 chunk 才折叠」判定。
+  - 陷阱：本环境 Write 工具偶发把结尾标记（</content> / </invoke>）写进文件尾，导致 node --check 报 "Invalid regular expression: missing /"；新建文件后用 tail/grep 自检结尾再跑测试。
+  - 上下文：上传列表渲染统一走 uploads.js `_render`（buildCards/buildBanner）；后续若加状态/筛选，改 uploads_view.js 纯函数即可，Page 不动。
+---
