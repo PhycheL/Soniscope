@@ -830,3 +830,24 @@
   - 上下文：FAKE_CODE（fc_live）在有网环境会真实触达 FC issue-credential 拿 401，是「测试夹具不需真实 wx.login 即可验证鉴权拒绝」的关键；无网时收敛为 SKIP。security E2E 的 STS 越权反例需 ALIYUN_DEPLOY_AK_ID/SECRET（AssumeRole 等价测试凭证）或 CODE=（走 FC），否则 SKIP。
   - 上下文：仅剩 US-032（MVP 最终验收 runbook 文档，只需 Typecheck，无 Tests），是纯文档 story，引用本 story 的 make verify-e2e-* / test-e2e-* 命令。
 ---
+
+## 2026-06-27 05:30 - US-032
+- 实现了什么：编写 MVP 最终验收 runbook 与真机闭环清单（docs/runbook/mvp-acceptance.md，新增）。
+  纯文档 story（唯一质量门=Typecheck passes），把 PRD §4（Feature 最终验收 AC）落地为可逐条执行的命令 + 真机操作清单：
+  · §0 验收前提：硬性约束「真实小程序/FC/OSS/Worker，不允许 mock」；故障注入开关仅用于失败重试项，其余走真链路；URL/AppID/Bucket 取自 runbook（含 issue-cedential 少一个 r 的真实拼写，未纠正）。
+  · §1 正常路径 100 条：1.1 真机连续录 100 条 30~90s 逐条保存上传、列表全 verified 无失败残留；1.2 make list-oss-objects DATE=<date> 计数=100 无需控制台；1.3 依次 make verify-e2e-integrity/sha256/fields（标注保存输出）；1.4 make verify-no-stale 无残留。
+  · §2 中断保护闭环（飞行模式录 60s→锁屏→解锁弹提示→保留→关飞行→verified）。
+  · §3 25 分钟长录音闭环（自动切 3 chunk、chunk_total=3、chunk_seq 1/2/3、session_id 一致、拼接≈25min）。
+  · §4 异常路径自动脚本（test-e2e-crash-recovery / test-e2e-retranscribe 升级仅旧版本+普通轮询不自动重转 / test-e2e-security 403 不返 STS + STS 越权 AccessDenied）。
+  · §5 故障注入失败重试 + 手动重传闭环（mock-fc-url-broken 自动失败 3 次→关→手动重传→verified→Worker 落盘，用户无需改源码）。
+  · §6 48h+1h 本地缓存自动清理 + OSS 对象仍存在复验。
+  · §7 1 周后 make verify-oss-retention 验证 OSS 永不删除（无 DeleteObject）。
+  · §8 验收完成判定表（人工/自动分类）；§9 失败排查指引。
+- 更改的文件：docs/runbook/mvp-acceptance.md（新）、scripts/ralph/{prd.json,progress.txt}。
+- 验证：make typecheck（mypy 65 文件 0 错）、make lint（ruff + 小程序 lint 全过）、make test（560 passed）全部通过；
+  纯文档改动不影响代码质量门。文档引用的所有 make target（list-oss-objects/verify-e2e-*/verify-no-stale/test-e2e-*/verify-oss-retention/retranscribe）已确认存在于 Makefile（US-029~US-031 交付）。
+- **未来迭代的学习：**
+  - 这是 PRD 最后一个 story（US-032，priority 32）。完成后全部 32 个 story passes=true。
+  - 文档类 story 的 make target 引用务必先 grep Makefile 确认目标真实存在（避免写出不存在的命令）；本仓库 E2E target 集中在 US-029(运维 make)/US-030(verify-e2e-*)/US-031(test-e2e-*)。
+  - runbook 引用真实云资源（URL/Bucket/AppID）一律从 docs/runbook/cloud-setup.md 与 AGENTS.md 速查表取，不要凭记忆；尤其 issue-cedential-ottfirocds 少一个 r 不要纠正。
+---
