@@ -639,3 +639,25 @@
   - 本 story 只做「.part→audio.wav」一步，未接入 poller.poll_once（那是 US-027 完整流水线）。US-024 落 manifest 时直接用 StandardizeResult 的 audio_format/original_format/audio_sha256/audio_size_bytes/original_sha256/original_size_bytes（字段已按 §3.3 manifest.audio/upload 对齐）。
   - 单测 hermetic 原则：standardize 默认 probe=probe_media/transcode=ffmpeg_to_wav，单测一律注入 fake 不触系统工具；真实 ffmpeg/ffprobe 验证只放 make test-* target（本机实跑），与 AGENTS「单测 mock 外部依赖、真实调用进 live/test target」一致。
 ---
+
+## 2026-06-27 18:00 - US-023
+- 实现了什么：Worker 启动恢复扫描（§3.6 三段）与统一原子写入工具（§3.5），含 make test-crash-recovery / simulate-worker-crash。沿用「纯逻辑（无 IO，直接单测）+ IO 注入」分层，单测全程不触系统工具/云端。
+  - apps/worker/src/soniscope_worker/recovery.py（新增，mypy strict + ruff + pytest 全覆盖）：
+    · 原子写入工具（§3.5）：atomic_write_text（同目录 tempfile.mkstemp 临时文件→os.replace，失败清临时文件）、atomic_write_json（manifest.json 等）、write_transcript_json（**临时文件刻意写 tmp/<id>.transcript.json.tmp** 再 rename，使转写中断时第二段扫描能据此清理）、transcript_txt_from_segments（segments[].text 顺序拼接）、create_done_marker（**最后创建、0 字节空文件**，AC#6）。
+    · finalize_fragment（转写落盘收尾，US-027 复用）：严格顺序 transcript.json（经 tmp）→ transcript.txt → .done 最后；任一步失败不创建 .done，杜绝半成品完成态。转写内容由调用方注入（make test 用确定性 stub，真实 NLS 转写器在 US-026）。
+    · 三段恢复扫描：recover_inbox（清 *.wav.tmp + *.part，AC#1/#2）、recover_tmp（清 *.transcript.json.tmp，AC#3）、classify_fragment_dir/scan_fragments（fragments/<date>/<id> 判定 done/pending/empty：有 .done→跳过、无 .done+有 audio.wav→转写未完、无 audio.wav→空目录，AC#4）；recover() 编排（remove_empty_dirs 可选删空目录）+ RecoveryReport 汇总；recover_runtime() 对真实 $SONISCOPE_HOME 扫描（Worker 启动调用）。
+    · run_test_crash_recovery（make target，自包含 tempdir）：构造 audio.wav 就绪但缺 transcript.json/.done 的转写中断现场 + inbox/tmp 全部中间态残留 → recover() 清理并判 pending → finalize_fragment 重转写补齐 transcript.json/.done（AC#7）。run_simulate_worker_crash（操作真实 $SONISCOPE_HOME，inbox_root/fragments_root 可注入便于单测）：CASE=missing-done 删 .done（AC#8）、CASE=stale-part 生成残留 .part（AC#9），未知 CASE / 缺 FRAGMENT_ID / 非法 id / 找不到目录均非零退出。
+  - cli.py：新增 test-crash-recovery、simulate-worker-crash（--case/--fragment-id）两子命令。
+  - poller.py run_worker_run：启动 poll_loop 前调 recover_runtime(log)（lazy import），把 §3.6 恢复扫描接入真实 Worker 启动（poll_loop 内既有 cleanup_parts 保留，US-021 测试不受影响）。
+  - Makefile：新增 test-crash-recovery、simulate-worker-crash（CASE= FRAGMENT_ID=）两 target + .PHONY。
+  - apps/worker/tests/test_recovery.py（新增 26 用例）：原子写入（无临时残留/JSON 往返/transcript 经 tmp/txt 拼接/.done 0 字节/finalize 全产物+done last）、inbox/tmp 清理（含缺目录安全、保留无关文件）、fragments 分类五分支（done/pending/empty/非法 id/日期不一致）、scan_fragments、recover 编排（清理+分类+summary、删空目录/默认忽略）、run_test_crash_recovery pass、simulate 六路径（未知 CASE/缺 id/非法 id/missing-done 删标记+无目录/stale-part 生成可被清理）。
+- 更改的文件：apps/worker/src/soniscope_worker/{recovery.py(新),cli.py,poller.py}、Makefile、apps/worker/tests/test_recovery.py(新)、scripts/ralph/{prd.json,progress.txt}。
+- 验证：make typecheck（mypy 47 文件 0 错）、make lint（ruff apps/ 全过 + miniprogram lint passed）、make test（401 passed，+26）全部通过；**实跑 make test-crash-recovery 全绿**（清理三类中间态残留 + 判 pending + 重转写补齐 transcript.json/txt/.done）；make simulate-worker-crash 未知 CASE 正确非零退出；CLI --help 显示两新命令。
+  未跑：真实 $SONISCOPE_HOME 上 make simulate-worker-crash CASE=missing-done/stale-part FRAGMENT_ID=<真实 id> 后重启 Worker 的端到端恢复（需真实 fragment 目录 + 真实 OSS 重下 + US-026/027 真实转写器补齐 .done）——本沙箱无真实运行时数据与云端，simulate 的故障注入逻辑已单测覆盖、test-crash-recovery 已用确定性 stub 等价验证恢复→重转写→.done 全链路。
+- **未来迭代的学习：**
+  - 三段式协议的「临时文件位置」有讲究：transcript.json 的临时文件**必须**写 tmp/<id>.transcript.json.tmp（不是 fragment 目录内同级 tmp），因为这正是 §3.6 第二段「转写中断」的恢复信号；manifest.json / transcript.txt 用同目录 sibling 临时文件即可。recovery.write_transcript_json 已封装此约定，US-024/027 落 transcript 一律走它，勿自行 open+write。
+  - .done 创建顺序是硬约束：finalize_fragment 内严格 transcript.json → transcript.txt → create_done_marker 最后；.done 必须 0 字节（create_done_marker 用 `open(path,'wb')` 空写）。US-027 串完整流水线时，manifest 终稿 + transcript 都落盘后才调 create_done_marker。
+  - 恢复扫描入口已接入 run_worker_run（recover_runtime），但「重转写 pending fragments」的循环编排留给 US-027（poll_once 目前只下载，不标准化/转写）。US-027 把 process_plan 下载 → audio.standardize → finalize_fragment 串起，并对 recover() 返回的 pending 列表补转写。finalize_fragment 与 audio.StandardizeResult 字段已就绪可直接组装。
+  - simulate-worker-crash 是「故障注入器」而非「恢复器」：它只删 .done / 造残留 .part，真正的修复由重启后的 recover_runtime + 主循环完成。单测注入 inbox_root/fragments_root 即可在 tempdir 验证注入效果，不碰真实 $SONISCOPE_HOME。
+  - mypy strict 下 atomic_write_json 的 obj 参数用 Any（json.dumps 接受任意），dataclass 字段用 list[FragmentState]=field(default_factory=list)；tempfile.mkstemp 返回 (fd, str)，用 os.fdopen(fd,...) 包装写入避免 fd 泄漏。
+---

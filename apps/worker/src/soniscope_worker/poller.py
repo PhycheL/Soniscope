@@ -464,6 +464,10 @@ def run_worker_run(log: Callable[[str], None] = print) -> None:
         return
     interval = cfg.poll.interval_seconds
     log(f"[poll] Worker 主轮询启动，间隔 {interval}s，bucket={cfg.oss.bucket}")
+    # 启动恢复扫描（US-023 §3.6）：清理 inbox/tmp 中间态残留，按文件状态恢复 fragment。
+    from soniscope_worker.recovery import recover_runtime
+
+    recover_runtime(log=log)
     source = RealOssSource(cfg)
     poll_loop(
         source,

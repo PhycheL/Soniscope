@@ -7,6 +7,7 @@
 	deploy-fc rollback-fc fc-logs test-fc-live test-verify-upload oss-delete-obj \
 	show-oss-object test-sts-escape test-poll-interval \
 	test-wav-passthrough test-audio-transcode-to-wav test-transcode-fail \
+	test-crash-recovery simulate-worker-crash \
 	lint-miniprogram typecheck lint test help
 .DEFAULT_GOAL := help
 
@@ -75,6 +76,13 @@ test-audio-transcode-to-wav: ## 用 sample-20s.m4a 验证非 WAV 转码为 WAV
 
 test-transcode-fail: ## 用损坏音频验证转码失败留档到 inbox/failed/
 	uv run python -m soniscope_worker test-transcode-fail
+
+test-crash-recovery: ## 转写中 kill -9 → 重启清理 tmp 并重新转写补齐 transcript.json 与 .done
+	uv run python -m soniscope_worker test-crash-recovery
+
+simulate-worker-crash: ## 注入崩溃场景（CASE=missing-done|stale-part FRAGMENT_ID=<id>）
+	uv run python -m soniscope_worker simulate-worker-crash \
+		--case "$(CASE)" --fragment-id "$(FRAGMENT_ID)"
 
 typecheck: ## mypy strict 类型检查
 	uv run mypy

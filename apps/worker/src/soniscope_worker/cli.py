@@ -277,6 +277,33 @@ def test_transcode_fail() -> None:
     raise typer.Exit(code=code)
 
 
+@app.command(name="test-crash-recovery")
+def test_crash_recovery() -> None:
+    """模拟转写中 kill -9 后重启：清理 tmp 残留并重新转写补齐 transcript.json 与 .done。"""
+    from soniscope_worker.recovery import run_test_crash_recovery
+
+    lines, code = run_test_crash_recovery()
+    for line in lines:
+        typer.echo(line, err=code != 0)
+    raise typer.Exit(code=code)
+
+
+@app.command(name="simulate-worker-crash")
+def simulate_worker_crash(
+    case: str = typer.Option(
+        ..., "--case", help="崩溃场景：missing-done | stale-part"
+    ),
+    fragment_id: str = typer.Option(..., "--fragment-id", help="目标 fragment_id"),
+) -> None:
+    """注入 Worker 崩溃场景（删 .done / 残留 .part），重启后由恢复扫描修复（US-023）。"""
+    from soniscope_worker.recovery import run_simulate_worker_crash
+
+    lines, code = run_simulate_worker_crash(case, fragment_id)
+    for line in lines:
+        typer.echo(line, err=code != 0)
+    raise typer.Exit(code=code)
+
+
 @app.command(name="lint-miniprogram")
 def lint_miniprogram() -> None:
     """对 apps/miniprogram 做静态检查（配置/域名/页面/无硬编码密钥，US-011）。"""
