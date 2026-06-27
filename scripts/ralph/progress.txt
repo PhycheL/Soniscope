@@ -772,3 +772,21 @@
   - --all-from 日期筛选用 scan_fragments(fragments_root) 过滤 state.date>=from_date：date 目录名 YYYY-MM-DD 字典序与时间序一致，无需 datetime 解析。scan_fragments 已对非法目录名/日期不一致返回 None 过滤，retranscribe_one 再 object_key_for 二次校验。
   - US-029（OSS/E2E 运维 make 命令）、US-031（E2E test-e2e-retranscribe）可复用本处：test-e2e-retranscribe 调 make retranscribe ARGS="--all-from <date> --upgrade" 验证仅旧 params_version 重转 + 普通轮询不自动重转（retranscribe_all_from / should_retranscribe 已是真实逻辑，只需接真实 config + 真实 fragment 目录）。
 ---
+
+## 2026-06-27 15:30 - US-029
+- 实现了什么：OSS 与 E2E 运维辅助 make 命令收口（首交付 list-oss-objects / verify-no-stale / verify-oss-retention；show-oss-object 复用 US-017、oss-delete-obj 复用 US-010，不重复实现）。
+  - apps/worker/src/soniscope_worker/ops.py（新增，mypy strict + ruff + pytest 覆盖）：沿用「纯逻辑 + OssSource Protocol 注入」分层。
+    · list-oss-objects（AC#2）：validate_date（YYYY-MM-DD 正则 + date.fromisoformat 合法性）→ date_listing_prefix → wav_objects_for_date（按 recordings/<date>/ 前缀 + .wav 过滤、按 key 排序）→ format_list_objects（逐对象 key+size + 总数）；run_list_oss_objects 复用 poller.RealOssSource.list_recordings，非法日期不触 IO、OSS 不可达收敛单项 fail 只输出类名。
+    · verify-no-stale（AC#4）：find_stale 用 glob（非递归）扫 inbox 顶层 *.part / *.wav.tmp + tmp 下 *.transcript.json.tmp；inbox/failed/ 留档不计入（关键：用 glob 而非 rglob）。无残留 exit 0、有残留逐条列路径 exit 1。
+    · verify-oss-retention（AC#5）：count_oss_wav（fragment_id_from_key 往返校验计数）vs count_local_fragments（fragments/<date>/<id>/ 含 .done|audio.wav|manifest.json 之一才计，空目录不计）要求 OSS≥本地；scan_business_source_for_delete 扫 Worker 业务源码确认无真实删除调用（红线 R-07）；scan_logs_for_delete 扫日志文件。OSS 不可用（缺 config/不可达）该维度 SKIP 不致命，源码红线/日志命中/数量倒挂致命。
+  - cli.py：新增 list-oss-objects（--date）/ verify-no-stale / verify-oss-retention 三个 typer 子命令。
+  - Makefile：新增三个 target（list-oss-objects DATE=、verify-no-stale、verify-oss-retention）+ .PHONY。
+  - apps/worker/tests/test_ops.py（新增 33 用例）：FakeSource + tmp_path 全程不触网；含「真实 Worker 包业务源码无删除调用」断言（test_scan_business_source_no_delete_in_real_package）。
+- 更改的文件：apps/worker/src/soniscope_worker/{ops.py(新),cli.py}、Makefile、apps/worker/tests/test_ops.py(新)、scripts/ralph/{prd.json,progress.txt}。
+- 验证：make typecheck（mypy 61 文件 0 错）、make lint（ruff apps/ 全过 + 小程序）、make test（526 passed，+33）全部通过；实跑 verify-no-stale（clean exit 0 / 注入 .part exit 1）、list-oss-objects 非法日期 exit 1、verify-oss-retention 无 config（OSS 维度 SKIP、源码红线真实扫描通过、整体 exit 0）。未跑：真实云端 list-oss-objects / verify-oss-retention OSS 比对（需 config.yaml + alibabacloud-oss-v2 触网，本沙箱不具备）。
+- **未来迭代的学习：**
+  - 红线 R-07 源码扫描必须区分「真实调用形态」与「说明性提及」：用 call-shaped 模式（.delete_object( / DeleteObjectRequest / .delete_objects( / DeleteObjectsRequest）而非裸 token，否则 poller.py / cli.py 里 docstring 的「绝不调用 DeleteObject」会被误判违规。日志扫描则用宽松 token（DeleteObject / delete_object）匹配人类可读记录。两套 token 分开（_SOURCE_DELETE_PATTERNS vs _LOG_DELETE_TOKENS）。
+  - 删除调用允许出现的「仅测试用」模块口径（与 US-010 记录一致）：oss_admin.py / verify_upload_live.py / fc_live.py；ops.py 自身是运维工具模块也加入豁免集（_DELETE_ALLOWED_MODULES），其字符串字面量 token 不会自我误报。新增任何真实删除能力必须落在这几个模块且重度标注仅测试用。
+  - inbox/failed/ 是 US-022 转码失败的有意留档，verify-no-stale 用 glob（非递归）只查 inbox 顶层故天然排除；改残留扫描时勿误用 rglob 把 failed/ 留档当残留。
+  - US-030（verify-e2e-integrity/sha256/fields）可复用 ops.count_local_fragments 数 Fragment 目录、poller.fragment_id_from_key 校验 key；US-031（test-e2e-security）的 STS 越权反例已在 sts_escape/fc_live 就绪。US-029 为最后一批运维命令收口，剩 US-030/031/032。
+---

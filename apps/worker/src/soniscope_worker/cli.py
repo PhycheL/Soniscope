@@ -461,6 +461,44 @@ def test_cli_upgrade() -> None:
     raise typer.Exit(code=code)
 
 
+@app.command(name="list-oss-objects")
+def list_oss_objects(
+    date: str = typer.Option("", "--date", help="目标日期 YYYY-MM-DD"),
+) -> None:
+    """列出指定日期 recordings/<date>/ 下的 .wav 对象并输出总数（US-029）。"""
+    from soniscope_worker.ops import run_list_oss_objects
+
+    if not date.strip():
+        typer.echo("缺少 --date（make list-oss-objects DATE=<YYYY-MM-DD>）", err=True)
+        raise typer.Exit(code=1)
+    lines, code = run_list_oss_objects(date)
+    for line in lines:
+        typer.echo(line, err=code != 0)
+    raise typer.Exit(code=code)
+
+
+@app.command(name="verify-no-stale")
+def verify_no_stale() -> None:
+    """检查 inbox 无 .part / .wav.tmp、tmp 无 .transcript.json.tmp 残留（US-029）。"""
+    from soniscope_worker.ops import run_verify_no_stale
+
+    lines, code = run_verify_no_stale()
+    for line in lines:
+        typer.echo(line, err=code != 0)
+    raise typer.Exit(code=code)
+
+
+@app.command(name="verify-oss-retention")
+def verify_oss_retention() -> None:
+    """对比 OSS 对象数与本地 fragments 数 + 扫描日志/源码确认无 DeleteObject（US-029）。"""
+    from soniscope_worker.ops import run_verify_oss_retention
+
+    lines, code = run_verify_oss_retention()
+    for line in lines:
+        typer.echo(line, err=code != 0)
+    raise typer.Exit(code=code)
+
+
 @app.command(name="lint-miniprogram")
 def lint_miniprogram() -> None:
     """对 apps/miniprogram 做静态检查（配置/域名/页面/无硬编码密钥，US-011）。"""

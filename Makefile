@@ -13,6 +13,7 @@
 	test-download-interrupt test-no-redownload test-transcribe \
 	retranscribe test-idempotent-skip test-no-auto-retranscribe \
 	test-cli-retranscribe test-cli-upgrade \
+	list-oss-objects verify-no-stale verify-oss-retention \
 	lint-miniprogram typecheck lint test help
 .DEFAULT_GOAL := help
 
@@ -127,6 +128,15 @@ test-cli-retranscribe: ## --force 无条件重转并原子覆盖 transcript.json
 
 test-cli-upgrade: ## --upgrade 只重转 model/params_version 不同的 Fragment
 	uv run python -m soniscope_worker test-cli-upgrade
+
+list-oss-objects: ## 列出当天 recordings/<date>/ 下 .wav 对象 + 计数（DATE=<YYYY-MM-DD>）
+	uv run python -m soniscope_worker list-oss-objects --date $(DATE)
+
+verify-no-stale: ## 检查 inbox 无 .part/.wav.tmp、tmp 无 .transcript.json.tmp 残留
+	uv run python -m soniscope_worker verify-no-stale
+
+verify-oss-retention: ## 对比 OSS 对象数与本地 fragments 数 + 确认无 DeleteObject（红线 R-07）
+	uv run python -m soniscope_worker verify-oss-retention
 
 typecheck: ## mypy strict 类型检查
 	uv run mypy
