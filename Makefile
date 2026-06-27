@@ -6,6 +6,7 @@
 .PHONY: install check-config init-dirs verify-prep worker-run \
 	deploy-fc rollback-fc fc-logs test-fc-live test-verify-upload oss-delete-obj \
 	show-oss-object test-sts-escape test-poll-interval \
+	test-wav-passthrough test-audio-transcode-to-wav test-transcode-fail \
 	lint-miniprogram typecheck lint test help
 .DEFAULT_GOAL := help
 
@@ -65,6 +66,15 @@ test-poll-interval: ## 验证 Worker 按 poll.interval_seconds 周期扫描（EX
 	uv run python -m soniscope_worker test-poll-interval \
 		$(if $(strip $(EXPECTED)),--expected $(EXPECTED),) \
 		$(if $(strip $(ITERATIONS)),--iterations $(ITERATIONS),)
+
+test-wav-passthrough: ## 用 sample-20s.wav 验证 WAV 直通（audio.sha256==original_sha256）
+	uv run python -m soniscope_worker test-wav-passthrough
+
+test-audio-transcode-to-wav: ## 用 sample-20s.m4a 验证非 WAV 转码为 WAV
+	uv run python -m soniscope_worker test-audio-transcode-to-wav
+
+test-transcode-fail: ## 用损坏音频验证转码失败留档到 inbox/failed/
+	uv run python -m soniscope_worker test-transcode-fail
 
 typecheck: ## mypy strict 类型检查
 	uv run mypy

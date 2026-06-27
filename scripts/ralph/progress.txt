@@ -17,6 +17,8 @@
 - 真实云端校验命令（live/verify-prep 类）模式：把"取数据"（IO/云 SDK）收敛到一个 `Probes` Protocol，纯校验逻辑 `check_*` 只对已取回的结构化 dataclass 做判断（无 IO，直接单测）；单测注入 `FakeProbes` 不触网，真实运行用 `RealProbes`（lazy import 云 SDK，缺失抛 `ProbeError`，由编排层 try/except 收敛为单项 fail）。云 SDK 无 stub：在根 pyproject 用 `[[tool.mypy.overrides]] module=["alibabacloud_oss_v2.*"] ignore_missing_imports=true`，lazy import 函数返回 `Any` 即可消除 attr-defined。
 - 校验报告绝不打印 AK Secret：必填字段非空检查只列字段名不列值；用 `.get_secret_value()` 仅做"是否为空"判断后丢弃。单测专门断言 secret 明文不出现在报告里。
 - 小程序（apps/miniprogram/）是 JS，不进 mypy/ruff（两者只覆盖 apps/ 下的 .py）。其静态检查走 Python CLI 子命令 `soniscope_worker.miniprogram_lint`（make lint 串联 `ruff check apps/` + `python -m soniscope_worker lint-miniprogram`），逻辑放 Worker 包内可被 mypy/ruff/pytest 覆盖；node v22 可用但未引入 npm/eslint。小程序合法域名/常量单一真实来源在 apps/miniprogram/config.js（US-012+ 一律 require 取用，勿散落硬编码）；脱敏日志在 apps/miniprogram/utils/logger.js（传对象自动按敏感键名脱敏）。WeChat DevTools 模拟器/真机类 AC 本沙箱无法自动验证，用 node --check + JSON.parse 做最大化静态验证后在进度里标注需人工复验。
+- Worker 文件落盘遵守三段式协议（先临时→原子 os.replace→最后 .done）：临时文件名用 `<id>.part`（下载）/`<id>.wav.tmp`（转码）；inbox/tmp/fragments 同一文件系统保证 rename 原子。失败（探测/转码）只动 inbox（留档 inbox/failed/<id>.part + 清 .wav.tmp），**绝不创建 fragment 完成目录**，杜绝半成品完成态。本机 ffmpeg/ffprobe + tests/audio 真实 fixtures 实跑的端到端校验只放 make test-* target；Worker 标准化逻辑在 audio.py，可注入 probe/transcode，单测全程不触系统工具。
+- ffmpeg 转码陷阱：输出文件名带 `.tmp`（如 `<id>.wav.tmp`）时 ffmpeg 无法按扩展名推断 muxer，必须显式 `-f wav`（否则报 "Error initializing the muxer ... Invalid argument"）；输入文件靠内容探测无需 `-f`。消费源文件（os.replace 移走 / unlink）前务必先算 original_sha256/size。
 
 ---
 
@@ -616,4 +618,24 @@
   - 安全红线落实方式：OssSource Protocol **不定义** delete 方法（结构化协议层面禁止），RealOssSource 不实现 delete_*；单测断言 `dir(OssSource)` 公开成员恰为 {list_recordings, head_metadata, download} + RealOssSource 无 delete 属性。删除能力只在 oss_admin（仅测试用，双门控）。US-029 verify-oss-retention 扫日志也以「业务路径无 DeleteObject」为准。
   - .part 是下载中间态：sha256 不符删 .part（本地，非 OSS）等下一轮重下（AC#4）；崩溃残留 .part 启动 cleanup_parts 清理重下（AC#6）。「删 .part」与「删 OSS 对象」是两件事，前者随处可做、后者业务路径绝不做。
   - 轮询循环可测性与守护进程健壮性：poll_loop 注入 sleep/monotonic/on_scan/max_iterations/stop——单测用假时钟跑固定轮数+采集时间戳验间隔，真实 run_worker_run 用默认 time.sleep/time.monotonic 无限循环。**poll_loop 把每轮 poll_once 包在 try/except 里**：单轮扫描失败（如 list_recordings OSS 不可达）只记日志不杀死守护进程，下一轮重试——故 make test-poll-interval 即便 OSS 暂不可达也能维持 ~30s 节奏（每轮记错误后继续）；本地无 config 仍优雅 SKIP exit 0。process_plan 自身另有 try/except 收敛单对象失败为 error，两层互补。
+---
+
+## 2026-06-27 17:00 - US-022
+- 实现了什么：Worker 音频格式检测、WAV 直通与非 WAV 转码（tech-spec §5.1/§3.3/§3.5）。沿用「纯逻辑（无 IO，直接单测）+ IO 用可注入 callable（probe/transcode）」分层，单测注入 fake 全程不触 ffmpeg/ffprobe。
+  - apps/worker/src/soniscope_worker/audio.py（新增，mypy strict + ruff + pytest 覆盖）：
+    · 纯逻辑：is_wav(MediaInfo)（format_name 含 wav 或流编码 pcm_*，与 fixtures.codec_matches 一致，不信扩展名，AC#1）、format_label（非 WAV 原始格式标签兜底：aac→m4a / 首个 codec / 容器名，仅元数据缺 original_format 时用）。
+    · ffmpeg_to_wav（IO）：ffmpeg -i src -vn -ac 1 -ar 16000 -c:a pcm_s16le -f wav dest（ASR 友好 16k 单声道 PCM）；ffmpeg 缺失/转码失败抛 AudioToolError。**关键：输出文件名为 <id>.wav.tmp，.tmp 扩展名无法让 ffmpeg 推断 muxer，必须显式 -f wav**。
+    · standardize(part, fragment_id, fragments_root, inbox_root, failed_root, original_format?, log, probe, transcode)→StandardizeResult（核心）：① 由 object_key_for 解析 date（非法 fragment_id→failed）；② 消费 part 前先算 original_sha256/original_size_bytes（保证非 WAV 路径两 sha 都非 null，AC#6）；③ ffprobe 探测（FixtureError→留档 inbox/failed/ +failed，不建 fragment 目录，AC#7）；④ is_wav→**直通**：mkdir fragment 目录+os.replace(part→audio.wav)，bytes 不变故 audio.sha256==original_sha256、size 相等（AC#2/#5）；⑤ 非 WAV→**转码**：先写 inbox/<id>.wav.tmp→os.replace→audio.wav，删 part，audio.sha256 真实重算（AC#3/#4/#6）；转码失败删 .wav.tmp 半成品+留档 inbox/failed/+不建 fragment 目录（AC#7/#10）。
+    · make test 入口 run_test_wav_passthrough / run_test_audio_transcode_to_wav / run_test_transcode_fail：用真实 tests/audio fixtures + ffmpeg/ffprobe 在 tempfile 工作区端到端跑 + 断言（passthrough sha 相等 / transcode sha 不同且 audio.wav 可被 ffprobe 识别为 WAV / 损坏音频留档未污染 fragments）；缺 fixture 或 ffmpeg 不可用优雅 SKIP exit 0。
+  - cli.py：新增 test-wav-passthrough / test-audio-transcode-to-wav / test-transcode-fail 三子命令（lazy import，typer.Exit(code)）。
+  - Makefile：新增同名三 target + .PHONY。
+  - apps/worker/tests/test_audio.py（新增 20 用例，FakeProbe/fake transcode 不触 ffmpeg）：is_wav/format_label 全分支、直通 rename 保 bytes+sha 相等+part 移走、original_format 探测兜底、转码产物 sha 不同+tmp 在 inbox+清理、探测失败留档+不建目录、转码失败留档+清 .wav.tmp+不建目录、缺 part/非法 fragment_id→failed、ok 属性、run_test_* 缺 fixture SKIP（monkeypatch _fixture_path）。
+- 更改的文件：apps/worker/src/soniscope_worker/{audio.py(新),cli.py}、Makefile、apps/worker/tests/test_audio.py(新)、scripts/ralph/{prd.json,progress.txt}。
+- 验证：make typecheck（mypy 45 文件 0 错）、make lint（ruff apps/ 全过 + miniprogram lint passed）、make test（375 passed，+20）全部通过；**本机 ffmpeg/ffprobe + 真实 fixtures 实跑三 make target 全绿**：test-wav-passthrough（sample-20s.wav 直通，audio.sha256==original b07dee76…）、test-audio-transcode-to-wav（sample-20s.m4a→WAV，original d3d28661… ≠ audio 32ebf875…，ffprobe 识别为 WAV）、test-transcode-fail（损坏字节探测失败留档 inbox/failed/ 未污染 fragments/）。
+- **未来迭代的学习：**
+  - ffmpeg 转码输出到 ``<id>.wav.tmp``（三段式协议要求临时文件）时，**必须显式 ``-f wav``**——ffmpeg 默认按输出扩展名选 muxer，``.tmp`` 无法识别会报「Error initializing the muxer ... Invalid argument」。输入 ``.part`` 则靠内容探测无需 ``-f``。
+  - standardize 的「消费前先算 original_sha256/size」很关键：直通时 os.replace 把 part 移走、转码时 part 被删，之后再算就拿不到原始字节了；先算保证两路径 original_* 都真实非 null（§3.3 AC#5/#6）。
+  - 三段式 + 失败隔离：直通/转码成功才 mkdir fragment 目录（os.replace 原子落 audio.wav）；任何失败（探测/转码）都只动 inbox（留档 inbox/failed/<id>.part + 清 .wav.tmp），**绝不创建 fragment 目录**，故崩溃/失败永不产生半成品完成态（US-023 启动恢复扫描会清 inbox/*.wav.tmp，与此互补）。
+  - 本 story 只做「.part→audio.wav」一步，未接入 poller.poll_once（那是 US-027 完整流水线）。US-024 落 manifest 时直接用 StandardizeResult 的 audio_format/original_format/audio_sha256/audio_size_bytes/original_sha256/original_size_bytes（字段已按 §3.3 manifest.audio/upload 对齐）。
+  - 单测 hermetic 原则：standardize 默认 probe=probe_media/transcode=ffmpeg_to_wav，单测一律注入 fake 不触系统工具；真实 ffmpeg/ffprobe 验证只放 make test-* target（本机实跑），与 AGENTS「单测 mock 外部依赖、真实调用进 live/test target」一致。
 ---

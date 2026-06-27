@@ -244,6 +244,39 @@ def test_poll_interval(
     raise typer.Exit(code=code)
 
 
+@app.command(name="test-wav-passthrough")
+def test_wav_passthrough() -> None:
+    """用 sample-20s.wav 验证 WAV 直通/无损路径（audio.sha256 == original_sha256，US-022）。"""
+    from soniscope_worker.audio import run_test_wav_passthrough
+
+    lines, code = run_test_wav_passthrough()
+    for line in lines:
+        typer.echo(line, err=code != 0)
+    raise typer.Exit(code=code)
+
+
+@app.command(name="test-audio-transcode-to-wav")
+def test_audio_transcode_to_wav() -> None:
+    """用 sample-20s.m4a 验证非 WAV 转码为 WAV（输出可被 ffprobe 识别为 WAV，US-022）。"""
+    from soniscope_worker.audio import run_test_audio_transcode_to_wav
+
+    lines, code = run_test_audio_transcode_to_wav()
+    for line in lines:
+        typer.echo(line, err=code != 0)
+    raise typer.Exit(code=code)
+
+
+@app.command(name="test-transcode-fail")
+def test_transcode_fail() -> None:
+    """用损坏音频验证转码失败留档到 inbox/failed/、不污染 fragments/（US-022）。"""
+    from soniscope_worker.audio import run_test_transcode_fail
+
+    lines, code = run_test_transcode_fail()
+    for line in lines:
+        typer.echo(line, err=code != 0)
+    raise typer.Exit(code=code)
+
+
 @app.command(name="lint-miniprogram")
 def lint_miniprogram() -> None:
     """对 apps/miniprogram 做静态检查（配置/域名/页面/无硬编码密钥，US-011）。"""
