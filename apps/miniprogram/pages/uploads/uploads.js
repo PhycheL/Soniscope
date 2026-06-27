@@ -22,6 +22,7 @@ const {
   DELETE_CONFIRM_MESSAGE,
 } = require('../../utils/retention')
 const { buildCards, buildBanner } = require('../../utils/uploads_view')
+const faultInjection = require('../../utils/fault_injection')
 
 const logger = createLogger('uploads')
 
@@ -31,13 +32,30 @@ Page({
     banner: { visible: false, count: 0, hours: 0, text: '' },
     // 展开的长录音 session_id 集合（AC#8：展开后才显示每个 chunk）。
     expanded: {},
+    // 开发者故障注入菜单入口仅非 production 可见（US-020 AC#1）。
+    devMenuVisible: false,
   },
 
   onLoad() {
     // 同一时刻只跑一个上传 / verify 循环，避免重复 onShow 并发处理。
     this._processing = false
     this._verifying = false
+    this.setData({ devMenuVisible: faultInjection.isDevEnv(config.ENV) })
     logger.info('uploads page loaded')
+  },
+
+  // 跳转开发者故障注入菜单（US-020）；production 下入口不可见，故不会触发。
+  onTapDevMenu() {
+    wx.navigateTo({ url: '/pages/dev/dev' })
+  },
+
+  // 读取当前故障注入开关（受 config.ENV 门控，production 永远全关）。
+  _faults() {
+    return faultInjection.loadFaults({
+      env: config.ENV,
+      getStorage: (k) => wx.getStorageSync(k),
+      setStorage: (k, v) => wx.setStorageSync(k, v),
+    })
   },
 
   // 每次切到本页（含从录音页「保存并上传」后切 tab）：清理本地缓存 → 刷新队列 → 上传 → verify。
@@ -143,6 +161,10 @@ Page({
   },
 
   _isOnline() {
+    // 故障注入：mock-network-offline 强制离线，即使真实网络可用（US-020 AC#3）。
+    if (faultInjection.isEnabled(this._faults(), faultInjection.FAULT_NETWORK_OFFLINE)) {
+      return Promise.resolve(false)
+    }
     return new Promise((resolve) => {
       try {
         wx.getNetworkType({
@@ -306,6 +328,10 @@ Page({
   },
 
   _wxRequestSts(code, fragmentId, size) {
+    // 故障注入：mock-fc-url-broken 让所有 FC 请求强制失败（US-020 AC#2）。
+    if (faultInjection.isEnabled(this._faults(), faultInjection.FAULT_FC_URL_BROKEN)) {
+      return Promise.reject(new Error('MOCK_FC_URL_BROKEN'))
+    }
     return new Promise((resolve, reject) => {
       wx.request({
         url: config.FC_ISSUE_CREDENTIAL_URL,
@@ -319,6 +345,18 @@ Page({
   },
 
   _wxRequestVerify(code, fragmentId, expectedSize) {
+    const faults = this._faults()
+    // 故障注入：mock-fc-url-broken 让所有 FC 请求强制失败（US-020 AC#2）。
+    if (faultInjection.isEnabled(faults, faultInjection.FAULT_FC_URL_BROKEN)) {
+      return Promise.reject(new Error('MOCK_FC_URL_BROKEN'))
+    }
+    // 故障注入：mock-verify-fail 让 /verify-upload 永远返回 verified:false（US-020 AC#4）。
+    if (faultInjection.isEnabled(faults, faultInjection.FAULT_VERIFY_FAIL)) {
+      return Promise.resolve({
+        statusCode: 200,
+        data: { verified: false, reason: 'OBJECT_NOT_FOUND' },
+      })
+    }
     return new Promise((resolve, reject) => {
       wx.request({
         url: config.FC_VERIFY_UPLOAD_URL,

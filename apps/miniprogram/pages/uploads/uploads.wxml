@@ -1,4 +1,7 @@
 <view class="container">
+  <!-- 开发者故障注入菜单入口：仅非 production 可见（US-020 AC#1）。 -->
+  <view wx:if="{{devMenuVisible}}" class="dev-entry" bindtap="onTapDevMenu">⚙ 开发者故障注入</view>
+
   <!-- AC#4：存在待上传 / 上传失败 / 待人工重传 / 待人工 verify 时显示离线积压红色提示。 -->
   <view wx:if="{{banner.visible}}" class="banner">{{banner.text}}</view>
 

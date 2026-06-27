@@ -1,0 +1,26 @@
+<!-- 开发者故障注入菜单（US-020）。仅 devEnv 为 true（非 production）时渲染开关列表。 -->
+<view class="dev" wx:if="{{devEnv}}">
+  <view class="dev-title">开发者故障注入</view>
+  <view class="dev-sub">仅非生产环境可见 · 运行时切换无需改源码</view>
+
+  <view
+    class="switch {{item.enabled ? 'switch--on' : ''}}"
+    wx:for="{{switches}}"
+    wx:key="name"
+    bindtap="onToggleSwitch"
+    data-name="{{item.name}}"
+  >
+    <view class="switch-main">
+      <view class="switch-name">{{item.name}}</view>
+      <view class="switch-label">{{item.label}}</view>
+      <view class="switch-hint">{{item.hint}}</view>
+    </view>
+    <view class="switch-state {{item.enabled ? 'switch-state--on' : ''}}">
+      {{item.enabled ? '已开启' : '已关闭'}}
+    </view>
+  </view>
+</view>
+
+<view class="dev dev--prod" wx:else>
+  <view class="dev-title">开发者菜单在生产环境不可用</view>
+</view>

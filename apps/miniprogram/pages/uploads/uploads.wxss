@@ -161,3 +161,12 @@
   font-size: 24rpx;
   color: #444444;
 }
+
+/* 开发者故障注入菜单入口（US-020，仅非 production 可见） */
+.dev-entry {
+  margin-bottom: 16rpx;
+  padding: 12rpx 16rpx;
+  font-size: 24rpx;
+  color: #1a73e8;
+  text-align: right;
+}

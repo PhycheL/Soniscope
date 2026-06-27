@@ -1,0 +1,71 @@
+.dev {
+  padding: 24rpx;
+}
+
+.dev-title {
+  font-size: 34rpx;
+  font-weight: 600;
+  color: #222;
+}
+
+.dev-sub {
+  margin-top: 8rpx;
+  margin-bottom: 24rpx;
+  font-size: 24rpx;
+  color: #888;
+}
+
+.switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24rpx;
+  margin-bottom: 16rpx;
+  border-radius: 12rpx;
+  background: #ffffff;
+  border: 2rpx solid #e6e6e6;
+}
+
+.switch--on {
+  border-color: #1a73e8;
+  background: #f0f6ff;
+}
+
+.switch-main {
+  flex: 1;
+  padding-right: 16rpx;
+}
+
+.switch-name {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #222;
+}
+
+.switch-label {
+  margin-top: 6rpx;
+  font-size: 26rpx;
+  color: #444;
+}
+
+.switch-hint {
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  color: #999;
+}
+
+.switch-state {
+  flex-shrink: 0;
+  font-size: 26rpx;
+  color: #999;
+}
+
+.switch-state--on {
+  color: #1a73e8;
+  font-weight: 600;
+}
+
+.dev--prod {
+  text-align: center;
+  color: #999;
+}

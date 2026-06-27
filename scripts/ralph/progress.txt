@@ -568,3 +568,28 @@
   - 陷阱：本环境 Write 工具偶发把结尾标记（</content> / </invoke>）写进文件尾，导致 node --check 报 "Invalid regular expression: missing /"；新建文件后用 tail/grep 自检结尾再跑测试。
   - 上下文：上传列表渲染统一走 uploads.js `_render`（buildCards/buildBanner）；后续若加状态/筛选，改 uploads_view.js 纯函数即可，Page 不动。
 ---
+
+## 2026-06-27 08:00 - US-020
+- 实现了什么：小程序开发者故障注入菜单（tech-spec §6.1）——仅非 production 可见、运行时切换的三个开关，用于真机构造 FC 失效、网络离线、verify 失败异常路径。沿用「纯逻辑 utils + Page 薄 IO 壳」与「ENV 门控」。
+  - apps/miniprogram/utils/fault_injection.js（新，纯函数 + 注入 storage deps，node --test 覆盖）：
+    · 三个开关常量 FAULT_FC_URL_BROKEN='mock-fc-url-broken' / FAULT_NETWORK_OFFLINE='mock-network-offline' / FAULT_VERIFY_FAIL='mock-verify-fail' + FAULT_SWITCHES（含 label/hint）+ FAULT_STORAGE_KEY='soniscope:fault_injection'。
+    · 纯逻辑：isDevEnv（env!=='production'，AC#1）、normalizeFaults（未知键丢弃、布尔化、默认全关）、isEnabled/setFault/toggleFault（不可变）、buildSwitchViews（name/label/hint/enabled 视图模型）。
+    · loadFaults/saveFaults（注入 {env,getStorage,setStorage}）：统一 ENV 门控——production 读永远返回全关、写直接忽略（即便菜单已不可见也安全兜底，AC#1）。
+  - apps/miniprogram/pages/dev/dev.{js,wxml,wxss,json}（新页面）：devEnv 据 config.ENV 判定；非 prod 渲染三个开关卡片，bindtap onToggleSwitch 运行时 toggleFault+saveFaults 落盘并 _refresh（AC#5）；production 分支只显示「生产环境不可用」兜底。
+  - apps/miniprogram/app.json：注册 pages/dev/dev（miniprogram_lint 会校验四件套齐全，已补全）。
+  - apps/miniprogram/pages/uploads/uploads.js：新增 _faults()（loadFaults，受 config.ENV 门控）；onLoad setData devMenuVisible=isDevEnv（AC#1 入口）；onTapDevMenu→wx.navigateTo /pages/dev/dev；三处适配器接入开关效果：
+    · _isOnline：mock-network-offline → 直接 resolve(false)，queued 项保持待上传（AC#3）。
+    · _wxRequestSts：mock-fc-url-broken → reject，FC 请求强制失败（AC#2）→ uploader 走 FC_UNREACHABLE → 待人工重传。
+    · _wxRequestVerify：mock-fc-url-broken → reject；mock-verify-fail → resolve {statusCode:200,data:{verified:false,reason:'OBJECT_NOT_FOUND'}}（AC#4）→ verify 走 unverified → 待人工重传。
+  - apps/miniprogram/pages/uploads/uploads.wxml/wxss：顶部加 wx:if=devMenuVisible 的「⚙ 开发者故障注入」入口（AC#1）。
+  - apps/miniprogram/test/fault_injection.test.js（新，15 用例）：纯逻辑全覆盖（isDevEnv/normalize/toggle/buildSwitchViews/loadFaults·saveFaults 的 prod 门控）；dev 页 harness（dev 环境三开关切换落盘、production 菜单不可用且切换不落盘——用 mutate config.ENV 再 finally 还原）；uploads 页 harness（devMenuVisible+navigateTo、mock-network-offline 保持 queued、关开关后自动上传、mock-fc-url-broken→待人工重传、关后手动重传成功、mock-verify-fail→待人工重传+OBJECT_NOT_FOUND）。
+- 更改的文件：apps/miniprogram/utils/fault_injection.js(新)、apps/miniprogram/pages/dev/dev.{js,wxml,wxss,json}(新)、apps/miniprogram/app.json、apps/miniprogram/pages/uploads/{uploads.js,uploads.wxml,uploads.wxss}、apps/miniprogram/test/fault_injection.test.js(新)、scripts/ralph/{prd.json,progress.txt}。
+- 验证：make typecheck（mypy 41 文件 0 错）、make lint（ruff apps/ 全过 + miniprogram lint passed，新 dev 页四件套通过 check_app_pages）、make test（pytest 327 passed）全部通过；node --test apps/miniprogram/test/*.test.js 117 passed（+15）；node --check 全部新增/改动 .js 通过；app.json/dev.json JSON 可解析。
+  未自动验证（需人工 WeChat DevTools/真机）：AC#6 打开 mock-fc-url-broken 真机录音自动重试 3 次失败→列表变红→关闭后手动重传成功；AC#7 打开 mock-network-offline 真机进入离线排队→关闭后自动恢复——本沙箱无 DevTools/真机，已用 node Page harness + mock wx 等价覆盖三个开关效果与 ENV 门控。
+- **未来迭代的学习：**
+  - ENV 门控单一来源是 config.js 的 ENV（当前 'development'）；故障注入读写都过 fault_injection.loadFaults/saveFaults 的门控，production 强制全关 + 不落盘，无需在每个调用点重复判 env。
+  - 新增小程序页面必须：① app.json pages 注册；② 四件套（.js/.json/.wxml/.wxss）齐全——否则 miniprogram_lint.check_app_pages 报「缺少 X 文件」使 make lint 失败。
+  - dev 页 production 分支测试用「mutate 已 require 的 config 对象的 ENV 属性 + finally 还原 + delete require.cache[CONFIG]」：因 dev.js 在函数内动态读 config.ENV（非模块加载时缓存），mutate 即生效；同理可测任何依赖 config.ENV 的 production 路径。
+  - 故障注入效果落在 uploads 页的三个请求适配器（_isOnline/_wxRequestSts/_wxRequestVerify），不改 uploader/verify 纯逻辑，保 US-017/018 既有测试绿；mock-fc-url-broken 同时作用于 issue-credential 与 verify-upload 两类 FC 请求（reject）。
+  - 陷阱：navigateTo 目标 dev 页不是 tabBar 页（tabBar 只有 index/uploads），故用 wx.navigateTo 而非 switchTab。
+---

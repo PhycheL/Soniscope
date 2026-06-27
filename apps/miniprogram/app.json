@@ -1,7 +1,8 @@
 {
   "pages": [
     "pages/index/index",
-    "pages/uploads/uploads"
+    "pages/uploads/uploads",
+    "pages/dev/dev"
   ],
   "window": {
     "navigationBarTitleText": "日观声记",
