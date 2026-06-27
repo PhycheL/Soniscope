@@ -9,6 +9,7 @@
 	test-wav-passthrough test-audio-transcode-to-wav test-transcode-fail \
 	test-crash-recovery simulate-worker-crash \
 	test-fragment-integrity test-manifest-idempotent \
+	test-transcribe-oss-url test-transcribe-direct test-transcribe-perf \
 	lint-miniprogram typecheck lint test help
 .DEFAULT_GOAL := help
 
@@ -90,6 +91,15 @@ test-fragment-integrity: ## 跑完一条 Fragment 校验五产物齐全（audio/
 
 test-manifest-idempotent: ## 同一固定 WAV 跑两次，除时间戳外 manifest 完全一致
 	uv run python -m soniscope_worker test-manifest-idempotent
+
+test-transcribe-oss-url: ## oss-url 模式转写 sample-20s.wav，校验 mode=oss-url 与 §5.4 基线
+	uv run python -m soniscope_worker test-transcribe-oss-url
+
+test-transcribe-direct: ## direct 模式转写 sample-20s.wav，校验 mode=direct-upload 且主干一致
+	uv run python -m soniscope_worker test-transcribe-direct
+
+test-transcribe-perf: ## 约 1 分钟音频端到端耗时与 P-01 基线阈值比较
+	uv run python -m soniscope_worker test-transcribe-perf
 
 typecheck: ## mypy strict 类型检查
 	uv run mypy

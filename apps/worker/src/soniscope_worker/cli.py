@@ -326,6 +326,39 @@ def test_manifest_idempotent() -> None:
     raise typer.Exit(code=code)
 
 
+@app.command(name="test-transcribe-oss-url")
+def test_transcribe_oss_url() -> None:
+    """oss-url 模式转写 sample-20s.wav，校验 mode=oss-url 与 runbook §5.4 基线（US-026）。"""
+    from soniscope_worker.nls import run_test_transcribe_oss_url
+
+    lines, code = run_test_transcribe_oss_url()
+    for line in lines:
+        typer.echo(line, err=code != 0)
+    raise typer.Exit(code=code)
+
+
+@app.command(name="test-transcribe-direct")
+def test_transcribe_direct() -> None:
+    """direct 模式转写 sample-20s.wav，校验 mode=direct-upload 且主干与 oss-url 一致（US-026）。"""
+    from soniscope_worker.nls import run_test_transcribe_direct
+
+    lines, code = run_test_transcribe_direct()
+    for line in lines:
+        typer.echo(line, err=code != 0)
+    raise typer.Exit(code=code)
+
+
+@app.command(name="test-transcribe-perf")
+def test_transcribe_perf() -> None:
+    """约 1 分钟音频端到端耗时与 P-01 基线阈值比较（US-026）。"""
+    from soniscope_worker.nls import run_test_transcribe_perf
+
+    lines, code = run_test_transcribe_perf()
+    for line in lines:
+        typer.echo(line, err=code != 0)
+    raise typer.Exit(code=code)
+
+
 @app.command(name="lint-miniprogram")
 def lint_miniprogram() -> None:
     """对 apps/miniprogram 做静态检查（配置/域名/页面/无硬编码密钥，US-011）。"""

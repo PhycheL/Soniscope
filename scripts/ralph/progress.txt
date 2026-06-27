@@ -19,6 +19,7 @@
 - 小程序（apps/miniprogram/）是 JS，不进 mypy/ruff（两者只覆盖 apps/ 下的 .py）。其静态检查走 Python CLI 子命令 `soniscope_worker.miniprogram_lint`（make lint 串联 `ruff check apps/` + `python -m soniscope_worker lint-miniprogram`），逻辑放 Worker 包内可被 mypy/ruff/pytest 覆盖；node v22 可用但未引入 npm/eslint。小程序合法域名/常量单一真实来源在 apps/miniprogram/config.js（US-012+ 一律 require 取用，勿散落硬编码）；脱敏日志在 apps/miniprogram/utils/logger.js（传对象自动按敏感键名脱敏）。WeChat DevTools 模拟器/真机类 AC 本沙箱无法自动验证，用 node --check + JSON.parse 做最大化静态验证后在进度里标注需人工复验。
 - Worker 文件落盘遵守三段式协议（先临时→原子 os.replace→最后 .done）：临时文件名用 `<id>.part`（下载）/`<id>.wav.tmp`（转码）；inbox/tmp/fragments 同一文件系统保证 rename 原子。失败（探测/转码）只动 inbox（留档 inbox/failed/<id>.part + 清 .wav.tmp），**绝不创建 fragment 完成目录**，杜绝半成品完成态。本机 ffmpeg/ffprobe + tests/audio 真实 fixtures 实跑的端到端校验只放 make test-* target；Worker 标准化逻辑在 audio.py，可注入 probe/transcode，单测全程不触系统工具。
 - ffmpeg 转码陷阱：输出文件名带 `.tmp`（如 `<id>.wav.tmp`）时 ffmpeg 无法按扩展名推断 muxer，必须显式 `-f wav`（否则报 "Error initializing the muxer ... Invalid argument"）；输入文件靠内容探测无需 `-f`。消费源文件（os.replace 移走 / unlink）前务必先算 original_sha256/size。
+- 可注入默认值要 monkeypatch 友好：函数签名里需被单测替换的「默认依赖」（如 duration_probe/today/clock）不要在 def 处直接绑定模块级函数（`def f(probe=_probe)`，def-time 绑定后 monkeypatch 模块属性无效），而是默认 `None` 再在函数体首行 `probe = arg if arg is not None else _probe` call-time 解析。轮询/重试类逻辑统一注入 sleep/monotonic（假时钟 _Clock：monotonic 读 t 不自前进 + sleep 记录列表），用 side-effect 回调推进时钟做边界（超时/续签）确定性单测。
 
 ---
 
@@ -697,4 +698,28 @@
   - 陷阱：测试构造 TranscriberConfig 时，appkey/access_key_secret 字段类型是 MaskedSecret，直接传 str 会被 mypy 报 arg-type；用 TranscriberConfig.model_validate({...}) 让 Pydantic 在运行时把 str 强转成 MaskedSecret（与 load_config 路径一致），mypy 也满意。
   - 上下文：US-026 的 CloudSpeechTranscriber 应在本处骨架上接入真实 NLS（复用 verify_prep.nls_response_to_result 的 Sentences→segments 映射 + scripts/test_asr.py 的 filetrans POP 基线）；返回 TranscriptResult 后用 .transcript_json()/.as_result_dict() 落盘。manifest.transcript_json_from_result 已能接受含 duration 的 dict。
   - 上下文：业务流程（US-027 集成流水线）只 import create_transcriber + Transcriber/TranscriptResult，不要直接 import 具体 provider 类（AC#7 已用 isinstance(Transcriber) 断言守住）。
+---
+
+## 2026-06-27 20:00 - US-026
+- 实现了什么：阿里云 NLS 云端转写器 oss-url / direct 两模式（tech-spec §5.2/§3.4/§6.8）。沿用「纯逻辑（无 IO，直接单测）+ IO 用 NlsBackend Protocol 注入 + 假时钟」分层，单测全程不触网/不调 ffprobe/不调云 SDK。
+  - apps/worker/src/soniscope_worker/nls.py（新增，mypy strict + ruff + pytest 全覆盖）：
+    · 纯逻辑：is_retryable_status（0=网络/5xx→可重试，4xx→否）、estimate_cost_yuan（runbook §5.3 费率 2.5 元/小时）、nls_result_to_transcript（filetrans Result.Sentences BeginTime/EndTime ms→s + language=zh + duration 取本地实测，§3.4）、transcript_text（拼 segments[].text 供基线比对）、build_cost_log（§6.8 asr_call_completed 九字段）、flash_to_filetrans_shape（极速版 flash_result.sentences begin_time/end_time/text → filetrans 形状，两模式共用同一映射）、DailyCounter（当日累计调用/时长，跨日归零、仅内存）。
+    · IO 注入点 NlsBackend Protocol：presign_oss_url / submit_oss_url / poll_task / transcribe_direct。
+    · 编排 transcribe_via_nls：oss-url→_run_oss_url（presign→submit→轮询；now-url_issued_at>=50min 自动续签+重提交，日志「重新签发」，AC#3）；direct→日志 mode=direct-upload + transcribe_direct（AC#4）；两路结果统一经 nls_result_to_transcript；完成后 counter.record + log(json 成本日志，AC#7）。_with_retries：NlsTranscribeError.retryable 才按 RETRY_DELAYS_SECONDS=[5,15,45] 退避最多 3 次（共 4 次尝试），4xx 立即抛（AC#5）。duration_probe/today 改 call-time 解析（默认 None→模块级函数）便于 monkeypatch。
+    · RealNlsBackend（lazy import 云 SDK，复用 verify_prep._import_oss/_oss_client/_import_nls_core）：presign_oss_url（load_config 取 OSS 段，presign 1 小时，AC#2）；submit_oss_url/poll_task（filetrans SubmitTask/GetTaskResult，复用 verify_prep NLS_FILETRANS_* 常量）；transcribe_direct（极速版 FlashRecognizer：CreateToken→nls-gateway POST 音频字节→flash_to_filetrans_shape）；_classify_exception（读 http_status/error_code，5xx/网络→retryable，4xx→否，只记类名不泄漏明文）。
+    · make test 入口 run_test_transcribe_oss_url/direct/perf：用真实 config + 真实 OSS sample/ + fixtures 端到端跑，断言 mode 日志 + §5.4 基线主干（_BASELINE_KEYWORDS 含「选择」「优先级」）/ direct 主干一致 / perf 端到端耗时 <= PERF_THRESHOLD_SECONDS=120s（P-01）。缺 config/SDK/ffprobe/网络优雅 SKIP exit 0。
+  - transcriber.py：CloudSpeechTranscriber 从 US-025 占位（抛 NotImplementedError）改为委托 nls.transcribe_via_nls（持 DailyCounter 跨调用累计；backend 可注入、缺省 RealNlsBackend；log 缺省 print）。
+  - cli.py：新增 test-transcribe-oss-url / test-transcribe-direct / test-transcribe-perf 三子命令。
+  - Makefile：新增同名三 target + .PHONY。
+  - apps/worker/tests/test_nls.py（新增 22 用例，FakeBackend + _Clock 假时钟）：纯逻辑全分支、oss-url happy+成本日志、QUEUEING/RUNNING→SUCCESS 轮询、续签（推时钟过 50min→presign/submit 各 2 次+日志「重新签发」）、非成功状态抛错、direct 模式日志+映射、5xx 退避[5,15]后成功、4xx 不重试、retryable 耗尽 3 次、RealNlsBackend._classify_exception 三类、presign 缺 SDK 抛 ProbeError、三 make 入口缺 config SKIP。test_transcriber.py：占位测试改为「委托后端」测试（monkeypatch nls._probe_duration）。
+- 更改的文件：apps/worker/src/soniscope_worker/{nls.py(新),transcriber.py,cli.py}、Makefile、apps/worker/tests/{test_nls.py(新),test_transcriber.py}、scripts/ralph/{prd.json,progress.txt}。
+- 验证：make typecheck（mypy 53 文件 0 错）、make lint（ruff apps/ 全过 + miniprogram lint passed）、make test（451 passed，+22）全部通过；CLI --help 显示三命令；make test-transcribe-oss-url 在无 config 时优雅 SKIP exit 0。
+  未跑：真实 make test-transcribe-{oss-url,direct,perf} 全链路（需真实 config.yaml NLS appkey/AK + alibabacloud-oss-v2/aliyun-python-sdk-core + 触网 OSS presign/NLS 提交轮询，本沙箱不具备）——AC#8/#9/#10 真实云端项需在 Worker 主机复验；编排/重试/续签/映射/成本日志逻辑已用 FakeBackend + 假时钟全单测覆盖。
+- **未来迭代的学习：**
+  - oss-url 与 direct 两模式响应形状不同（filetrans Result.Sentences[BeginTime/EndTime/Text] vs 极速版 flash_result.sentences[begin_time/end_time/text]）：在 RealNlsBackend.transcribe_direct 里用 flash_to_filetrans_shape 归一化为 filetrans 形状，使编排层 nls_result_to_transcript 一份映射通吃两模式。新增 provider 时也应在后端归一化，而非在映射层分叉。
+  - direct 模式（方案 B 降级）真实走的是 NLS「录音文件识别极速版 FlashRecognizer」（nls-gateway-<region>.aliyuncs.com/stream/v1/FlashRecognizer，二进制 POST + X-NLS-Token），不是 filetrans（filetrans 只接 file_link URL，不支持 multipart）；Token 经 CreateToken（nls-meta.cn-shanghai.aliyuncs.com，version 2019-02-28，仅上海）。oss-url（方案 A 首选）走 filetrans 异步 SubmitTask/GetTaskResult。这两个真实 API 本沙箱无法 live 验证。
+  - 续签判定用注入 monotonic 的「now - url_issued_at >= RESIGN_THRESHOLD_SECONDS(3000)」：单测用 _Clock（monotonic 读 t 不自前进 + sleep 记录），在 on_poll 回调里手动把 clock.t 推过 50min 触发续签，断言 presign/submit 各 2 次。轮询循环可测性沿用 poller.poll_loop 的注入时钟模式。
+  - transcribe_via_nls 的 duration_probe/today 默认 None→call-time 解析模块级函数（_probe_duration/_today_iso），而非 def-time 绑定默认值；否则 monkeypatch 模块级函数对已绑定默认无效（test_transcriber 委托测试踩过）。需要单测 monkeypatch 的可注入默认一律用此 None→call-time 模式。
+  - 成本日志（§6.8）当日累计计数由 CloudSpeechTranscriber 实例持有的 DailyCounter 跨 transcribe 调用累加，跨日自动归零、不持久化（重启归零）；US-027 串流水线时一个 Transcriber 实例贯穿整轮即可天然累计。
+  - 错误分类红线：NlsTranscribeError.error_code 只含稳定错误码/HTTP_<code>/异常类名，绝不含 AK/appkey/token 明文；RealNlsBackend._classify_exception 用 getattr 读 http_status/error_code 容错（POP SDK 用 get_http_status()/get_error_code()，urllib 用 .code）。
 ---

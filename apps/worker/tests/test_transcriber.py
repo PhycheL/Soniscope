@@ -83,11 +83,37 @@ def test_whisper_local_transcribe_raises_not_implemented() -> None:
     assert "本地 Whisper" in str(exc.value)
 
 
-def test_cloud_speech_transcribe_placeholder_points_to_us026() -> None:
-    transcriber = CloudSpeechTranscriber(_config("cloud-speech"))
-    with pytest.raises(NotImplementedError) as exc:
-        transcriber.transcribe("frag", Path("/tmp/audio.wav"), "recordings/x.wav")
-    assert "US-026" in str(exc.value)
+def test_cloud_speech_transcribe_delegates_to_backend(monkeypatch: pytest.MonkeyPatch) -> None:
+    # US-026：CloudSpeechTranscriber.transcribe 委托注入的 NLS 后端，不再抛占位异常。
+    import soniscope_worker.nls as nls
+
+    monkeypatch.setattr(nls, "_probe_duration", lambda _p: 20.0)
+
+    class _FakeBackend:
+        def presign_oss_url(self, oss_key: str, expires_seconds: int) -> str:
+            return f"https://signed/{oss_key}"
+
+        def submit_oss_url(self, file_link: str) -> str:
+            return "task-1"
+
+        def poll_task(self, task_id: str) -> dict[str, object]:
+            return {
+                "StatusText": nls.STATUS_SUCCESS,
+                "Result": {"Sentences": [{"BeginTime": 0, "EndTime": 1000, "Text": "你好"}]},
+            }
+
+        def transcribe_direct(self, audio_path: Path) -> dict[str, object]:
+            raise AssertionError("oss-url 模式不应走 direct")
+
+    transcriber = CloudSpeechTranscriber(
+        _config("cloud-speech"),
+        backend=_FakeBackend(),
+        log=lambda _m: None,
+    )
+    result = transcriber.transcribe("frag", Path("/tmp/audio.wav"), "recordings/x.wav")
+    assert result.provider == "aliyun-nls"
+    assert result.duration == 20.0
+    assert "".join(s.text for s in result.segments) == "你好"
 
 
 def test_cloud_speech_keeps_config() -> None:

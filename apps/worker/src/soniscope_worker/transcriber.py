@@ -15,6 +15,7 @@
 :meth:`TranscriptResult.transcript_json` 派生落盘用的五字段 dict（§3.4）。
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
@@ -90,17 +91,31 @@ class Transcriber(Protocol):
 
 
 class CloudSpeechTranscriber:
-    """云端 ASR 转写器（阿里云 NLS）。
+    """云端 ASR 转写器（阿里云 NLS，US-026）。
 
-    本 story（US-025）只提供可被工厂返回的实例骨架；真实的 NLS oss-url / direct
-    调用逻辑在 US-026 接入。在此之前调用 :meth:`transcribe` 会抛 ``NotImplementedError``
-    指向 US-026，避免在未 live 验证时塞入未经验证的云代码。
+    真实调用逻辑在 :mod:`soniscope_worker.nls`：``upload_mode=oss-url`` 走录音文件识别
+    （filetrans）签名 URL 拉取；``upload_mode=direct`` 走极速版（FlashRecognizer）本地直传。
+    当日累计调用 / 时长计数（§6.8 成本日志）由本实例持有，跨日自动归零、不持久化。
+
+    NLS 后端通过 ``backend`` 注入以便单测（不触网）；缺省构造 :class:`RealNlsBackend`。
     """
 
     name = "cloud-speech"
 
-    def __init__(self, config: TranscriberConfig) -> None:
+    def __init__(
+        self,
+        config: TranscriberConfig,
+        *,
+        backend: Any | None = None,
+        log: Callable[[str], None] = print,
+    ) -> None:
         self._config = config
+        self._backend = backend
+        self._log = log
+        # 延迟构造，避免无云 SDK 时 import 报错；同时持有跨调用的当日累计计数。
+        from soniscope_worker.nls import DailyCounter
+
+        self._counter = DailyCounter()
 
     @property
     def config(self) -> TranscriberConfig:
@@ -112,8 +127,17 @@ class CloudSpeechTranscriber:
         audio_path: Path,
         oss_key: str,
     ) -> TranscriptResult:
-        raise NotImplementedError(
-            "CloudSpeechTranscriber.transcribe 将在 US-026 接入阿里云 NLS 实现。"
+        from soniscope_worker.nls import RealNlsBackend, transcribe_via_nls
+
+        backend = self._backend if self._backend is not None else RealNlsBackend(self._config)
+        return transcribe_via_nls(
+            self._config,
+            fragment_id,
+            audio_path,
+            oss_key,
+            backend=backend,
+            counter=self._counter,
+            log=self._log,
         )
 
 
