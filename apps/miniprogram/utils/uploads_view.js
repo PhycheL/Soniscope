@@ -138,6 +138,8 @@ function toChunkView(item) {
     isFailed: isFailed(item),
     canManualRetry: canManualRetry(status),
     canReVerify: canReVerify(status),
+    // 录制时间（毫秒），供历史弹层相对日期展示；无法解析时为 null。
+    recordedAtMs: recordedAtMs(item),
   }
 }
 
@@ -214,6 +216,71 @@ function buildCards(queue) {
   })
 }
 
+// ---- 录音页历史弹层展示装饰（原型 3：标题 + 「相对时间 · 时长/状态」+ 状态圆点色） ----
+
+// 相对日期文案：今天 / 昨天 / M-D（供历史卡片副标题）。now 便于单测注入。
+function relativeDay(ms, nowMs) {
+  if (ms == null || !Number.isFinite(ms)) {
+    return ''
+  }
+  const d = new Date(ms)
+  const now = new Date(nowMs)
+  const startOf = function (x) { return new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime() }
+  const dayMs = 24 * 60 * 60 * 1000
+  const diffDays = Math.round((startOf(now) - startOf(d)) / dayMs)
+  if (diffDays <= 0) {
+    return '今天'
+  }
+  if (diffDays === 1) {
+    return '昨天'
+  }
+  return d.getMonth() + 1 + '-' + d.getDate()
+}
+
+// 状态 → 圆点色类（up 蓝 / ok 绿 / fail 红）。
+function dotKindFor(status) {
+  if (inSet(FAILED_STATUSES, status)) {
+    return 'fail'
+  }
+  if (status === STATUS_VERIFIED) {
+    return 'ok'
+  }
+  return 'up'
+}
+
+// 给 buildCards 的卡片补充 title / subText / dotKind，得到原型风格的历史列表项。
+// nowMs 便于单测；标题优先用 fragmentId 尾段（无业务名时的稳定可读标识）。
+function decorateHistoryCards(cards, nowMs) {
+  const list = Array.isArray(cards) ? cards : []
+  const now = Number.isFinite(nowMs) ? nowMs : Date.now()
+  return list.map(function (card) {
+    if (card.type === 'session') {
+      return Object.assign({}, card, {
+        title: '长录音 · ' + card.chunkCount + ' 段',
+        subText: card.summaryText + ' · ' + card.aggregateText,
+        dotKind: card.aggregateKind === 'failed' ? 'fail' : card.aggregateKind === 'done' ? 'ok' : 'up',
+      })
+    }
+    const dur = card.durationText || formatDuration(card.durationSeconds || 0)
+    const day = relativeDay(card.recordedAtMs, now)
+    const tail = card.errorCode || card.reason
+    // 副标题：有录制时间 → 「今天 · 时长/错误」；失败无时间 → 「状态 · 错误」；否则 「状态 · 时长」。
+    let subText
+    if (day) {
+      subText = day + ' · ' + (tail || dur)
+    } else if (tail) {
+      subText = card.statusText + ' · ' + tail
+    } else {
+      subText = card.statusText + ' · ' + dur
+    }
+    return Object.assign({}, card, {
+      title: '录音',
+      subText: subText,
+      dotKind: dotKindFor(card.status),
+    })
+  })
+}
+
 module.exports = {
   BACKLOG_STATUSES: BACKLOG_STATUSES,
   FAILED_STATUSES: FAILED_STATUSES,
@@ -231,4 +298,7 @@ module.exports = {
   toChunkView: toChunkView,
   aggregateStatus: aggregateStatus,
   buildCards: buildCards,
+  relativeDay: relativeDay,
+  dotKindFor: dotKindFor,
+  decorateHistoryCards: decorateHistoryCards,
 }

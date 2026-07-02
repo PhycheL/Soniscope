@@ -1,22 +1,28 @@
-/* 全局样式 */
+/* 全局深色主题（原型：日观声记 SoniScope）。
+ * 设计 token 取自 docs/小程序原型：近黑背景 + 蓝色主行动 + 中央光晕。
+ * 颜色统一在此定义，页面样式引用具体值（WXSS 不支持跨文件 CSS 变量继承到 rpx 计算，故直接用色值）。 */
 page {
-  background-color: #f5f5f5;
-  color: #1f1f1f;
+  /* 沉浸式深色底：顶部微亮、整体近黑，制造纵深光晕。 */
+  background-color: #05060a;
+  background-image:
+    radial-gradient(120% 60% at 50% 8%, rgba(40, 52, 90, 0.35) 0%, rgba(5, 6, 10, 0) 60%),
+    radial-gradient(90% 45% at 50% 46%, rgba(48, 74, 150, 0.16) 0%, rgba(5, 6, 10, 0) 70%);
+  background-repeat: no-repeat;
+  color: #e8eaf2;
   font-size: 28rpx;
-  font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'PingFang SC', sans-serif;
 }
 
+/* 通用竖向容器。 */
 .container {
   display: flex;
   flex-direction: column;
-  align-items: center;
   box-sizing: border-box;
   min-height: 100vh;
-  padding: 48rpx 32rpx;
 }
 
+/* 次要说明文案。 */
 .hint {
-  margin-top: 24rpx;
-  color: #888888;
+  color: #7c839a;
   font-size: 24rpx;
 }

@@ -1,3 +1,6 @@
 {
-  "navigationBarTitleText": "录音"
+  "navigationBarTitleText": "日观声记",
+  "navigationBarBackgroundColor": "#05060a",
+  "navigationBarTextStyle": "white",
+  "backgroundColor": "#05060a"
 }

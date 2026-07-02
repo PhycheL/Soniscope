@@ -6,6 +6,7 @@
 // 临时文件为准；OSS object key 预览始终用 .wav 目标扩展名，仅表示 Worker 标准化目标。
 
 const { createLogger } = require('../../utils/logger')
+const config = require('../../config')
 const {
   formatDuration,
   detectOriginalFormat,
@@ -34,6 +35,9 @@ const {
   chunkCount,
   backfillChunkTotal,
 } = require('../../utils/chunking')
+const { createQueueRuntime } = require('../../utils/queue_runtime')
+const { buildCards, decorateHistoryCards } = require('../../utils/uploads_view')
+const faultInjection = require('../../utils/fault_injection')
 
 const logger = createLogger('index')
 
@@ -52,6 +56,22 @@ Page({
     recovery: null,
     // 草稿试听播放状态（US-014 AC#2）：true 时试听按钮显示「暂停」语义。
     playing: false,
+    // ---- 界面重设计新增（原型四态 + 历史弹层）----
+    // 中断恢复动作面板（点顶部横幅「查看」后展开）。
+    showRecoveryActions: false,
+    // 草稿试听进度：已播时长文案 + 进度条百分比。
+    playedText: '00:00',
+    playProgress: 0,
+    // 底部胶囊统计：失败 / 上传中条数。
+    pill: { failed: 0, uploading: 0 },
+    // 历史底部弹层开合。
+    historyOpen: false,
+    // 历史弹层数据：卡片列表 + 总条数（复用 uploads_view.buildCards）。
+    history: { cards: [], total: 0 },
+    // 长录音卡片展开集合。
+    expanded: {},
+    // 开发者故障注入入口仅非 production 可见（US-020）。
+    devMenuVisible: false,
   },
 
   onLoad() {
@@ -79,12 +99,23 @@ Page({
     this._bindRecorder()
     // 首次启动生成并持久化 device_short_id（US-015 AC#1，幂等）。
     ensureDeviceShortId(wx)
+    // 上传队列运行时（历史弹层复用统一编排；渲染回调刷新历史列表与底部胶囊统计）。
+    const self = this
+    this._runtime = createQueueRuntime({
+      wx: wx,
+      config: config,
+      logger: logger,
+      faultInjection: faultInjection,
+      onChange: function (queue) { self._renderQueue(queue) },
+    })
+    this.setData({ devMenuVisible: faultInjection.isDevEnv(config.ENV) })
     logger.info('index page loaded')
   },
 
-  // 回到前台（AC#4）：若存在中断保存的草稿，展示恢复提示。
+  // 回到前台（AC#4）：若存在中断保存的草稿，展示恢复提示；并刷新历史 / 驱动上传队列。
   onShow() {
     this._maybeShowRecovery()
+    this._refreshQueue()
   },
 
   // 切后台是等价中断（AC#1）：录音中切后台自动停止并保存草稿。
@@ -357,7 +388,7 @@ Page({
   // 保留（AC#5）：保留草稿，关闭提示，清掉中断槽位（草稿留待 US-014 试听 / 上传）。
   onKeepDraft() {
     this._clearInterruptStorage()
-    this.setData({ recovery: null })
+    this.setData({ recovery: null, showRecoveryActions: false })
     logger.info('interrupted draft kept')
   },
 
@@ -365,7 +396,7 @@ Page({
   onDiscardDraft() {
     this._cleanupDraftFile(this.data.draft)
     this._clearInterruptStorage()
-    this.setData({ recovery: null, draft: null, durationText: '00:00' })
+    this.setData({ recovery: null, draft: null, durationText: '00:00', showRecoveryActions: false })
     logger.info('interrupted draft discarded')
   },
 
@@ -373,9 +404,19 @@ Page({
   onRestartRecording() {
     this._cleanupDraftFile(this.data.draft)
     this._clearInterruptStorage()
-    this.setData({ recovery: null, draft: null })
+    this.setData({ recovery: null, draft: null, showRecoveryActions: false })
     logger.info('interrupted draft discarded, restart recording')
     this._startRecording()
+  },
+
+  // 顶部横幅「查看」：展开中断恢复动作面板。
+  onShowRecoveryActions() {
+    this.setData({ showRecoveryActions: true })
+  },
+
+  // 关闭中断恢复动作面板（点遮罩）。
+  onHideRecoveryActions() {
+    this.setData({ showRecoveryActions: false })
   },
 
   _clearInterruptStorage() {
@@ -399,17 +440,43 @@ Page({
       const self = this
       this._audio = wx.createInnerAudioContext()
       this._audio.onEnded(function () {
-        self.setData({ playing: false })
+        self.setData({ playing: false, playProgress: 0, playedText: '00:00' })
       })
       this._audio.onError(function (err) {
         self.setData({ playing: false })
         logger.error('audition error', { errMsg: err && err.errMsg })
       })
+      // 播放进度回调（原型 4 进度条）；mock 环境可能无 onTimeUpdate，故守卫。
+      if (typeof this._audio.onTimeUpdate === 'function') {
+        this._audio.onTimeUpdate(function () {
+          self._onAuditionProgress()
+        })
+      }
     }
     this._audio.src = draft.temp_file_path
     this._audio.play()
     this.setData({ playing: true })
     logger.info('audition play', { temp_file_path: draft.temp_file_path })
+  },
+
+  // 试听播放/暂停切换（原型 4 单一播放按钮）；委托既有 onTapPlay / onTapPause。
+  onTapPlayToggle() {
+    if (this.data.playing) {
+      this.onTapPause()
+    } else {
+      this.onTapPlay()
+    }
+  },
+
+  // 更新试听进度条与已播时长（原型 4：00:01 / 00:01）。
+  _onAuditionProgress() {
+    if (!this._audio) {
+      return
+    }
+    const cur = Number(this._audio.currentTime) || 0
+    const total = Number(this._audio.duration) || Number(this.data.draft && this.data.draft.duration_seconds) || 0
+    const percent = total > 0 ? Math.min(100, Math.round((cur / total) * 100)) : 0
+    this.setData({ playProgress: percent, playedText: formatDuration(Math.floor(cur)) })
   },
 
   // 暂停（AC#2）：暂停试听播放。
@@ -650,7 +717,80 @@ Page({
     }
   },
 
-  goUploads() {
-    wx.switchTab({ url: '/pages/uploads/uploads' })
+  // ---- 历史底部弹层 + 上传队列驱动（界面重设计） ----
+
+  // 读取队列 → 渲染历史卡片 + 底部胶囊统计。
+  _renderQueue(queue) {
+    const list = Array.isArray(queue) ? queue : this._readQueueSafe()
+    const cards = decorateHistoryCards(buildCards(list), Date.now())
+    let failed = 0
+    let uploading = 0
+    list.forEach(function (it) {
+      if (!it) {
+        return
+      }
+      if (it.status === 'upload_failed' || it.status === 'manual_retry' || it.status === 'manual_verify') {
+        failed += 1
+      } else if (it.status === 'uploading' || it.status === 'queued') {
+        uploading += 1
+      }
+    })
+    this.setData({
+      history: { cards: cards, total: list.length },
+      pill: { failed: failed, uploading: uploading },
+    })
+  },
+
+  _readQueueSafe() {
+    return this._runtime ? this._runtime.readQueue() : []
+  },
+
+  // onShow：清理本地缓存 → 渲染 → 驱动上传 / verify（离线或缺依赖时安全跳过）。
+  _refreshQueue() {
+    if (!this._runtime) {
+      return
+    }
+    try {
+      this._runtime.autoCleanup()
+      this._renderQueue(this._readQueueSafe())
+      Promise.resolve(this._runtime.drive()).catch(function () {})
+    } catch (e) {
+      logger.error('refresh queue failed', { errMsg: e && e.message })
+    }
+  },
+
+  // 打开历史弹层（打开前刷新一次数据）。
+  onOpenHistory() {
+    this._renderQueue(this._readQueueSafe())
+    this.setData({ historyOpen: true })
+  },
+
+  onCloseHistory() {
+    this.setData({ historyOpen: false })
+  },
+
+  // 展开 / 收起长录音卡片。
+  onToggleSession(e) {
+    const sessionId = e && e.currentTarget && e.currentTarget.dataset.sid
+    if (!sessionId) {
+      return
+    }
+    const expanded = Object.assign({}, this.data.expanded)
+    expanded[sessionId] = !expanded[sessionId]
+    this.setData({ expanded: expanded })
+  },
+
+  // 手动重传（历史弹层内）。
+  async onTapManualRetry(e) {
+    const fragmentId = e && e.currentTarget && e.currentTarget.dataset.fid
+    if (!fragmentId || !this._runtime) {
+      return
+    }
+    await this._runtime.manualRetry(fragmentId)
+  },
+
+  // 跳转开发者故障注入菜单（US-020，仅非 production 可见）。
+  onTapDevMenu() {
+    wx.navigateTo({ url: '/pages/dev/dev' })
   },
 })

@@ -1,3 +1,6 @@
 {
-  "navigationBarTitleText": "上传列表"
+  "navigationBarTitleText": "历史录音",
+  "navigationBarBackgroundColor": "#05060a",
+  "navigationBarTextStyle": "white",
+  "backgroundColor": "#05060a"
 }
