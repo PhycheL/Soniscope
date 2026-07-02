@@ -1,4 +1,7 @@
 {
   "navigationBarTitleText": "开发者故障注入",
+  "navigationBarBackgroundColor": "#05060a",
+  "navigationBarTextStyle": "white",
+  "backgroundColor": "#05060a",
   "usingComponents": {}
 }

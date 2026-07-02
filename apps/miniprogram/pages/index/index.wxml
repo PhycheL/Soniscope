@@ -1,39 +1,154 @@
-<view class="container">
-  <view class="record-area">
-    <button class="record-btn {{recording ? 'record-btn--active' : ''}}" bindtap="onTapRecord">
-      {{recording ? '停止录音' : '开始录音'}}
-    </button>
-    <view class="duration">{{durationText}}</view>
+<!-- 日观声记 · 沉浸式单屏录音。四态对应 docs/小程序原型：
+     1) 空闲：蓝色麦克风光晕 + 「轻点开始录音」；
+     2) 录音中：mm:ss 计时 + 红色停止 + 红色光晕；
+     3) 确认（草稿完成）：蓝麦克风 + 底部「待确认草稿」播放条 + 重录/删除/保存并上传；
+     4) 历史：底部弹层（bottom sheet）叠加在录音屏之上。
+     顶部中断横幅 + 底部「历史」胶囊常驻。JS 控制器方法/字段保持与既有测试一致。 -->
+<view class="screen">
+
+  <!-- 顶部中断恢复横幅（原型 1：● 有一段中断录音待处理 / 查看 / ×）。recovery 非空即显示。 -->
+  <view class="banner" wx:if="{{recovery}}">
+    <view class="banner-dot"></view>
+    <text class="banner-text">有一段中断录音待处理</text>
+    <view class="banner-view" catchtap="onShowRecoveryActions">查看</view>
+    <view class="banner-close" catchtap="onDiscardDraft">×</view>
   </view>
 
-  <view class="recovery" wx:if="{{recovery}}">
-    <view class="recovery-msg">{{recovery.message}}</view>
-    <view class="recovery-actions">
-      <button class="recovery-btn recovery-btn--keep" bindtap="onKeepDraft">保留</button>
-      <button class="recovery-btn recovery-btn--discard" bindtap="onDiscardDraft">丢弃</button>
-      <button class="recovery-btn recovery-btn--restart" bindtap="onRestartRecording">继续新录</button>
+  <!-- 中央录音区：状态提示 + 麦克风光晕按钮。 -->
+  <view class="stage">
+    <!-- 计时（仅录音中，原型 2）。 -->
+    <view class="timer" wx:if="{{recording}}">{{durationText}}</view>
+
+    <!-- 状态提示文案。 -->
+    <view class="stage-label" wx:if="{{!recording && draft && !draft.frozen}}">
+      <text class="stage-dot stage-dot--blue"></text>录 音 已 完 成 · 请 确 认
+    </view>
+    <view class="stage-label stage-label--muted" wx:elif="{{!recording && !draft}}">轻 点 开 始 录 音</view>
+
+    <!-- 麦克风 / 停止按钮 + 双层光晕环。 -->
+    <view class="mic-wrap {{recording ? 'is-recording' : ''}}" bindtap="onTapRecord">
+      <view class="ring ring-outer"></view>
+      <view class="ring ring-inner"></view>
+      <view class="mic-btn {{recording ? 'mic-btn--stop' : ''}}">
+        <!-- 录音中：白色方形停止图标；否则：麦克风图标。 -->
+        <view wx:if="{{recording}}" class="icon-stop"></view>
+        <view wx:else class="icon-mic">
+          <view class="icon-mic-cap"></view>
+          <view class="icon-mic-arc"></view>
+          <view class="icon-mic-stem"></view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 底部行动提示。 -->
+    <view class="stage-sub" wx:if="{{recording}}">再次轻点即结束并自动上传</view>
+    <view class="stage-sub" wx:elif="{{draft && !draft.frozen}}">试听后确认保存，或重录 / 删除</view>
+    <view class="stage-sub" wx:elif="{{!draft}}">一键开录 · 停止即上传</view>
+    <view class="stage-sub stage-sub--ok" wx:elif="{{draft.frozen}}">已加入上传队列</view>
+  </view>
+
+  <!-- 底部「历史」胶囊（原型 1/2：🕐 历史 · N失败 · N上传中）。 -->
+  <view class="dock" wx:if="{{!draft || draft.frozen}}">
+    <view class="pill" bindtap="onOpenHistory">
+      <view class="pill-clock"></view>
+      <text class="pill-label">历史</text>
+      <block wx:if="{{pill.failed > 0}}">
+        <text class="pill-sep">·</text>
+        <text class="pill-stat pill-stat--fail">●{{pill.failed}}失败</text>
+      </block>
+      <block wx:if="{{pill.uploading > 0}}">
+        <text class="pill-stat pill-stat--up">●{{pill.uploading}}上传中</text>
+      </block>
     </view>
   </view>
 
-  <view class="draft" wx:if="{{draft}}">
-    <view class="draft-title">{{draft.status_label || '录音草稿'}}</view>
-    <view class="draft-row" wx:if="{{draft.is_long}}">长录音：{{draft.chunk_total}} 段（超过 10 分钟自动分片，共享同一录音）</view>
-    <view class="draft-row">原始格式：{{draft.audio.original_format}}</view>
-    <view class="draft-row">时长：{{draft.duration_seconds}} 秒</view>
-    <view class="draft-row draft-row--mono">目标对象：{{draft.object_key_preview}}</view>
-    <view class="draft-note">前端不转码；object key 仅为 Worker 标准化目标（.wav）。</view>
-
-    <view class="draft-actions" wx:if="{{!draft.frozen && !recovery}}">
-      <button class="draft-btn" bindtap="onTapPlay" wx:if="{{!playing}}">试听</button>
-      <button class="draft-btn" bindtap="onTapPause" wx:else>暂停</button>
-      <button class="draft-btn" bindtap="onReRecord">重录</button>
-      <button class="draft-btn draft-btn--danger" bindtap="onDeleteDraft">删除</button>
-      <button class="draft-btn draft-btn--primary" bindtap="onTapSaveUpload">保存并上传</button>
+  <!-- 确认草稿播放条（原型 4：待确认草稿 00:01 / 00:01 + 播放 + 重录/删除/保存并上传）。 -->
+  <view class="confirm" wx:if="{{draft && !draft.frozen && !recovery}}">
+    <view class="confirm-top">
+      <view class="confirm-info">
+        <view class="confirm-title">{{draft.is_long ? '长录音草稿 · ' : '待确认草稿'}}{{draft.is_long ? draft.chunk_total + ' 段' : ''}}</view>
+        <view class="confirm-time">
+          <text class="confirm-time-cur">{{playedText}}</text>
+          <text class="confirm-time-tot"> / {{durationText}}</text>
+        </view>
+      </view>
+      <view class="confirm-play {{playing ? 'is-playing' : ''}}" bindtap="onTapPlayToggle">
+        <view wx:if="{{playing}}" class="icon-pause"></view>
+        <view wx:else class="icon-play"></view>
+      </view>
     </view>
-    <view class="draft-frozen" wx:elif="{{draft.frozen}}">已加入上传队列，前往「上传列表」查看进度。</view>
+    <view class="confirm-progress"><view class="confirm-progress-fill" style="width:{{playProgress}}%"></view></view>
+    <view class="confirm-actions">
+      <view class="cbtn cbtn--ghost" bindtap="onReRecord">重录</view>
+      <view class="cbtn cbtn--danger" bindtap="onDeleteDraft">删除</view>
+      <view class="cbtn cbtn--primary" bindtap="onTapSaveUpload">保存并上传</view>
+    </view>
   </view>
 
-  <view class="hint" wx:elif="{{!recovery}}">点击按钮开始录音；停止后会生成保留原始格式的本地草稿。</view>
+  <!-- 中断恢复动作面板（点「查看」后从横幅展开：保留 / 丢弃 / 继续新录）。 -->
+  <view class="recovery-mask" wx:if="{{showRecoveryActions}}" catchtap="onHideRecoveryActions"></view>
+  <view class="recovery-panel" wx:if="{{showRecoveryActions}}">
+    <view class="recovery-panel-title">中断录音待处理</view>
+    <view class="recovery-panel-msg">{{recovery.message}}</view>
+    <view class="recovery-panel-actions">
+      <view class="cbtn cbtn--primary" bindtap="onKeepDraft">保留</view>
+      <view class="cbtn cbtn--ghost" bindtap="onRestartRecording">继续新录</view>
+      <view class="cbtn cbtn--danger" bindtap="onDiscardDraft">丢弃</view>
+    </view>
+  </view>
+</view>
 
-  <view class="nav-link" bindtap="goUploads">查看上传列表 ›</view>
+<!-- ===================== 历史底部弹层（原型 3） ===================== -->
+<view class="sheet-mask {{historyOpen ? 'is-open' : ''}}" bindtap="onCloseHistory"></view>
+<view class="sheet {{historyOpen ? 'is-open' : ''}}">
+  <view class="sheet-grip"></view>
+  <view class="sheet-head">
+    <text class="sheet-title">历史录音</text>
+    <text class="sheet-count">{{history.total}} 条</text>
+  </view>
+
+  <scroll-view scroll-y class="sheet-body" wx:if="{{history.cards.length > 0}}">
+    <block wx:for="{{history.cards}}" wx:key="*this" wx:for-item="card">
+      <!-- 单条 Fragment 卡片。 -->
+      <view wx:if="{{card.type === 'single'}}" class="hcard {{card.isFailed ? 'hcard--fail' : ''}}">
+        <view class="hcard-dot hcard-dot--{{card.dotKind}}"></view>
+        <view class="hcard-main">
+          <view class="hcard-title">{{card.title}}</view>
+          <view class="hcard-sub">{{card.subText}}</view>
+        </view>
+        <view wx:if="{{card.canManualRetry}}" class="hcard-retry" catchtap="onTapManualRetry" data-fid="{{card.fragmentId}}">重传</view>
+      </view>
+
+      <!-- 长录音折叠卡片。 -->
+      <view wx:else class="hcard hcard--session {{card.aggregateKind === 'failed' ? 'hcard--fail' : ''}}">
+        <view class="hcard-head" catchtap="onToggleSession" data-sid="{{card.sessionId}}">
+          <view class="hcard-dot hcard-dot--{{card.dotKind}}"></view>
+          <view class="hcard-main">
+            <view class="hcard-title">{{card.title}}</view>
+            <view class="hcard-sub">{{card.subText}}</view>
+          </view>
+          <text class="hcard-toggle">{{expanded[card.sessionId] ? '收起' : '展开'}}</text>
+        </view>
+        <view wx:if="{{expanded[card.sessionId]}}" class="hcard-chunks">
+          <view wx:for="{{card.chunks}}" wx:key="fragmentId" wx:for-item="chunk"
+                class="hchunk {{chunk.isFailed ? 'hchunk--fail' : ''}}">
+            <view class="hcard-dot hcard-dot--{{chunk.isFailed ? 'fail' : 'up'}}"></view>
+            <view class="hcard-main">
+              <view class="hchunk-title">第 {{chunk.chunkSeq}} 段</view>
+              <view class="hcard-sub">{{chunk.statusText}}{{chunk.errorCode ? ' · ' + chunk.errorCode : ''}}</view>
+            </view>
+            <view wx:if="{{chunk.canManualRetry}}" class="hcard-retry" catchtap="onTapManualRetry" data-fid="{{chunk.fragmentId}}">重传</view>
+          </view>
+        </view>
+      </view>
+    </block>
+
+    <!-- 开发者故障注入入口（仅非 production 可见，原型 3 底部「开发者故障注入」）。 -->
+    <view wx:if="{{devMenuVisible}}" class="sheet-dev" bindtap="onTapDevMenu">开发者故障注入</view>
+  </scroll-view>
+
+  <view wx:else class="sheet-empty">
+    暂无录音。轻点麦克风开始第一条录音。
+    <view wx:if="{{devMenuVisible}}" class="sheet-dev" bindtap="onTapDevMenu">开发者故障注入</view>
+  </view>
 </view>

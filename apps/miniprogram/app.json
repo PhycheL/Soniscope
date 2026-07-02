@@ -6,24 +6,12 @@
   ],
   "window": {
     "navigationBarTitleText": "日观声记",
-    "navigationBarBackgroundColor": "#ffffff",
-    "navigationBarTextStyle": "black",
-    "backgroundColor": "#f5f5f5"
-  },
-  "tabBar": {
-    "color": "#888888",
-    "selectedColor": "#1a73e8",
-    "backgroundColor": "#ffffff",
-    "list": [
-      {
-        "pagePath": "pages/index/index",
-        "text": "录音"
-      },
-      {
-        "pagePath": "pages/uploads/uploads",
-        "text": "上传列表"
-      }
-    ]
+    "navigationBarBackgroundColor": "#05060a",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#05060a",
+    "backgroundColorTop": "#05060a",
+    "backgroundColorBottom": "#05060a",
+    "backgroundTextStyle": "dark"
   },
   "style": "v2",
   "sitemapLocation": "sitemap.json"
