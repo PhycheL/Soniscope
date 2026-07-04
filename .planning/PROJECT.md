@@ -46,6 +46,7 @@ SoniScope 是一条个人录音转写流水线:WeChat 小程序录音 → Aliyun
 - CONCERNS.md 已给出初步线索:fragment_id/object key 契约逻辑在 FC、Worker、小程序三处重复实现;`apps/miniprogram/config.js` 中拼写为 `issue-cedential` 的 FC 域名;`scripts/test_asr.py` 中已提交的(过期)预签名 OSS URL;docs/ 下有未提交的权威文档删除且 AGENTS.md 仍引用它们
 - 架构特点:无数据库、无消息队列,OSS 对象是唯一数据契约,Worker 以本地磁盘文件状态机为权威状态 — 契约审计需覆盖对象键、元数据、状态机三类约定
 - 项目处于部署阶段(2026-07),FC 直转已定为未来主转写路径,但本审计以现状为基准
+- Phase 1(审计章程与基线)已完成(2026-07-04):审计基线钉住 5927f36,CHARTER.md(严重度体系/工作量分档/发现 schema/排除清单)与 HYPOTHESES.md(25 条假设)、DO-NOT-FIX.md(4 条预录入)定稿,验证 13/13 通过
 
 ## Constraints
 
@@ -80,4 +81,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-04 after initialization*
+*Last updated: 2026-07-04 after Phase 1 completion*
