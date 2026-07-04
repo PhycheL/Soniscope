@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import zipfile
 from pathlib import Path
 
@@ -13,6 +14,7 @@ from soniscope_worker.fc_deploy import (
     DeployRecord,
     FcApiError,
     FcDeployError,
+    _exception_summary,
     backup_dir,
     curl_ok,
     deploy_one,
@@ -21,6 +23,7 @@ from soniscope_worker.fc_deploy import (
     format_deploy_log,
     format_report,
     function_url,
+    load_deploy_env,
     log_path,
     package_function,
     read_requirements,
@@ -133,6 +136,48 @@ def test_function_url_real_spelling() -> None:
 def test_function_url_unknown() -> None:
     with pytest.raises(FcDeployError):
         function_url("nope")
+
+
+def test_exception_summary_redacts_cloud_credentials(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ALIYUN_DEPLOY_AK_ID", "LTAISECRETID123456")
+    monkeypatch.setenv("ALIYUN_DEPLOY_AK_SECRET", "super-secret-value")
+
+    class CloudError(Exception):
+        code = "AccessDenied"
+        request_id = "req-1"
+        message = "denied for LTAISECRETID123456 using super-secret-value"
+
+    summary = _exception_summary(CloudError("fallback super-secret-value"))
+    assert "AccessDenied" in summary
+    assert "request_id=req-1" in summary
+    assert "LTAISECRETID123456" not in summary
+    assert "super-secret-value" not in summary
+
+
+def test_load_deploy_env_reads_repo_dotenv_without_overriding(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("ALIYUN_DEPLOY_AK_ID", "already-exported")
+    monkeypatch.delenv("ALIYUN_DEPLOY_AK_SECRET", raising=False)
+    monkeypatch.delenv("ALIYUN_AK_ID", raising=False)
+    (tmp_path / ".env").write_text(
+        "\n".join(
+            [
+                "# local deploy credentials",
+                "ALIYUN_DEPLOY_AK_ID=from-dotenv",
+                'export ALIYUN_DEPLOY_AK_SECRET="from-dotenv-secret"',
+                "ALIYUN_AK_ID=runtime-credential-ignored",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    loaded = load_deploy_env(tmp_path)
+
+    assert loaded == ["ALIYUN_DEPLOY_AK_SECRET"]
+    assert os.environ["ALIYUN_DEPLOY_AK_ID"] == "already-exported"
+    assert os.environ["ALIYUN_DEPLOY_AK_SECRET"] == "from-dotenv-secret"
+    assert "ALIYUN_AK_ID" not in os.environ
 
 
 def test_read_requirements_skips_comments(tmp_path: Path) -> None:

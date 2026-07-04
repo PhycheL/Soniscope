@@ -18,6 +18,8 @@ from __future__ import annotations
 
 import datetime
 import hashlib
+import os
+import re
 import shutil
 import time
 import urllib.error
@@ -46,6 +48,14 @@ EXCLUDE_SUFFIXES = (".pyc", ".pyo")
 # FC 共享模块（US-006）：随每个函数代码一起 vendoring 到包根，使两函数都能 import fc_shared。
 SHARED_PARENT = ("apps", "fc", "shared")  # 含 fc_shared 包
 SHARED_PACKAGE = "fc_shared"
+DEPLOY_ENV_KEYS = ("ALIYUN_DEPLOY_AK_ID", "ALIYUN_DEPLOY_AK_SECRET")
+_SECRET_ENV_NAMES = (
+    *DEPLOY_ENV_KEYS,
+    "ALIYUN_AK_ID",
+    "ALIYUN_AK_SECRET",
+    "WX_APP_SECRET",
+)
+_AK_PATTERN = re.compile(r"\b(?:LTAI|STS\.)[0-9A-Za-z]{8,}\b")
 
 
 class FcDeployError(Exception):
@@ -276,6 +286,65 @@ def format_report(records: Sequence[DeployRecord], action: str, log_file: Path) 
     return lines
 
 
+def _parse_dotenv_value(raw: str) -> str:
+    """Parse the simple KEY=VALUE format used by the local deploy .env."""
+    value = raw.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+        return value[1:-1]
+    return value
+
+
+def load_deploy_env(repo_root: Path) -> list[str]:
+    """Load deploy credentials from repo-root .env if they are not already exported."""
+    env_path = repo_root / ".env"
+    if not env_path.is_file():
+        return []
+
+    loaded: list[str] = []
+    for raw in env_path.read_text(encoding="utf-8-sig").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[len("export ") :].lstrip()
+        key, sep, value = line.partition("=")
+        if not sep:
+            continue
+        name = key.strip()
+        if name not in DEPLOY_ENV_KEYS or os.environ.get(name, "").strip():
+            continue
+        os.environ[name] = _parse_dotenv_value(value)
+        loaded.append(name)
+    return loaded
+
+
+def _redact_error_text(value: object) -> str:
+    """Render cloud SDK error text without leaking local credentials."""
+    text = str(value)
+    for name in _SECRET_ENV_NAMES:
+        secret = os.environ.get(name, "").strip()
+        if secret:
+            text = text.replace(secret, "***REDACTED***")
+    return _AK_PATTERN.sub("***REDACTED_AK***", text)
+
+
+def _exception_summary(exc: BaseException) -> str:
+    """Compact cloud SDK exception details for deploy logs."""
+    parts = [type(exc).__name__]
+    for attr in ("code", "status_code", "request_id", "message", "description"):
+        val = getattr(exc, attr, None)
+        if val:
+            parts.append(f"{attr}={_redact_error_text(val)[:300]}")
+    inner = getattr(exc, "inner_exception", None)
+    if inner is not None and inner is not exc:
+        parts.append(f"inner={_redact_error_text(inner)[:300]}")
+    if len(parts) == 1:
+        rendered = _redact_error_text(exc)
+        if rendered:
+            parts.append(rendered[:300])
+    return " ".join(parts)
+
+
 # ── 编排：备份 → 打包 → 部署 → 存活验证 ─────────────────────────────────────
 def _write_backup(api: FcApi, build_root: Path, function: str, timestamp: str) -> Path:
     """下载线上代码与环境变量名快照（只记名、不记值），写入备份目录。"""
@@ -405,6 +474,8 @@ def run_deploy(
     root = repo_root or default_repo_root()
     build_root = fc_build_root(root)
     ts = timestamp or _now_stamp()
+    if api is None:
+        load_deploy_env(root)
     used_api = api or RealFcApi()
     try:
         funcs = resolve_functions(function)
@@ -435,6 +506,8 @@ def run_rollback(
     root = repo_root or default_repo_root()
     build_root = fc_build_root(root)
     ts = timestamp or _now_stamp()
+    if api is None:
+        load_deploy_env(root)
     used_api = api or RealFcApi()
     if not function or not function.strip():
         return (["[FAIL] rollback-fc 需要 FUNCTION=<name> 参数"], 1)
@@ -462,6 +535,9 @@ def run_fc_logs(
     hours: float = LOG_LOOKBACK_HOURS,
 ) -> tuple[list[str], int]:
     """拉取近 N 小时 FC 日志；日志服务未配置时输出明确诊断。"""
+    root = repo_root or default_repo_root()
+    if api is None:
+        load_deploy_env(root)
     used_api = api or RealFcApi()
     if not function or not function.strip():
         return (["[FAIL] fc-logs 需要 FUNCTION=<name> 参数"], 1)
@@ -494,8 +570,6 @@ class RealFcApi:
     """
 
     def _client(self) -> Any:
-        import os
-
         ak_id = os.environ.get("ALIYUN_DEPLOY_AK_ID", "").strip()
         ak_secret = os.environ.get("ALIYUN_DEPLOY_AK_SECRET", "").strip()
         if not ak_id or not ak_secret:
@@ -519,14 +593,18 @@ class RealFcApi:
     def download_code(self, function: str) -> bytes:
         client = self._client()
         try:
-            resp = client.get_function_code(function)
+            from alibabacloud_fc20230330 import models as fc_models
+
+            resp = client.get_function_code(function, fc_models.GetFunctionCodeRequest())
             url = getattr(getattr(resp, "body", None), "url", None)
             if not url:
                 raise FcApiError(f"线上 {function} 无可下载代码 URL（疑似首次部署）。")
         except FcApiError:
             raise
+        except ImportError as exc:  # pragma: no cover
+            raise FcApiError("缺少依赖 alibabacloud-fc20230330。") from exc
         except Exception as exc:  # noqa: BLE001 - 任意失败收敛为 FcApiError（不泄漏明文）
-            raise FcApiError(f"获取线上代码失败：{type(exc).__name__}") from exc
+            raise FcApiError(f"获取线上代码失败：{_exception_summary(exc)}") from exc
         try:
             req = urllib.request.Request(str(url), method="GET")  # noqa: S310
             with urllib.request.urlopen(req, timeout=30) as r:  # noqa: S310
@@ -537,13 +615,17 @@ class RealFcApi:
     def env_var_names(self, function: str) -> list[str]:
         client = self._client()
         try:
-            resp = client.get_function(function)
+            from alibabacloud_fc20230330 import models as fc_models
+
+            resp = client.get_function(function, fc_models.GetFunctionRequest())
             env = getattr(getattr(resp, "body", None), "environment_variables", None)
             if isinstance(env, dict):
                 return [str(k) for k in env]
             return []
+        except ImportError as exc:  # pragma: no cover
+            raise FcApiError("缺少依赖 alibabacloud-fc20230330。") from exc
         except Exception as exc:  # noqa: BLE001
-            raise FcApiError(f"读取函数环境变量名失败：{type(exc).__name__}") from exc
+            raise FcApiError(f"读取函数环境变量名失败：{_exception_summary(exc)}") from exc
 
     def install_deps(self, staging_dir: Path, requirements: list[str]) -> None:
         # 运行依赖装入暂存目录（与代码一起打包），仅在 requirements.txt 有非注释行时调用。
@@ -579,7 +661,7 @@ class RealFcApi:
             req = fc_models.UpdateFunctionRequest(body=body)
             client.update_function(function, req)
         except Exception as exc:  # noqa: BLE001
-            raise FcApiError(f"更新函数代码失败：{type(exc).__name__}") from exc
+            raise FcApiError(f"更新函数代码失败：{_exception_summary(exc)}") from exc
 
     def curl(self, url: str) -> CurlResult:
         req = urllib.request.Request(url, method="GET")  # noqa: S310 - 固定 https 常量 URL
@@ -597,12 +679,16 @@ class RealFcApi:
         # FC 运行时日志接入阿里云 SLS；未配置 project/logstore 时给明确诊断。
         client = self._client()
         try:
-            resp = client.get_function(function)
+            from alibabacloud_fc20230330 import models as fc_models
+
+            resp = client.get_function(function, fc_models.GetFunctionRequest())
             log_config = getattr(getattr(resp, "body", None), "log_config", None)
             project = getattr(log_config, "project", None)
             logstore = getattr(log_config, "logstore", None)
+        except ImportError as exc:  # pragma: no cover
+            raise FcApiError("缺少依赖 alibabacloud-fc20230330。") from exc
         except Exception as exc:  # noqa: BLE001
-            raise FcApiError(f"读取函数日志配置失败：{type(exc).__name__}") from exc
+            raise FcApiError(f"读取函数日志配置失败：{_exception_summary(exc)}") from exc
         if not project or not logstore:
             raise FcApiError("函数未配置 SLS 日志服务（project/logstore 为空）。")
         raise FcApiError(
