@@ -9,11 +9,11 @@ Requirements for this milestone's audit report. Each maps to roadmap phases.
 
 ### 审计章程与框架 (CHARTER)
 
-- [ ] **CHARTER-01**: 审计基线钉住当前 HEAD SHA,报告中所有证据以 `path:line @ SHA` 形式引用
-- [ ] **CHARTER-02**: 定义项目化五级严重度体系(CRITICAL/HIGH/MEDIUM/LOW/INFO),每级用 SoniScope 场景术语定义(数据丢失/静默转写失败/凭证泄漏等),每个评级附"影响×可能性"一行理由
-- [ ] **CHARTER-03**: 定义 S/M/L/XL 工作量分档及判定标准(S ≤单文件、M=同组件多文件、L=跨组件、XL=需独立阶段);禁止小时级精确估计
-- [ ] **CHARTER-04**: 报告含范围与方法声明:五个审计维度、审计 SHA、明确排除项(FC 直转目标态对照、渗透测试深度、vendored `docs/example/` 逐行审计)
-- [ ] **CHARTER-05**: 统一发现记录 schema(ID、维度、严重度+理由、file:line@SHA 证据片段、修复建议、工作量、关联发现)与扫描排除清单,在所有维度审计开始前定稿
+- [x] **CHARTER-01**: 审计基线钉住当前 HEAD SHA,报告中所有证据以 `path:line @ SHA` 形式引用
+- [x] **CHARTER-02**: 定义项目化五级严重度体系(CRITICAL/HIGH/MEDIUM/LOW/INFO),每级用 SoniScope 场景术语定义(数据丢失/静默转写失败/凭证泄漏等),每个评级附"影响×可能性"一行理由
+- [x] **CHARTER-03**: 定义 S/M/L/XL 工作量分档及判定标准(S ≤单文件、M=同组件多文件、L=跨组件、XL=需独立阶段);禁止小时级精确估计
+- [x] **CHARTER-04**: 报告含范围与方法声明:五个审计维度、审计 SHA、明确排除项(FC 直转目标态对照、渗透测试深度、vendored `docs/example/` 逐行审计)
+- [x] **CHARTER-05**: 统一发现记录 schema(ID、维度、严重度+理由、file:line@SHA 证据片段、修复建议、工作量、关联发现)与扫描排除清单,在所有维度审计开始前定稿
 
 ### 契约一致性 (CONTRACT)
 
@@ -69,11 +69,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CHARTER-01 | Phase 1 | Pending |
-| CHARTER-02 | Phase 1 | Pending |
-| CHARTER-03 | Phase 1 | Pending |
-| CHARTER-04 | Phase 1 | Pending |
-| CHARTER-05 | Phase 1 | Pending |
+| CHARTER-01 | Phase 1 | Complete |
+| CHARTER-02 | Phase 1 | Complete |
+| CHARTER-03 | Phase 1 | Complete |
+| CHARTER-04 | Phase 1 | Complete |
+| CHARTER-05 | Phase 1 | Complete |
 | CONTRACT-01 | Phase 2 | Pending |
 | CONTRACT-02 | Phase 2 | Pending |
 | CONTRACT-03 | Phase 2 | Pending |
@@ -94,6 +94,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RPT-09 | Phase 5 | Pending |
 
 **Coverage:**
+
 - v1 requirements: 23 total(原统计 "20" 有误,实际计数 CHARTER 5 + CONTRACT 4 + AUDIT 5 + RPT 9 = 23,已修正)
 - Mapped to phases: 23
 - Unmapped: 0 ✓
