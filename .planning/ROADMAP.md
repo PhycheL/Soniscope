@@ -30,7 +30,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. 统一发现记录 schema(ID、维度、严重度+理由、file:line@SHA 证据片段、修复建议、工作量、关联发现)与扫描排除清单(含 vendored `docs/example/start-fc-main/`)定稿
   4. 范围与方法声明成文:五个审计维度、审计 SHA、明确排除项(FC 直转目标态对照、渗透测试深度)与零 diff 验收规则
   5. `.planning/codebase/CONCERNS.md` 全部线索已转为"未验证假设"清单,每条标注待验证维度,等待后续阶段证实/证伪
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — 审计章程 CHARTER.md(基线/严重度/工作量/schema/排除清单/范围方法)与 findings/ 五维度台账骨架
+- [ ] 01-02-PLAN.md — CONCERNS.md 线索分流:DO-NOT-FIX.md 预录入 + HYPOTHESES.md 假设清单 + STATE.md 过时阻塞清理
 
 ### Phase 2: 契约抽取与漂移分析
 **Goal**: 系统的核心契约(fragment_id / object key / `x-oss-meta-*` 等)在小程序、FC、Worker 三处实现的现状一致性有逐字段的证据矩阵与分歧判定
@@ -85,7 +89,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5(Phase 2 与 Phase 3 �
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. 审计章程与基线 | 0/? | Not started | - |
+| 1. 审计章程与基线 | 0/2 | Not started | - |
 | 2. 契约抽取与漂移分析 | 0/? | Not started | - |
 | 3. 组件与工具链深潜 | 0/? | Not started | - |
 | 4. 文档配置与测试审计 | 0/? | Not started | - |
