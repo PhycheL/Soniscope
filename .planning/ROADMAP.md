@@ -106,7 +106,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5(Phase 2 与 Phase 3 �
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. 审计章程与基线 | 2/2 | Complete   | 2026-07-04 |
+| 1. 审计章程与基线 | 2/2 | Complete    | 2026-07-04 |
 | 2. 契约抽取与漂移分析 | 0/? | Not started | - |
 | 3. 组件与工具链深潜 | 0/? | Not started | - |
 | 4. 文档配置与测试审计 | 0/? | Not started | - |
