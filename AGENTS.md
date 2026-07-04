@@ -436,3 +436,17 @@ python3 scripts/fetch_test_fixtures.py --check
 - 不要把“看起来像 typo”的真实云资源值自动纠正；尤其是 `issue-cedential-ottfirocds`。
 - 不确定真实云端状态时，写脚本验证并报告结果；不要凭记忆假设控制台配置。
 - 完成工作时明确说明跑过哪些验证、哪些没跑、失败输出是什么。不要声称未验证的内容已通过。
+
+## Agent skills
+
+### Issue tracker
+
+Issue 以本地 Markdown 文件形式跟踪，位于 `.scratch/<feature>/`（每个功能一个目录，PRD + 编号 issue 文件）。外部 PR 不作为 triage 来源。See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+五个 triage 角色使用默认标签字符串（needs-triage / needs-info / ready-for-agent / ready-for-human / wontfix），记录在 issue 文件的 `Status:` 行。See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+单一上下文布局：仓库根目录 `CONTEXT.md` + `docs/adr/`（由 /domain-modeling 按需懒创建）。See `docs/agents/domain.md`.
