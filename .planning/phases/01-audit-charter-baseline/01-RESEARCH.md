@@ -40,7 +40,7 @@ None — discussion stayed within phase scope.
 | CHARTER-02 | 项目化五级严重度体系,SoniScope 场景术语 + "影响×可能性"一行理由 | 五级 CRITICAL/HIGH/MEDIUM/LOW/INFO 与 影响×可能性 矩阵是行业标准做法(OWASP Risk Rating);本文提供 SoniScope 场景锚点建议表(Claude's Discretion 区域) |
 | CHARTER-03 | S/M/L/XL 工作量分档及判定标准,禁止小时估计 | 判定标准已由需求文本锁死(S ≤单文件、M=同组件多文件、L=跨组件、XL=需独立阶段),章程只需成文+配 SoniScope 示例;无需外部研究 |
 | CHARTER-04 | 范围与方法声明:五个审计维度、审计 SHA、明确排除项、零 diff 规则 | 五维度映射已从 REQUIREMENTS.md 推导(见"五个审计维度");D-05 排除清单九条路径全部实测存在;排除项措辞素材齐备 |
-| CHARTER-05 | 统一发现记录 schema 与扫描排除清单,在所有维度审计开始前定稿 | 提供 schema 字段设计、ID 规则建议、台账目录布局建议(含 Phase 2/3 并行写入的防冲突设计);CONCERNS.md 30 条线索已逐条盘点并给出 假设/Do-NOT-fix 分流建议 |
+| CHARTER-05 | 统一发现记录 schema 与扫描排除清单,在所有维度审计开始前定稿 | 提供 schema 字段设计、ID 规则建议、台账目录布局建议(含 Phase 2/3 并行写入的防冲突设计);CONCERNS.md 29 条线索已逐条盘点并给出 假设/Do-NOT-fix 分流建议 |
 </phase_requirements>
 
 ## Project Constraints (from CLAUDE.md)
@@ -57,9 +57,9 @@ None — discussion stayed within phase scope.
 
 Phase 1 是一个**纯文档阶段**:产出审计章程(基线声明、五级严重度、S/M/L/XL 分档、发现 schema、排除清单、范围与方法)和假设清单,不安装任何包、不写任何代码、不碰任何业务文件。风险不在技术,而在两点:(1) 章程条款必须精确到"任何审计者可直接套用而无需再作解释"——模糊措辞会在 Phase 2–5 造成口径漂移,Phase 5 校准成本剧增;(2) 产物落点必须严格避开零 diff 保护区。
 
-本次研究完成了全部仓库事实的机械验证:基线 SHA `5927f36` 存在且可解析全 SHA;工作树干净(STATE.md 中记录的 dirty-tree 阻塞已确认自行解除,3 份旧文档的删除已随提交入库);零 diff 验证命令实测输出为空(当前 HEAD `1f42395` 领先基线 2 个 `.planning/` 提交,不污染基线);D-05 排除清单九条路径全部存在;CONCERNS.md 共 30 条线索待分流。外部研究确认:五级严重度 + 影响×可能性格式与行业惯例(OWASP Risk Rating、主流审计机构分级)完全一致,章程可放心引用而无需发明。
+本次研究完成了全部仓库事实的机械验证:基线 SHA `5927f36` 存在且可解析全 SHA;工作树干净(STATE.md 中记录的 dirty-tree 阻塞已确认自行解除,3 份旧文档的删除已随提交入库);零 diff 验证命令实测输出为空(当前 HEAD `1f42395` 领先基线 2 个 `.planning/` 提交,不污染基线);D-05 排除清单九条路径全部存在;CONCERNS.md 共 29 条线索待分流(机械计数 `grep -cE '^\*\*[^*]+:\*\*$'` = 29)。外部研究确认:五级严重度 + 影响×可能性格式与行业惯例(OWASP Risk Rating、主流审计机构分级)完全一致,章程可放心引用而无需发明。
 
-**Primary recommendation:** 在 `.planning/audit/` 下建 4 类产物(CHARTER.md、HYPOTHESES.md、findings/ 目录骨架、DO-NOT-FIX.md 初稿);证据一律从 `git show 5927f36:<path>` 读取而非工作树,使行号天然免疫 HEAD 推进;CONCERNS.md 30 条线索按 D-08 分流为 ~4 条 Do-NOT-fix 预录入 + ~26 条编号假设(HYP-NN)。
+**Primary recommendation:** 在 `.planning/audit/` 下建 4 类产物(CHARTER.md、HYPOTHESES.md、findings/ 目录骨架、DO-NOT-FIX.md 初稿);证据一律从 `git show 5927f36:<path>` 读取而非工作树,使行号天然免疫 HEAD 推进;CONCERNS.md 29 条线索按 D-08 分流为 4 条 Do-NOT-fix 预录入 + 25 条编号假设(HYP-NN)。
 
 ## Architectural Responsibility Map
 
@@ -121,7 +121,7 @@ Phase 1 是一个**纯文档阶段**:产出审计章程(基线声明、五级严
                     │  工作树干净 / 零 diff 通过              │
                     └──────────────┬──────────────────────┘
                                    │
-  .planning/codebase/CONCERNS.md ──┤ (30 条线索)
+  .planning/codebase/CONCERNS.md ──┤ (29 条线索)
   .planning/codebase/STRUCTURE.md ─┤ (排除清单路径依据)
   REQUIREMENTS.md CHARTER-01~05 ───┤ (验收条款)
   CONTEXT.md D-01~D-09 ────────────┘ (锁定决策)
@@ -294,7 +294,7 @@ git grep -nE 'SecurityToken=|security_token.{0,4}[:=]\s*["'"'"']' 5927f36 -- .  
 
 ## CONCERNS.md 线索分流盘点(CHARTER-05 / 成功判据 5 的工作底稿)
 
-CONCERNS.md 共 **30 条**线索 [VERIFIED: 逐节清点]:Tech Debt 7、Known Bugs 0(显式"None detected"——应在 HYPOTHESES.md 记一条"已检查,无已知 bug 线索"的显式记录,喂 RPT-08)、Security 4、Performance 3、Fragile Areas 6、Scaling Limits 2、Dependencies at Risk 2、Missing Critical Features 2、Test Coverage Gaps 4。
+CONCERNS.md 共 **29 条**线索 [VERIFIED: 机械计数 `grep -cE '^\*\*[^*]+:\*\*$' .planning/codebase/CONCERNS.md` → 29;初版逐节清点误记 Fragile Areas 为 6,实为 5]:Tech Debt 7、Known Bugs 0(显式"None detected"——应在 HYPOTHESES.md 记一条"已检查,无已知 bug 线索"的显式记录,喂 RPT-08)、Security 4、Performance 3、Fragile Areas 5、Scaling Limits 2、Dependencies at Risk 2、Missing Critical Features 2、Test Coverage Gaps 4。
 
 **D-08 Do-NOT-fix 预录入(不转假设):** D-08 点名 3 条 + 明确同类 1 条,共建议预录入 4 条:
 1. `whisper-local` 桩(Tech Debt 节,"do not fix without a scope decision")
@@ -302,7 +302,7 @@ CONCERNS.md 共 **30 条**线索 [VERIFIED: 逐节清点]:Tech Debt 7、Known Bu
 3. handler.py mypy 豁免(Fragile Areas 节,pyproject.toml 已注释缘由)
 4. 小程序接收原始 STS 秘密(Security 节标注 "by design")[ASSUMED — D-08 用"等"字留了口,此条是否入 DNF 由规划确认]
 
-**其余 ~26 条 → HYP-NN 假设清单**,每条标注待验证维度(CON/CODE/TOOL/DOC/TEST)。注意若干条标注 "acceptable for MVP"(fc_deploy 仅 update_code、单用户 allowlist、wsgiref、Worker 串行)——这些**不是** D-08 点名的 Do-NOT-fix,仍应转为假设由 Phase 3/4 核实其"可接受"判断是否成立 [ASSUMED — 分流边界由规划最终定夺]。
+**其余 25 条 → HYP-NN 假设清单**,每条标注待验证维度(CON/CODE/TOOL/DOC/TEST)。注意若干条标注 "acceptable for MVP"(fc_deploy 仅 update_code、单用户 allowlist、wsgiref、Worker 串行)——这些**不是** D-08 点名的 Do-NOT-fix,仍应转为假设由 Phase 3/4 核实其"可接受"判断是否成立 [ASSUMED — 分流边界由规划最终定夺]。
 
 注意维度归属示例:AGENTS.md 旧路径引用 → DOC;test_asr.py 过期预签名 URL → TOOL(含安全标注);fragment_id 三处重复 → CON;纯 JS sha256 → CODE。
 
@@ -328,7 +328,7 @@ CONCERNS.md 共 **30 条**线索 [VERIFIED: 逐节清点]:Tech Debt 7、Known Bu
 
 ### Pitfall 4: 假设清单丢失可追溯性
 **What goes wrong:** CONCERNS.md 条目转写时合并/改写,Phase 4 无法逐条对账,RPT-08 映射表断链。
-**How to avoid:** HYP-NN 与 CONCERNS.md 原节名+条目标题一一对应,30 条(含 Known Bugs 的"无线索"显式记录)全部入账;转换表在 HYPOTHESES.md 头部给出计数核对(30 = 4 DNF + 25 HYP + 1 显式无发现记录,或规划定的实际分流数)。
+**How to avoid:** HYP-NN 与 CONCERNS.md 原节名+条目标题一一对应,29 条粗体线索全部入账;转换表在 HYPOTHESES.md 头部给出计数核对(29 = 4 DNF + 25 HYP;Known Bugs 的"无线索"显式记录另加 1 条,不计入 29)。
 **Warning signs:** HYP 计数 + DNF 计数 ≠ CONCERNS.md 条目数。
 
 ### Pitfall 5: 从工作树而非基线 SHA 取证
@@ -384,16 +384,18 @@ git diff --stat 5927f36 -- apps/ scripts/ docs/                 # 零 diff(期�
 | A4 | "acceptable for MVP" 类条目(fc_deploy 仅 update_code、allowlist、wsgiref、串行 Worker)转假设而非 DNF | CONCERNS 分流盘点 | 中 — 若应入 DNF,Phase 3/4 会白花核实功夫;建议规划时向用户确认或按本建议执行并在 HYPOTHESES.md 标注分流依据 |
 | A5 | 台账按维度分 5 文件(防 Phase 2/3 并行写冲突) | Architecture Patterns | 低 — 属台账形态 Discretion;单文件亦可行但有合并冲突风险 |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **D-08 "等" 字的完整 DNF 预录入清单**
+1. **D-08 "等" 字的完整 DNF 预录入清单 (RESOLVED)**
    - What we know: 明确点名 3 条(whisper-local、issue-cedential、handler mypy 豁免)。
    - What's unclear: CONCERNS.md 另有 "by design"/"acceptable for MVP" 标注条目是否同列。
    - Recommendation: 采纳本研究分流建议(4 条 DNF + 其余转假设),在 DO-NOT-FIX.md 与 HYPOTHESES.md 各自写明分流依据,Phase 5 组装 RPT-05 时用户可最终裁定——不阻塞规划。
+   - **RESOLVED:** 规划已按本建议采纳——01-02-PLAN.md Task 1 预录入 4 条 DNF(DNF-01~04,DNF-04 标明 A3 假设性质供 Phase 5 裁定),其余 25 条转 HYP;"acceptable for MVP" 类条目全部转假设。最终边界由 Phase 5 组装 RPT-05 时用户裁定。
 
-2. **章程单文件 vs 多文件**
+2. **章程单文件 vs 多文件 (RESOLVED)**
    - What we know: 唯一硬约束是落点在 `.planning/`;CHARTER-01~05 五组规则彼此引用密切。
    - Recommendation: 单一 CHARTER.md(全 SHA 声明一次的 D-02 要求天然指向单文件)+ 独立 HYPOTHESES.md / DO-NOT-FIX.md / findings/ 骨架,共 4 类产物;规划按此拆 plan 即可。
+   - **RESOLVED:** 规划已按本建议采纳——01-01-PLAN.md 产出单一 CHARTER.md + findings/ 五维度台账骨架,01-02-PLAN.md 产出 HYPOTHESES.md + DO-NOT-FIX.md,共 4 类产物。
 
 ## Environment Availability
 
@@ -420,7 +422,7 @@ git diff --stat 5927f36 -- apps/ scripts/ docs/                 # 零 diff(期�
 | CHARTER-02 | 五级严重度全部定义且带影响×可能性格式 | smoke | `for s in CRITICAL HIGH MEDIUM LOW INFO; do grep -q "$s" .planning/audit/CHARTER.md || echo "MISSING $s"; done` | ❌ 本阶段产出 |
 | CHARTER-03 | S/M/L/XL 分档成文、无小时估计 | smoke | `grep -qE 'XL' .planning/audit/CHARTER.md && ! grep -qE '[0-9]+\s*(小时|h\b|hours)' .planning/audit/CHARTER.md` | ❌ 本阶段产出 |
 | CHARTER-04 | 排除清单九路径 + 五维度 + 零 diff 规则在章程中 | smoke | `for p in start-fc-main scripts/ralph openspec tests/audio; do grep -q "$p" .planning/audit/CHARTER.md || echo "MISSING $p"; done` | ❌ 本阶段产出 |
-| CHARTER-05 | schema 七字段齐备;假设清单计数与 CONCERNS.md 对账 | integration | schema 示例字段 grep;HYP+DNF 条目计数 = 30(`grep -c '^### HYP-' .planning/audit/HYPOTHESES.md` 等) | ❌ 本阶段产出 |
+| CHARTER-05 | schema 七字段齐备;假设清单计数与 CONCERNS.md 对账 | integration | schema 示例字段 grep;HYP+DNF 条目计数 = 29(`grep -c '^### HYP-' .planning/audit/HYPOTHESES.md` 等) | ❌ 本阶段产出 |
 | (基线不变量) | 零 diff 保持 | smoke | `test -z "$(git diff --stat 5927f36 -- apps/ scripts/ docs/)"` | ✅ 命令已实测 |
 
 ### Sampling Rate
@@ -459,7 +461,7 @@ git diff --stat 5927f36 -- apps/ scripts/ docs/                 # 零 diff(期�
 - 本地 git 验证(2026-07-04):`git rev-parse`、`git status --porcelain`、`git diff --stat`、路径存在性、`git --version` — 基线全部事实
 - `.planning/phases/01-audit-charter-baseline/01-CONTEXT.md` — D-01~D-09 锁定决策
 - `.planning/REQUIREMENTS.md`、`.planning/ROADMAP.md` — CHARTER-01~05 条款、五维度、Out of Scope 禁令
-- `.planning/codebase/CONCERNS.md` — 30 条线索逐条清点
+- `.planning/codebase/CONCERNS.md` — 29 条线索逐条清点(机械计数复核)
 - `./.claude/CLAUDE.md` — 项目约束、秘密红线、文档语言习惯
 
 ### Secondary (MEDIUM confidence)
