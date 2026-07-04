@@ -29,7 +29,7 @@ install: ## 安装所有 Python 依赖并生成 lock 文件（uv workspace）
 check-config: ## 读取 config.yaml → 校验必填字段 → 打印脱敏摘要 → 检查 600 权限
 	uv run python -m soniscope_worker check-config
 
-init-dirs: ## 在 \$$SONISCOPE_HOME 下幂等创建 inbox/ inbox/failed/ fragments/ tmp/
+init-dirs: ## 读取 SONISCOPE_HOME（环境变量或 .env），在已存在工作目录下创建 inbox/ inbox/failed/ fragments/ tmp/
 	uv run python -m soniscope_worker init-dirs
 
 verify-prep: ## 一键校验 US-001 人工准备产物（OSS/STS/FC/NLS/fixture/环境）

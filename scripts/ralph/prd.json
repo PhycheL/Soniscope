@@ -26,10 +26,10 @@
     {
       "id": "US-002",
       "title": "实现配置 schema、脱敏加载器与运行时目录初始化",
-      "description": "作为开发者，我需要 Worker 能从 SONISCOPE_HOME 或默认目录加载 config.yaml，校验 OSS、轮询和转写配置，并初始化本地运行时目录。",
+      "description": "作为开发者，我需要 Worker 能从 SONISCOPE_HOME 加载 config.yaml，校验 OSS、轮询和转写配置，并初始化本地运行时目录。",
       "acceptanceCriteria": [
         "配置 schema 覆盖 oss.endpoint、oss.bucket、oss.access_key_id、oss.access_key_secret、poll.interval_seconds、transcriber.name、provider、model、params_version、api_endpoint、appkey、access_key_id、access_key_secret、upload_mode、local.enabled",
-        "配置加载顺序为 $SONISCOPE_HOME/config.yaml，未设置 SONISCOPE_HOME 时回退到 ~/SoniScope/config.yaml",
+        "配置加载顺序为环境变量 SONISCOPE_HOME，其次仓库根目录 .env 中的 SONISCOPE_HOME；未设置时直接失败",
         "缺失必填字段时一次性列出所有缺失字段名并以非零退出",
         "日志和 repr 中对 access_key_secret、appkey、api_key 等敏感字段只显示前后 4 位或等价脱敏摘要",
         "make check-config 读取实际配置，打印脱敏摘要，并在 config.yaml 权限不是 600 时给出明确警告",

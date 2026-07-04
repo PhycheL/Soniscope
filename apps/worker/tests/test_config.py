@@ -195,3 +195,14 @@ def test_cli_init_dirs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     assert (tmp_path / "inbox" / "failed").is_dir()
     assert (tmp_path / "fragments").is_dir()
     assert (tmp_path / "tmp").is_dir()
+
+
+def test_cli_init_dirs_requires_existing_home(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    missing_home = tmp_path / "missing"
+    monkeypatch.setenv("SONISCOPE_HOME", str(missing_home))
+    result = runner.invoke(app, ["init-dirs"])
+    assert result.exit_code == 1
+    assert "SONISCOPE_HOME 不存在" in result.stderr
+    assert not missing_home.exists()

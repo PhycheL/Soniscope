@@ -10,7 +10,7 @@
 #   - transcriber.access_key_id / access_key_secret（§2.3 soniscope-asr AK）
 #
 # 同时负责 H 块要求的相关操作：
-#   - 写到 $SONISCOPE_HOME（默认 ~/SoniScope），与代码仓库分离
+#   - 写到 SONISCOPE_HOME 指定的目录（可来自环境变量或仓库根目录 .env），与代码仓库分离
 #   - 生成后立即 chmod 600（红线 §3）
 #   - 不覆盖已填好的配置（除非 --force）
 #
@@ -27,34 +27,54 @@ FILL='__FILL_ME__'   # --check 据此判断哪些字段尚未填写
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUNBOOK_DEFAULT="$REPO_ROOT/docs/runbook/cloud-setup.md"
+ENV_FILE="$REPO_ROOT/.env"
 
 log()  { printf '[gen-config] %s\n' "$*"; }
 warn() { printf '[gen-config] ⚠ %s\n' "$*" >&2; }
 die()  { printf '[gen-config] 错误：%s\n' "$*" >&2; exit 1; }
 
 usage() {
-  sed -n '3,34p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  sed -n '3,23p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
   exit "${1:-0}"
 }
 
 resolve_home() {
-  # 目录来源优先级（以 runbook 为准）；结果写入全局 HOME_DIR / HOME_SRC：
-  #   1) runbook §7「工作目录环境变量：SONISCOPE_HOME=...」
-  #   2) 环境变量 $SONISCOPE_HOME
-  #   3) ~/SoniScope
+  # 目录来源优先级；结果写入全局 HOME_DIR / HOME_SRC：
+  #   1) 环境变量 $SONISCOPE_HOME
+  #   2) 仓库根目录 .env 中的 SONISCOPE_HOME
   local home src
-  home="$(rb_value '工作目录环境变量')"   # 形如 SONISCOPE_HOME=/path
-  home="${home#SONISCOPE_HOME=}"
-  if [ -n "$home" ]; then
-    src="runbook §7"
-  elif [ -n "${SONISCOPE_HOME:-}" ]; then
+  if [ -n "${SONISCOPE_HOME:-}" ]; then
     home="$SONISCOPE_HOME"; src="环境变量 SONISCOPE_HOME"
   else
-    home="$HOME/SoniScope"; src="默认 ~/SoniScope"
+    home="$(dotenv_soniscope_home)"
+    [ -n "$home" ] || die "未设置 SONISCOPE_HOME。请 export SONISCOPE_HOME=/path/to/SoniScope，或在仓库根目录 .env 写入 SONISCOPE_HOME=/path/to/SoniScope。"
+    src=".env"
   fi
   case "$home" in "~"|"~/"*) home="${HOME}${home#\~}";; esac
   HOME_DIR="$home"
   HOME_SRC="$src"
+}
+
+dotenv_soniscope_home() {
+  [ -f "$ENV_FILE" ] || return 0
+  awk '
+    function trim(s) { gsub(/^[ \t]+|[ \t]+$/, "", s); return s }
+    /^[ \t]*(#|$)/ { next }
+    {
+      line = $0
+      sub(/^[ \t]*export[ \t]+/, "", line)
+      if (line ~ /^[ \t]*SONISCOPE_HOME[ \t]*=/) {
+        sub(/^[^=]*=/, "", line)
+        line = trim(line)
+        if ((substr(line, 1, 1) == "\"" && substr(line, length(line), 1) == "\"") ||
+            (substr(line, 1, 1) == "\047" && substr(line, length(line), 1) == "\047")) {
+          line = substr(line, 2, length(line) - 2)
+        }
+        print line
+        exit
+      }
+    }
+  ' "$ENV_FILE"
 }
 
 # ---- 从 runbook 抽取「首个匹配行里的第一个反引号包裹值」 ----
@@ -198,11 +218,13 @@ main() {
     return
   fi
 
+  [ -d "$home" ] || die "工作目录不存在：${home}。请先手动创建/挂载该目录，并通过 SONISCOPE_HOME 指向它。"
+  [ -w "$home" ] || die "工作目录不可写：${home}。请检查目录权限。"
+
   if [ -f "$dst" ] && [ "$force" -ne 1 ]; then
     die "$dst 已存在。如确认要覆盖（会清掉已填凭证），请加 --force；只想校验请用 --check。"
   fi
 
-  mkdir -p "$home"
   write_template "$dst"
   chmod 600 "$dst"
 

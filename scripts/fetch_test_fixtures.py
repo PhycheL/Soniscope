@@ -13,8 +13,8 @@
 
 任一不匹配时输出指向 `docs/runbook/cloud-setup.md` 第 6 节的修复提示。
 
-工作目录按以下优先级解析（与 scripts/gen_worker_config.sh 一致，以 runbook 为准）：
-runbook §7 的 `SONISCOPE_HOME` → 环境变量 `$SONISCOPE_HOME` → `~/SoniScope`。
+工作目录按以下优先级解析（与 scripts/gen_worker_config.sh 一致）：
+环境变量 `$SONISCOPE_HOME` → 仓库根目录 `.env` 中的 `SONISCOPE_HOME`。
 
 下载遵循项目三段式协议：先写 `<name>.part` → 校验 → 原子 rename 为最终文件。
 
@@ -28,13 +28,13 @@ from __future__ import annotations
 
 import argparse
 import os
-import re
 import sys
 from pathlib import Path
+from typing import NoReturn
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 MANIFEST_PATH = REPO_ROOT / "tests" / "audio" / "fixtures.manifest.json"
-RUNBOOK_PATH = REPO_ROOT / "docs" / "runbook" / "cloud-setup.md"
+ENV_PATH = REPO_ROOT / ".env"
 
 # 复用 Worker 包内的校验逻辑；插入 src 路径使脚本在裸 `python3`（未装包）下也可导入。
 sys.path.insert(0, str(REPO_ROOT / "apps" / "worker" / "src"))
@@ -50,40 +50,49 @@ from soniscope_worker.fixtures import (  # noqa: E402
 )
 
 
-def _fail(msg: str) -> "NoReturn":  # type: ignore[name-defined]
+def _fail(msg: str) -> NoReturn:
     print(f"[fetch-fixtures] 错误：{msg}", file=sys.stderr)
     sys.exit(1)
 
 
-def runbook_home() -> "str | None":
-    """从 runbook §7「工作目录环境变量：`SONISCOPE_HOME=...`」读取工作目录。"""
-    if not RUNBOOK_PATH.is_file():
+def _parse_dotenv_value(raw: str) -> str:
+    value = raw.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+        return value[1:-1]
+    return value
+
+
+def dotenv_soniscope_home() -> str | None:
+    if not ENV_PATH.is_file():
         return None
-    m = re.search(r"SONISCOPE_HOME=([^\s`]+)", RUNBOOK_PATH.read_text(encoding="utf-8"))
-    return m.group(1) if m else None
+    for raw in ENV_PATH.read_text(encoding="utf-8-sig").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[len("export ") :].lstrip()
+        key, sep, value = line.partition("=")
+        if sep and key.strip() == "SONISCOPE_HOME":
+            return _parse_dotenv_value(value)
+    return None
 
 
 def resolve_config_path() -> Path:
-    # 目录来源优先级（以 runbook 为准）：runbook §7 → $SONISCOPE_HOME → ~/SoniScope
-    candidates = []
-    rb = runbook_home()
-    if rb:
-        candidates.append(Path(rb).expanduser() / "config.yaml")
+    # 目录来源优先级：$SONISCOPE_HOME → repo .env 中的 SONISCOPE_HOME
     home = os.environ.get("SONISCOPE_HOME")
     if home:
-        candidates.append(Path(home).expanduser() / "config.yaml")
-    candidates.append(Path("~/SoniScope/config.yaml").expanduser())
-
-    seen: set[Path] = set()
-    candidates = [p for p in candidates if not (p in seen or seen.add(p))]
-
-    for p in candidates:
-        if p.is_file():
-            return p
-    tried = "\n  ".join(str(p) for p in candidates)
+        config_path = Path(os.path.expandvars(home.strip())).expanduser() / "config.yaml"
+    elif dotenv_home := dotenv_soniscope_home():
+        config_path = Path(os.path.expandvars(dotenv_home.strip())).expanduser() / "config.yaml"
+    else:
+        _fail(
+            "未设置 SONISCOPE_HOME。请先 export SONISCOPE_HOME=/path/to/SoniScope，"
+            "或在仓库根目录 .env 中写入 SONISCOPE_HOME=/path/to/SoniScope。"
+        )
+    if config_path.is_file():
+        return config_path
     _fail(
-        "找不到 config.yaml，已尝试以下路径：\n  "
-        f"{tried}\n"
+        f"找不到 config.yaml：{config_path}\n"
         "请先运行 scripts/gen_worker_config.sh 生成运行时配置，其中需包含 "
         "oss.access_key_id / oss.access_key_secret（soniscope-local-reader 只读凭证）。"
     )

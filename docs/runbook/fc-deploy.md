@@ -381,9 +381,10 @@ os.environ["ALIYUN_AK_SECRET"]
 ./.env
 ```
 
-内容只放部署期凭证：
+内容只放部署期凭证和 Worker 工作目录指针；不要把 Worker 的 OSS / ASR 明文 AK 放进 `.env`：
 
 ```bash
+SONISCOPE_HOME=/path/to/SoniScope
 ALIYUN_DEPLOY_AK_ID=<soniscope-fc-deploy 的 AK ID>
 ALIYUN_DEPLOY_AK_SECRET=<soniscope-fc-deploy 的 AK Secret>
 ```
@@ -654,7 +655,7 @@ curl https://verify-upload-nnjpaoamhw.cn-beijing.fcapp.run
 - [ ] `soniscope-fc-deploy` 已临时绑定 `AliyunFCFullAccess`，或已绑定可用的 `soniscope-fc-deploy-code-only`
 - [ ] `soniscope-fc-recordings-headonly` 自定义策略已创建
 - [ ] `soniscope-fc` 已绑定 `soniscope-fc-recordings-headonly`
-- [ ] `.env` 已创建，且只包含 `ALIYUN_DEPLOY_AK_ID` / `ALIYUN_DEPLOY_AK_SECRET`
+- [ ] `.env` 已创建，且只包含 `SONISCOPE_HOME` 与 `ALIYUN_DEPLOY_AK_ID` / `ALIYUN_DEPLOY_AK_SECRET`
 - [ ] `git check-ignore .env` 输出 `.env`
 - [ ] `issue-credential` 已配置完整 FC 运行时环境变量
 - [ ] `verify-upload` 已配置完整 FC 运行时环境变量

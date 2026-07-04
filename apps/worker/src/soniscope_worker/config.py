@@ -3,7 +3,7 @@
 `config.yaml` 用 Pydantic v2 校验，敏感字段（access_key_secret / appkey / api_key）
 在 repr / 日志中只显示前后 4 位。缺失必填字段时一次性列出所有缺失项并以非零退出。
 
-加载顺序见 paths.soniscope_home()：① $SONISCOPE_HOME/config.yaml → ② ~/SoniScope/config.yaml。
+加载顺序见 paths.soniscope_home()：① 环境变量 SONISCOPE_HOME → ② 仓库根目录 .env。
 """
 
 from pathlib import Path

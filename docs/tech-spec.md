@@ -97,8 +97,8 @@ my_soniscope/
 
 ### 2.2 运行时数据目录
 
-```
-/Volumes/Data/software/SoniScope/        # $SONISCOPE_HOME（本项目实际值）
+```text
+$SONISCOPE_HOME/                         # 运行时根目录，由环境变量或仓库根 .env 指定
 ├── inbox/                                # 临时下载区
 │   ├── <fragment_id>.part                # 下载中
 │   └── failed/                           # 转码失败留档（不参与轮询重试）
@@ -140,7 +140,7 @@ transcriber:
     enabled: false                # whisper-local 子配置开关，不参与工厂选择（工厂只看 name）
 ```
 
-**加载顺序**：① `$SONISCOPE_HOME/config.yaml` → ② `~/SoniScope/config.yaml`（未设置 `SONISCOPE_HOME` 时的兜底默认）。本项目实际 `SONISCOPE_HOME=/Volumes/Data/software/SoniScope`，因此实际配置文件为 `/Volumes/Data/software/SoniScope/config.yaml`；找不到时报错并提示用户参考 PRD US-001 (H)。
+**加载顺序**：① 当前进程环境变量 `SONISCOPE_HOME` → ② 仓库根目录 `.env` 中的 `SONISCOPE_HOME`。配置文件固定读取 `$SONISCOPE_HOME/config.yaml`；未设置 `SONISCOPE_HOME` 时报错并提示用户参考 PRD US-001 (H)。不再兜底到任何固定目录。
 
 用 Pydantic v2 定义 `SoniScopeConfig` 模型。敏感字段（`access_key_secret` / `appkey` / `api_key`）在 `__repr__` / 日志中只显示前后 4 位。缺失必填字段时一次性列出所有缺失项。
 
@@ -535,7 +535,7 @@ class TranscriptResult:
   | `mock-verify-fail` | `/verify-upload` 永远返回 `verified: false` | US-013 verify 失败 → 待人工 verify |
 
 - **OSS 直传**：必须使用 STS 临时凭证 + V4 签名直传，不走 FC 中转
-- **Worker 运行环境**：当前验证主机为 Mac Studio M4 Max（macOS 26.5，Python 3.13.2，`SONISCOPE_HOME=/Volumes/Data/software/SoniScope`，可用磁盘 2.38TB）；代码仍要求 Python 3.11+，无 GPU 要求（本期不做本地推理）；`$SONISCOPE_HOME` 所在磁盘可用空间 ≥ 50GB（音频积压 + 转写文件长期保留预留）；系统工具依赖 `git` / `make` / `curl` / `ffmpeg` / `ffprobe`
+- **Worker 运行环境**：当前验证主机为 Mac Studio M4 Max（macOS 26.5，Python 3.13.2）；代码要求 Python 3.11+，无 GPU 要求（本期不做本地推理）；`SONISCOPE_HOME` 必须由环境变量或仓库根 `.env` 显式提供，且所在磁盘可用空间 ≥ 50GB（音频积压 + 转写文件长期保留预留）；系统工具依赖 `git` / `make` / `curl` / `ffmpeg` / `ffprobe`
 - **音频 sha256**：前端用 wasm-crypto 或类似库计算，避免主线程阻塞
 - **小程序 SDK 接口约定**：
 
@@ -608,7 +608,7 @@ class TranscriptResult:
 | `install` | — | `uv sync`，安装所有 Python 依赖 | US-002 |
 | `verify-prep` | — | 一键校验 US-001 全部人工准备产物 | US-002 |
 | `check-config` | — | 读取 config.yaml → 打印脱敏摘要 → 校验必填字段 | US-002 |
-| `init-dirs` | — | 创建 `$SONISCOPE_HOME` 下 `inbox/` / `fragments/` / `tmp/` | US-002 |
+| `init-dirs` | `SONISCOPE_HOME` 环境变量或 `.env` | 在已存在的 `$SONISCOPE_HOME` 下创建 `inbox/` / `fragments/` / `tmp/` | US-002 |
 | `worker-run` | — | 启动 Worker 主轮询 | US-002 |
 | `typecheck` | — | mypy strict | US-002 |
 | `lint` | — | ruff | US-002 |

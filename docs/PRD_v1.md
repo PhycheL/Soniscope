@@ -89,8 +89,8 @@
 | **(D) 微信小程序** | 注册小程序（AppID `wx3f973c7297728b0c`）+ 配置服务器域名白名单（两个 FC request 域名 + 北京 OSS uploadFile 域名）+ 安装开发者工具 + 获取真机 openid（runbook 已登记 2 个体验者） | — |
 | **(E) ASR** | 开通阿里云智能语音交互 NLS 项目 `soniscope`（endpoint `cn-beijing`，模型 `中文普通话（识音石 V1 - 端到端模型)`，无免费额度）+ 用测试音频完成一次真实联调基线 | — |
 | **(F) 测试音频** | 4 段标准测试音频二进制不进 git，存于 OSS `sample/` 前缀；本地通过 `python3 scripts/fetch_test_fixtures.py` 拉取到 `tests/audio/`，sha256 以 runbook 为准 | — |
-| **(G) Worker 环境** | 选定 Worker 主机（当前：Mac Studio M4 Max / macOS 26.5 / Python 3.13.2）+ 系统工具 + `SONISCOPE_HOME=/Volumes/Data/software/SoniScope` | — |
-| **(H) 凭证注入** | FC 环境变量填入 tech-spec §4.0 定义的变量 + Worker `$SONISCOPE_HOME/config.yaml`（实际路径 `/Volumes/Data/software/SoniScope/config.yaml`）按 tech-spec §2.3 schema 填入；长期密钥仅保存在 FC 环境变量 / 1Password / `$SONISCOPE_HOME`，不进 repo | tech-spec §4.0 / §2.3 |
+| **(G) Worker 环境** | 选定 Worker 主机（当前：Mac Studio M4 Max / macOS 26.5 / Python 3.13.2）+ 系统工具 + 显式设置 `SONISCOPE_HOME`（环境变量或仓库根 `.env`） | — |
+| **(H) 凭证注入** | FC 环境变量填入 tech-spec §4.0 定义的变量 + Worker `$SONISCOPE_HOME/config.yaml` 按 tech-spec §2.3 schema 填入；长期密钥仅保存在 FC 环境变量 / 1Password / `$SONISCOPE_HOME`，不进 repo | tech-spec §4.0 / §2.3 |
 | **(I) 文档登记** | `docs/runbook/cloud-setup.md` 包含全部非敏感资源信息（无明文 AK） | — |
 
 **完成判据**：
@@ -107,7 +107,7 @@
 - 跑 4 条 STS 反例（PutObject 越界 / ListBucket / GetObject / Expired）
 - `curl` runbook 登记的两个 FC 3.0 URL（`https://issue-cedential-ottfirocds.cn-beijing.fcapp.run`、`https://verify-upload-nnjpaoamhw.cn-beijing.fcapp.run`）返回 HTTP 2xx 健康响应；`412` / `CAExited` / 5xx / 网络错误均视为失败
 - `python3 scripts/fetch_test_fixtures.py --check` 验证 `tests/audio/` 4 个文件存在（3 wav + 1 m4a）+ sha256 与 runbook §6 匹配
-- `make check-config` 读取 `$SONISCOPE_HOME/config.yaml`（实际 `/Volumes/Data/software/SoniScope/config.yaml`）通过
+- `make check-config` 读取 `$SONISCOPE_HOME/config.yaml` 通过
 
 > ⚠️ `make verify-prep` 脚本本身由 AI 在 US-002 提供；US-001 完成时只需手工跑过反例验证 + 把信息记入 runbook 即可。
 
@@ -115,7 +115,7 @@
 
 > **AI 编程任务**：写 Python 项目骨架、配置 schema、CLI 入口、`make verify-prep` 一键校验脚本。
 >
-> **前置假设（来自 US-001）**：用户已按 US-001 H 块填好 `$SONISCOPE_HOME/config.yaml`（实际 `/Volumes/Data/software/SoniScope/config.yaml`），已按 F 块通过 `python3 scripts/fetch_test_fixtures.py` 准备好 `tests/audio/*.{wav,m4a}`。本 story 不要求用户做任何额外手工操作。
+> **前置假设（来自 US-001）**：用户已按 US-001 G 块显式设置 `SONISCOPE_HOME`，并按 H 块填好 `$SONISCOPE_HOME/config.yaml`，已按 F 块通过 `python3 scripts/fetch_test_fixtures.py` 准备好 `tests/audio/*.{wav,m4a}`。本 story 不要求用户做任何额外手工操作。
 
 **描述：** 作为开发者，我需要 AI 搭好 **monorepo 骨架**（顶层 uv workspace + `apps/worker/` Python 子项目 + 顶层 Makefile），实现 Worker 的配置 schema 与 CLI 入口，并提供 `make verify-prep` 脚本验证 US-001 准备的全部产物（OSS / RAM / FC / 测试音频 / config.yaml）真实可用。本 story **不**创建 `apps/miniprogram/` 与 `apps/fc/`（它们分别由 US-007+ 和 US-003+ 创建对应代码），但顶层 workspace 配置要为后续 member 留好位置。
 
@@ -136,7 +136,7 @@
 
 **(C) CLI 命令**
 - [ ] `make check-config` → 读取配置 → 打印脱敏摘要 → 对缺失字段报错并退出非零
-- [ ] `make init-dirs` → 在 `SONISCOPE_HOME`（本项目实际 `/Volumes/Data/software/SoniScope`；未设置时才回退到 `~/SoniScope/`）下创建 `inbox/` / `fragments/` / `tmp/`，已存在时幂等不报错
+- [ ] `make init-dirs` → 读取 `SONISCOPE_HOME`（环境变量或仓库根 `.env`），在已存在的工作目录下创建 `inbox/` / `fragments/` / `tmp/`，已存在时幂等不报错；未设置 `SONISCOPE_HOME` 时不得自动创建默认目录
 
 **(D) `make verify-prep` 一键校验 US-001 全部产物（本 story 最关键的产出）**
 - [ ] `make verify-prep` 依次执行下列检查，并输出汇总 pass/fail 报告：
@@ -146,7 +146,7 @@
   4. **(E 块)** 用 config 中的 NLS AppKey + AK，上传 `tests/audio/sample-20s.wav` → 拿到结构化转写结果 → 验证结构符合 tech-spec §3.4
   5. **(F 块)** `tests/audio/sample-{20s,54s,25min}.wav` + `sample-20s.m4a` 四个文件存在 + sha256 与 runbook 中记录的一致 + ffprobe duration 与文件名标注的时长在 ±2s 内；额外检查 `sample-20s.m4a` 的 codec=aac（m4a 容器内为 AAC，作为“非 WAV → WAV”转码 fixture）
   6. **(G 块)** Python 版本 ≥ 3.11；`SONISCOPE_HOME` 路径可写；可用磁盘 ≥ 50GB；`ffmpeg` + `ffprobe` 可用（**音频统一标准化为 WAV 的依赖**）
-  7. **(H 块)** `$SONISCOPE_HOME/config.yaml`（实际 `/Volumes/Data/software/SoniScope/config.yaml`）权限为 600；所有必填字段非空
+  7. **(H 块)** `$SONISCOPE_HOME/config.yaml` 权限为 600；所有必填字段非空
 - [ ] 单项失败时，输出中包含**修复指引**（如 "请重做 US-001 (B) 反例 3"，附 runbook 中对应章节锚点）
 - [ ] 全部通过时，最后一行打印 `✅ US-001 preparation verified. Ready for US-003+`
 - [ ] **runbook 中 sha256 校验失败**时（用户改动了 fixture）→ 明确提示并指向 US-001 (F) 块的更新步骤
@@ -481,7 +481,7 @@
 
 - [ ] 脚本启动后按 `poll.interval_seconds`（默认值见 tech-spec §2.3）周期轮询 OSS，列出 `recordings/` 前缀下所有对象
 - [ ] 对每个**本地尚未存在**或**本地存在但无 `.done`** 的对象：
-  - 下载到 `$SONISCOPE_HOME/inbox/<fragment_id>.part`（本项目实际 `/Volumes/Data/software/SoniScope/inbox/<fragment_id>.part`）
+  - 下载到 `$SONISCOPE_HOME/inbox/<fragment_id>.part`
   - 下载完成后计算 **`original_sha256`**；与 OSS 元数据比对一致性；不一致 → 删除 `.part`，下一轮重下
   - **格式检测与标准化**：按 tech-spec §5.1 / §3.5 执行格式检测 → WAV 合规直通 / 任意非 WAV 格式转码为 WAV → 原子 rename 到 `fragments/` 目录；转码失败 → 留档到 `inbox/failed/`（不参与自动重试，需人工介入）
   - **读取 OSS 用户自定义元数据**：通过 OSS API 获取前端上传时附带的元数据，写入 manifest 对应字段（tech-spec §3.2 / ADR-8）
@@ -639,7 +639,7 @@
 **[正常路径 · 100 条录音落盘完整性]**
 
 - [ ] `make list-oss-objects DATE=<YYYY-MM-DD>` → 列出**完整的 100 个 `.wav` 对象**（脚本化输出 + 计数 = 100），文件名与前端 `fragment_id` 一一对应；用户**无需打开 OSS 控制台**
-- [ ] `make verify-e2e-integrity` → 本地 `$SONISCOPE_HOME/fragments/`（本项目实际 `/Volumes/Data/software/SoniScope/fragments/`）下出现**完整的 100 个 Fragment 目录**，每个目录都同时包含 5 个产物文件（清单见 tech-spec §2.2）
+- [ ] `make verify-e2e-integrity` → 本地 `$SONISCOPE_HOME/fragments/` 下出现**完整的 100 个 Fragment 目录**，每个目录都同时包含 5 个产物文件（清单见 tech-spec §2.2）
 - [ ] `make verify-e2e-sha256` → 每条 Fragment 的 sha256 完整性按 tech-spec §3.3 一致性规则校验通过（OSS 侧 + 本地侧）
 - [ ] `make verify-e2e-fields` → 每条 Fragment 的 `manifest.upload.verified_at` 非空、`manifest.transcription.completed_at` 非空
 
@@ -707,7 +707,7 @@
 - **FR-10**：Worker**必须**按 `config.yaml` 中可配置的 `poll.interval_seconds`（默认值见 tech-spec §2.3）周期轮询 OSS（US-015）。
 - **FR-11**：Worker**绝不**调用 OSS `DeleteObject`，OSS 文件永久保留（US-015 + §4 最终验收 AC）。
 - **FR-12**：本地文件操作**必须**走"先临时 → 原子 rename → 写 `.done`"写入协议（tech-spec §3.5 / US-016）。
-- **FR-13**：脚本启动时**必须**扫描 `$SONISCOPE_HOME/fragments/`（本项目实际 `/Volumes/Data/software/SoniScope/fragments/`），对每个目录按状态机决定是跳过 / 重转 / 重下 / 新办（US-016）。
+- **FR-13**：脚本启动时**必须**扫描 `$SONISCOPE_HOME/fragments/`，对每个目录按状态机决定是跳过 / 重转 / 重下 / 新办（US-016）。
 - **FR-14**：转写**必须**通过抽象接口调用（tech-spec §5.3）；本期默认实现云端转写（调用云端语音转文字 API），且预留本地转写占位骨架；**本期不部署本地推理模型**（US-017）。
 - **FR-15**：转写幂等性**必须**基于 `.done` 标记文件判断——`.done` 存在即跳过，不因模型 / 参数版本变更自动重转；四元组 `(audio_sha256, transcriber, model, params_version)` 仅记录于 manifest 供溯源和 CLI 筛选（US-018）。
 - **FR-16**：每个 Fragment 目录最终**必须**同时存在 `audio.wav` / `manifest.json` / `transcript.json` / `transcript.txt` / `.done` 五个文件（US-019）。

@@ -493,8 +493,8 @@
         <tr><th>② 微信小程序</th><td>AppID、AppSecret、服务器域名白名单、体验者真机 openid</td></tr>
         <tr><th>③ 云端语音转文字 API</th><td>默认阿里云 NLS 录音文件极速版；AppKey + 调用凭证</td></tr>
         <tr><th>④ 测试音频素材</th><td>4 段标准音频（3 wav + 1 m4a），存于 OSS 私有 bucket，本地 <code class="inline">tests/audio/</code> 经脚本拉取，记录 sha256</td></tr>
-        <tr><th>⑤ Worker 运行环境</th><td>任意可跑 Python 3.11+ 的主机；<code class="inline">$SONISCOPE_HOME</code> 工作目录（默认 <code class="inline">~/SoniScope/</code>）</td></tr>
-        <tr><th>⑥ 凭证注入</th><td>FC 环境变量（10 项，含可选上传上限）+ Worker <code class="inline">~/SoniScope/config.yaml</code>（chmod 600）</td></tr>
+        <tr><th>⑤ Worker 运行环境</th><td>任意可跑 Python 3.11+ 的主机；显式设置 <code class="inline">$SONISCOPE_HOME</code> 工作目录（环境变量或仓库根 <code class="inline">.env</code>）</td></tr>
+        <tr><th>⑥ 凭证注入</th><td>FC 环境变量（10 项，含可选上传上限）+ Worker <code class="inline">$SONISCOPE_HOME/config.yaml</code>（chmod 600）</td></tr>
       </table>
 
       <div class="redlines" style="margin-top: 18px;">
@@ -504,7 +504,7 @@
           <li>Worker 任何路径 <b>绝不</b> 调用 OSS <code class="inline">DeleteObject</code>。</li>
           <li>STS 凭证必须 <b>精确到单个 object key</b>，不带通配符；有效期 ≤ 15 分钟。</li>
           <li>FC 接口必须有 <b>openid allowlist</b> 校验，不接受匿名调用。</li>
-          <li>明文 AK / Secret 不进 git；FC 走环境变量，Worker 走 <code class="inline">~/SoniScope/config.yaml</code>（chmod 600）。</li>
+          <li>明文 AK / Secret 不进 git；FC 走环境变量，Worker 走 <code class="inline">$SONISCOPE_HOME/config.yaml</code>（chmod 600）。</li>
         </ol>
       </div>
 
@@ -894,7 +894,7 @@ curl -i https://verify-upload-yyyyyyyy.cn-beijing.fcapp.run/
 <pre>shasum -a 256 &lt;本地音频文件&gt;
 <span class="cmt"># 写入 manifest 的 sha256 字段 + runbook §6 表格</span></pre>
         </li>
-        <li>本地拉取并校验（任意机器，需 <code class="inline">~/SoniScope/config.yaml</code> 中的只读 OSS 凭证）：
+        <li>本地拉取并校验（任意机器，需 <code class="inline">$SONISCOPE_HOME/config.yaml</code> 中的只读 OSS 凭证）：
 <pre>python3 scripts/fetch_test_fixtures.py         <span class="cmt"># 从 OSS 下载到 tests/audio/</span>
 python3 scripts/fetch_test_fixtures.py --check <span class="cmt"># 只按 sha256 校验，不下载</span></pre>
         </li>
@@ -929,7 +929,7 @@ ffprobe -v error -show_entries stream=codec_name \
     <!-- ============== G ============== -->
     <section class="block" id="block-g">
       <h2><span class="chip">G</span>Worker 运行环境（与 macOS 解耦）<span class="state" id="state-block-g"></span></h2>
-      <p class="lead">目标：一台能跑 Python 3.11+ 的主机，工作目录 <code class="inline">$SONISCOPE_HOME</code>（默认 <code class="inline">~/SoniScope/</code>）有 ≥ 50GB 空间。</p>
+      <p class="lead">目标：一台能跑 Python 3.11+ 的主机，显式设置工作目录 <code class="inline">$SONISCOPE_HOME</code>，且该目录所在磁盘有 ≥ 50GB 空间。</p>
 
       <h3 class="step-title">操作步骤</h3>
       <ol class="steps">
@@ -945,12 +945,16 @@ ffprobe -v error -show_entries stream=codec_name \
 <span class="cmt">#   macOS: brew install git make curl ffmpeg</span>
 <span class="cmt">#   Ubuntu: sudo apt install -y git make curl ffmpeg</span></pre>
         </li>
-        <li>检查工作目录磁盘空间：
-<pre>df -h ~
+      <li>设置并检查工作目录磁盘空间：
+<pre>export SONISCOPE_HOME=/path/to/SoniScope
+<span class="cmt"># 或写入仓库根 .env：SONISCOPE_HOME=/path/to/SoniScope</span>
+
+test -n "$SONISCOPE_HOME"
+mkdir -p "$SONISCOPE_HOME"
+df -h "$SONISCOPE_HOME"
 <span class="cmt"># 期望：Avail ≥ 50GB</span>
 
-mkdir -p ~/SoniScope
-ls -la ~/SoniScope
+ls -la "$SONISCOPE_HOME"
 <span class="cmt"># 期望：目录创建成功，可写</span></pre>
         </li>
         <li>克隆代码仓库（如还没在该主机上）：
@@ -962,7 +966,7 @@ cd my_soniscope</pre>
 
       <div class="callout info">
         <span class="title">关于 $SONISCOPE_HOME</span>
-        AGENTS.md 明确：<b>运行时数据目录与代码仓库严格分离</b>。代码在 <code class="inline">my_soniscope/</code>，运行时数据（config.yaml / inbox / fragments / tmp）在 <code class="inline">$SONISCOPE_HOME</code>。可通过环境变量切换。默认值 <code class="inline">~/SoniScope/</code>。运行时数据<b>绝不</b> 进 git。
+        AGENTS.md 明确：<b>运行时数据目录与代码仓库严格分离</b>。代码在 <code class="inline">my_soniscope/</code>，运行时数据（config.yaml / inbox / fragments / tmp）在 <code class="inline">$SONISCOPE_HOME</code>。必须通过环境变量或仓库根 <code class="inline">.env</code> 显式设置。运行时数据<b>绝不</b> 进 git。
       </div>
 
       <h3 class="step-title">验收清单</h3>
@@ -970,8 +974,8 @@ cd my_soniscope</pre>
         <li><input type="checkbox" id="g1"><label for="g1">已记录 Worker 主机标识（hostname / IP / OS 版本）到 runbook。</label></li>
         <li><input type="checkbox" id="g2"><label for="g2"><code class="inline">python3 --version</code> 输出 3.11+。</label></li>
         <li><input type="checkbox" id="g3"><label for="g3"><code class="inline">which git make curl ffmpeg ffprobe</code> 五条都能找到。</label></li>
-        <li><input type="checkbox" id="g4"><label for="g4"><code class="inline">df -h ~</code> 显示 ≥ 50GB 可用空间。</label></li>
-        <li><input type="checkbox" id="g5"><label for="g5"><code class="inline">mkdir -p ~/SoniScope</code> 不报错。</label></li>
+        <li><input type="checkbox" id="g4"><label for="g4"><code class="inline">df -h "$SONISCOPE_HOME"</code> 显示 ≥ 50GB 可用空间。</label></li>
+        <li><input type="checkbox" id="g5"><label for="g5"><code class="inline">mkdir -p "$SONISCOPE_HOME"</code> 不报错。</label></li>
         <li><input type="checkbox" id="g6"><label for="g6">能 <code class="inline">git clone</code> 本项目到该主机。</label></li>
       </ul>
     </section>
@@ -1013,7 +1017,7 @@ cd my_soniscope</pre>
 }</pre>
       <p style="font-size: 13.5px; color: var(--muted);">这份 JSON 只作为录入模板；实际文件和 runbook 中不要保存明文 Secret。填好后分别同步到 <code class="inline">issue-credential</code> 与 <code class="inline">verify-upload</code> 两个函数。</p>
 
-      <h3 class="step-title">H-2 Worker <code class="inline">~/SoniScope/config.yaml</code></h3>
+      <h3 class="step-title">H-2 Worker <code class="inline">$SONISCOPE_HOME/config.yaml</code></h3>
       <p style="font-size: 13.5px;">在 G 块选定的 Worker 主机上创建配置文件，注入 OSS 读凭证 + ASR 凭证：</p>
 <pre>oss:
   endpoint: oss-cn-beijing.aliyuncs.com
@@ -1038,18 +1042,18 @@ transcriber:
 
       <p style="font-size: 13.5px;">保存后立即调整权限并验证：</p>
 <pre><span class="cmt"># 仅自己可读，防止其他用户偷看明文 AK</span>
-chmod 600 ~/SoniScope/config.yaml
+chmod 600 "$SONISCOPE_HOME/config.yaml"
 
 <span class="cmt"># 验证</span>
-ls -la ~/SoniScope/config.yaml
+ls -la "$SONISCOPE_HOME/config.yaml"
 <span class="cmt"># 期望：-rw------- 1 you staff ... config.yaml</span>
 
-grep -c '^[a-z]' ~/SoniScope/config.yaml
+grep -c '^[a-z]' "$SONISCOPE_HOME/config.yaml"
 <span class="cmt"># 期望：≥ 8（粗略统计已填字段数）</span></pre>
 
       <div class="callout danger">
         <span class="title">✗ 红线提醒</span>
-        ① <code class="inline">~/SoniScope/config.yaml</code> 必须在 <code class="inline">.gitignore</code> 覆盖范围内（运行时目录默认与代码仓库分离，且 <code class="inline">SONISCOPE_HOME</code> 默认值在 <code class="inline">~/SoniScope/</code>，不在 repo 里）。<br>
+        ① <code class="inline">$SONISCOPE_HOME/config.yaml</code> 必须位于代码仓库之外；<code class="inline">SONISCOPE_HOME</code> 可以通过当前 shell 或仓库根 <code class="inline">.env</code> 提供，但运行时目录本身不得进 git。<br>
         ② FC 环境变量值在控制台是脱敏显示，但 FC 函数代码访问 <code class="inline">os.environ['ALIYUN_AK_SECRET']</code> 可拿到明文，<b>禁止</b> 在日志中打印完整 Secret，必须遵守"前后 4 位"约定。
       </div>
 
@@ -1057,8 +1061,8 @@ grep -c '^[a-z]' ~/SoniScope/config.yaml
       <ul class="checklist" data-block="block-h">
         <li><input type="checkbox" id="h1"><label for="h1">FC 控制台 → <code class="inline">issue-credential</code> → 配置 → 环境变量：能看到 10 个键都已填值（脱敏显示）。</label></li>
         <li><input type="checkbox" id="h2"><label for="h2"><code class="inline">verify-upload</code> 函数 <b>独立</b>配置了同样 10 个环境变量（FC 3.0 无服务级共享，两份必须各自填全）。</label></li>
-        <li><input type="checkbox" id="h3"><label for="h3">Worker 主机：<code class="inline">~/SoniScope/config.yaml</code> 存在，且 <code class="inline">grep -c '^[a-z]' </code> ≥ 8。</label></li>
-        <li><input type="checkbox" id="h4"><label for="h4"><code class="inline">ls -la ~/SoniScope/config.yaml</code> 权限为 <code class="inline">-rw-------</code>（chmod 600）。</label></li>
+        <li><input type="checkbox" id="h3"><label for="h3">Worker 主机：<code class="inline">$SONISCOPE_HOME/config.yaml</code> 存在，且 <code class="inline">grep -c '^[a-z]' </code> ≥ 8。</label></li>
+        <li><input type="checkbox" id="h4"><label for="h4"><code class="inline">ls -la "$SONISCOPE_HOME/config.yaml"</code> 权限为 <code class="inline">-rw-------</code>（chmod 600）。</label></li>
         <li><input type="checkbox" id="h5"><label for="h5"><b>回头确认（US-002 完成后）</b>：跑 <code class="inline">make check-config</code> 输出"所有必填字段已就绪"。</label></li>
       </ul>
     </section>
@@ -1077,7 +1081,7 @@ grep -c '^[a-z]' ~/SoniScope/config.yaml
         <li><b>## 云端 ASR 服务</b>：服务商名 / 项目名 / AppKey / API endpoint / 免费额度信息 / 月度成本估算 / 联调基线 JSON 片段</li>
         <li><b>## 测试音频素材</b>：4 个 fixture 文件的相对路径 + sha256 + duration</li>
         <li><b>## Worker 运行环境</b>：主机标识 / Python 版本 / 工作目录路径 / 可用磁盘空间</li>
-        <li><b>## 凭证管理约定</b>：明文 AK 一律不进仓库；FC 端在环境变量、Worker 端在 <code class="inline">~/SoniScope/config.yaml</code>（chmod 600，已被 .gitignore 覆盖）</li>
+        <li><b>## 凭证管理约定</b>：明文 AK 一律不进仓库；FC 端在环境变量、Worker 端在 <code class="inline">$SONISCOPE_HOME/config.yaml</code>（chmod 600，运行时目录不进 git）</li>
       </ol>
 
       <h3 class="step-title">敏感信息检查</h3>
@@ -1123,7 +1127,7 @@ make verify-prep
 <span class="cmt">#   4 条 STS 反例（PutObject 越界 / ListBucket / GetObject / Expired）</span>
 <span class="cmt">#   curl 两个 FC URL 返回 200</span>
 <span class="cmt">#   python3 scripts/fetch_test_fixtures.py --check  4 个 fixture 校验通过</span>
-<span class="cmt">#   make check-config 读取 ~/SoniScope/config.yaml 通过</span>
+<span class="cmt">#   make check-config 读取 $SONISCOPE_HOME/config.yaml 通过</span>
 
 <span class="cmt"># 输出：pass/fail 汇总报告</span></pre>
 

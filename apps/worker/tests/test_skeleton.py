@@ -3,12 +3,14 @@
 import os
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from soniscope_worker import __version__
 from soniscope_worker.cli import app
 from soniscope_worker.config import config_path
 from soniscope_worker.paths import (
+    RuntimeHomeError,
     fragments_dir,
     inbox_dir,
     soniscope_home,
@@ -47,6 +49,16 @@ def test_home_from_env(monkeypatch: object) -> None:
         del os.environ["SONISCOPE_HOME"]
 
 
-def test_home_default_fallback() -> None:
-    os.environ.pop("SONISCOPE_HOME", None)
-    assert soniscope_home() == Path.home() / "SoniScope"
+def test_home_from_dotenv(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("SONISCOPE_HOME", raising=False)
+    monkeypatch.chdir(tmp_path)
+    home = tmp_path / "runtime"
+    (tmp_path / ".env").write_text(f"SONISCOPE_HOME={home}\n", encoding="utf-8")
+    assert soniscope_home() == home
+
+
+def test_home_requires_soniscope_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("SONISCOPE_HOME", raising=False)
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(RuntimeHomeError, match="未设置 SONISCOPE_HOME"):
+        soniscope_home()

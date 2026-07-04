@@ -431,8 +431,8 @@
 
 
 
--  工作目录环境变量：`SONISCOPE_HOME=/Volumes/Data/software/SoniScope`
--  工作目录可用磁盘空间：`2.38TB`
+-  工作目录环境变量：由部署环境通过 `SONISCOPE_HOME` 提供（可 `export` 或写入仓库根 `.env`；本文件不登记固定路径）
+-  工作目录可用磁盘空间：以部署环境 `df -h "$SONISCOPE_HOME"` 为准，要求 ≥ 50GB
 -  仓库 clone 路径：`/Users/bemied/ProjectCode/my_soniscope`
 
 ---
@@ -443,9 +443,9 @@
 
 1. **明文 AK / Secret / Token / AppSecret 不进 git 仓库**——本文件、所有源码、所有配置模板都不允许出现明文值。
 2. **FC 端**：所有凭证走 FC **环境变量**注入。环境变量在控制台填入并脱敏显示；FC 函数代码通过 `os.environ[...]` 读取，**禁止**完整打印到日志（前后 4 位约定，AGENTS.md §"配置与敏感信息"）。
-3. **Worker 端**：所有凭证写在 `$SONISCOPE_HOME/config.yaml`（默认 `~/SoniScope/config.yaml`）。该文件：
+3. **Worker 端**：所有凭证写在 `$SONISCOPE_HOME/config.yaml`。该文件：
    - 权限 `chmod 600`（仅当前用户可读）
-   - 路径默认在 `$SONISCOPE_HOME` 下，与代码仓库严格分离，**绝不在 repo 内**
+   - 路径固定在 `$SONISCOPE_HOME` 下，与代码仓库严格分离，**绝不在 repo 内**
    - 即使路径在 repo 内，也已被 `.gitignore` 覆盖
 4. **小程序端**：源代码内**绝不**包含任何长期 AccessKey 或业务密钥；上传 OSS 用 FC 签发的 STS 临时凭证（精确到单 object key）。
 5. **OSS 端**：Worker **绝不**调用 `DeleteObject`——OSS 文件永不删除（数据零丢失承诺）。

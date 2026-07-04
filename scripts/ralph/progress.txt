@@ -5,7 +5,7 @@
 - 顶层 Makefile 是唯一命令入口；所有命令用 `uv run ...` 执行，用户无需 cd 子目录。target 命名遵循 tech-spec §6.5。
 - 质量门：`make typecheck`（mypy strict）、`make lint`（ruff，只查 apps/）、`make test`（pytest，testpaths=apps/worker/tests）。
 - mypy/ruff/pytest 配置集中在根 pyproject.toml；mypy 用 files=apps/worker/{src,tests} + mypy_path + explicit_package_bases 适配 src 布局。
-- 运行时数据目录与 repo 分离：$SONISCOPE_HOME（默认 ~/SoniScope），由 paths.py 解析；config.yaml、运行时目录、测试音频二进制均 gitignore，不进 git。
+- 运行时数据目录与 repo 分离：$SONISCOPE_HOME 由环境变量或仓库根 .env 显式提供，由 paths.py 解析；config.yaml、运行时目录、测试音频二进制均 gitignore，不进 git。
 - 不要“修正”真实云资源里的拼写，尤其 issue-cedential-ottfirocds（少一个 r）。
 - 遗留 scripts/test_asr.py 暂不纳入 lint（ruff 只查 apps/），由其归属 story 收口。
 - scripts/ 下脚本「收口」模式（US-003 fetch_test_fixtures.py）：可测逻辑抽进 Worker 包（如 soniscope_worker/fixtures.py，自动被 mypy strict + ruff + pytest 覆盖），scripts/ 脚本作薄 CLU/IO 壳（OSS 下载等）复用之；脚本顶部 `sys.path.insert(0, REPO_ROOT/"apps/worker/src")` 后再 `from soniscope_worker... import`（带 `# noqa: E402`），使裸 `python3 scripts/xxx.py`（未装包）也能导入。

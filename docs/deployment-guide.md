@@ -43,7 +43,7 @@
 | 主机 | Mac Studio M4 Max（参考基线；代码要求 Python 3.11+，无 GPU 要求） |
 | OS | macOS 26.5 |
 | Python | 3.13.2（代码要求 `>=3.11`） |
-| 磁盘 | `$SONISCOPE_HOME` 所在盘可用 ≥ 50GB（本机 2.38TB） |
+| 磁盘 | `$SONISCOPE_HOME` 所在盘可用 ≥ 50GB |
 | 系统工具 | `git` / `make` / `curl` / `ffmpeg` / `ffprobe`（缺失则 Worker 启动失败并提示） |
 | 包管理 | `uv`（管理 Python workspace） |
 
@@ -58,13 +58,19 @@ python3 --version   # 需 ≥ 3.11
 
 ### 1.2 运行时目录与环境变量
 
-Worker 运行时数据与代码仓库**严格分离**，由 `$SONISCOPE_HOME` 指定。本项目实际值：
+Worker 运行时数据与代码仓库**严格分离**，由 `SONISCOPE_HOME` 指定。可在当前 shell 中导出：
 
 ```bash
-export SONISCOPE_HOME=/Volumes/Data/software/SoniScope
+export SONISCOPE_HOME=/path/to/SoniScope
 ```
 
-> 建议写入 shell 配置（`~/.zshrc`）持久化。未设置时兜底默认 `~/SoniScope`。目录结构（`inbox/` / `fragments/` / `tmp/` / `config.yaml`）见 tech-spec §2.2，由 `make init-dirs` 自动创建。
+也可以写入仓库根目录本地 `.env`（已被 `.gitignore` 忽略）：
+
+```bash
+SONISCOPE_HOME=/path/to/SoniScope
+```
+
+> `SONISCOPE_HOME` 必须显式存在；脚本不会兜底到固定目录。目录结构（`inbox/` / `fragments/` / `tmp/` / `config.yaml`）见 tech-spec §2.2；`make init-dirs` 只创建已存在工作目录下的子目录。
 
 ### 1.3 拉取代码
 
@@ -150,13 +156,16 @@ make verify-prep    # 一键校验 OSS / RAM / STS / FC / NLS / fixture / 环境
 
 ### 4.1 部署期凭证（本地 `.env`）
 
-FC 部署脚本会自动读取仓库根目录 `.env` 中的部署凭证（`fc_deploy.py`）。如果当前 shell 已显式导出同名变量，shell 中的值优先，`.env` 不会覆盖它。在仓库根目录创建 `.env`（已被 `.gitignore` 覆盖）：
+FC 部署脚本会自动读取仓库根目录 `.env` 中的部署凭证（`fc_deploy.py`）。Worker 相关命令也会从同一个 `.env` 读取 `SONISCOPE_HOME`。如果当前 shell 已显式导出同名变量，shell 中的值优先，`.env` 不会覆盖它。在仓库根目录创建 `.env`（已被 `.gitignore` 覆盖）：
 
 ```bash
 # .env（绝不进 git）
+SONISCOPE_HOME=/path/to/SoniScope
 ALIYUN_DEPLOY_AK_ID=<soniscope-fc-deploy 的 AK ID>
 ALIYUN_DEPLOY_AK_SECRET=<soniscope-fc-deploy 的 AK Secret>
 ```
+
+> Worker 的 OSS / ASR 明文 AK 仍只放 `$SONISCOPE_HOME/config.yaml`，不要放进仓库 `.env`。
 
 > 缺失时 `make deploy-fc` 报错：`缺少部署凭证 ALIYUN_DEPLOY_AK_ID/ALIYUN_DEPLOY_AK_SECRET（tech-spec §6.4）`。
 
@@ -246,7 +255,7 @@ make fc-logs FUNCTION=verify-upload         # 拉取近 1 小时 FC 日志（SLS
 
 ```bash
 make install     # uv sync
-make init-dirs   # 在 $SONISCOPE_HOME 下幂等创建 inbox/ inbox/failed/ fragments/ tmp/
+make init-dirs   # 读取 SONISCOPE_HOME，在已存在工作目录下创建 inbox/ inbox/failed/ fragments/ tmp/
 ```
 
 ### 5.2 生成并填写运行时配置 config.yaml
@@ -254,7 +263,7 @@ make init-dirs   # 在 $SONISCOPE_HOME 下幂等创建 inbox/ inbox/failed/ frag
 用脚本从 runbook 自动抽取非敏感值生成模板，敏感字段留占位符手工填：
 
 ```bash
-scripts/gen_worker_config.sh          # 读 runbook 生成到 $SONISCOPE_HOME/config.yaml（已存在则拒绝覆盖）
+scripts/gen_worker_config.sh          # 读取 SONISCOPE_HOME，生成 $SONISCOPE_HOME/config.yaml（已存在则拒绝覆盖）
 scripts/gen_worker_config.sh --force  # 强制重新生成（会清掉已填凭证）
 ```
 

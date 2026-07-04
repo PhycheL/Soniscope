@@ -13,7 +13,7 @@ from soniscope_worker.config import (
     config_permission_is_600,
     load_config,
 )
-from soniscope_worker.paths import init_runtime_dirs
+from soniscope_worker.paths import RuntimeHomeError, init_runtime_dirs
 
 app = typer.Typer(
     add_completion=False,
@@ -38,10 +38,10 @@ def version() -> None:
 @app.command(name="check-config")
 def check_config() -> None:
     """读取 config.yaml → 校验必填字段 → 打印脱敏摘要 → 检查权限是否为 600。"""
-    path = config_path()
     try:
+        path = config_path()
         cfg = load_config(path)
-    except ConfigError as exc:
+    except (ConfigError, RuntimeHomeError) as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=1) from exc
 
@@ -60,7 +60,13 @@ def check_config() -> None:
 @app.command(name="init-dirs")
 def init_dirs() -> None:
     """在 $SONISCOPE_HOME 下幂等创建 inbox/ inbox/failed/ fragments/ tmp/。"""
-    for d in init_runtime_dirs():
+    try:
+        dirs = init_runtime_dirs()
+    except RuntimeHomeError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+
+    for d in dirs:
         typer.echo(f"ok  {d}")
 
 
