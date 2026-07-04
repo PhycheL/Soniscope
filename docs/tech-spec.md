@@ -577,7 +577,7 @@ class TranscriptResult:
 
 **FC 形态**：本项目使用 FC 3.0 顶级 Web 函数，**不创建 / 不依赖 `soniscope-svc` service 层级**。实际云端函数名为 `issue-credential`、`verify-upload`，分别有独立的 `*.cn-beijing.fcapp.run` 公网 URL。
 
-**打包**：`make deploy-fc` 脚本为每个 FC 函数独立打包（`handler.py` + 依赖）→ 上传至阿里云 FC 3.0 对应顶级函数。打包产物落 `build/fc/<function_name>/`。
+**打包**：`make deploy-fc` 脚本为每个 FC 函数独立打包（Custom Runtime 入口 `app.py` + 函数 `handler.py` + `fc_shared` + 依赖）→ 上传至阿里云 FC 3.0 对应顶级函数。打包产物落 `build/fc/<function_name>/`。
 
 **备份**：部署前自动备份当前线上版本到 `build/fc/backup/<YYYYMMDD-HHMMSS>/<function_name>.zip`，含函数代码 + 环境变量快照（仅变量名，不含值）。
 

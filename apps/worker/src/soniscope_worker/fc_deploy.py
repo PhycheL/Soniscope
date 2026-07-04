@@ -48,6 +48,7 @@ EXCLUDE_SUFFIXES = (".pyc", ".pyo")
 # FC 共享模块（US-006）：随每个函数代码一起 vendoring 到包根，使两函数都能 import fc_shared。
 SHARED_PARENT = ("apps", "fc", "shared")  # 含 fc_shared 包
 SHARED_PACKAGE = "fc_shared"
+CUSTOM_RUNTIME_ENTRYPOINT = "app.py"
 DEPLOY_ENV_KEYS = ("ALIYUN_DEPLOY_AK_ID", "ALIYUN_DEPLOY_AK_SECRET")
 _SECRET_ENV_NAMES = (
     *DEPLOY_ENV_KEYS,
@@ -203,6 +204,14 @@ def _vendor_shared(repo_root: Path, staging: Path) -> None:
         _copy_tree(shared_pkg, staging / SHARED_PACKAGE)
 
 
+def _copy_custom_runtime_entrypoint(repo_root: Path, staging: Path) -> None:
+    """Copy the FC Custom Runtime app.py expected by the cloud start command."""
+    app_py = repo_root.joinpath(*SHARED_PARENT) / CUSTOM_RUNTIME_ENTRYPOINT
+    if not app_py.is_file():
+        raise FcDeployError(f"FC Custom Runtime 入口文件不存在：{app_py}")
+    shutil.copy2(app_py, staging / CUSTOM_RUNTIME_ENTRYPOINT)
+
+
 def package_function(repo_root: Path, function: str, build_root: Path, api: FcApi) -> PackageResult:
     """打包单个函数代码及运行依赖到 ``build/fc/<function_name>/`` 与同名 zip。"""
     name = source_dir_name(function)
@@ -215,6 +224,7 @@ def package_function(repo_root: Path, function: str, build_root: Path, api: FcAp
     staging.mkdir(parents=True)
     _copy_tree(src, staging)
     _vendor_shared(repo_root, staging)
+    _copy_custom_runtime_entrypoint(repo_root, staging)
     reqs = read_requirements(src / "requirements.txt")
     if reqs:
         api.install_deps(staging, reqs)
@@ -238,10 +248,10 @@ def find_latest_backup(build_root: Path, function: str) -> Path | None:
 
 
 def curl_ok(curl: CurlResult) -> bool:
-    """存活验证通过：可达且响应不是 5xx。"""
+    """存活验证通过：可达且 HTTP 状态为 2xx。"""
     if not curl.reachable:
         return False
-    return curl.status is None or not (500 <= curl.status < 600)
+    return curl.status is not None and 200 <= curl.status < 300
 
 
 def format_deploy_log(records: Sequence[DeployRecord], timestamp: str, action: str) -> list[str]:

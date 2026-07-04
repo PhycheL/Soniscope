@@ -94,6 +94,9 @@ class FakeFcApi:
 def _make_repo(tmp_path: Path, *, requirements: dict[str, str] | None = None) -> Path:
     """构造含 apps/fc/<dir>/handler.py 的临时仓库根。"""
     reqs = requirements or {}
+    shared = tmp_path / "apps" / "fc" / "shared"
+    shared.mkdir(parents=True)
+    (shared / "app.py").write_text("# custom runtime app\n", encoding="utf-8")
     for fn in FUNCTIONS:
         d = tmp_path / "apps" / "fc" / source_dir_name(fn)
         d.mkdir(parents=True)
@@ -205,8 +208,10 @@ def test_zip_dir_deterministic(tmp_path: Path) -> None:
 
 def test_curl_ok() -> None:
     assert curl_ok(CurlResult("u", True, 200))
-    assert curl_ok(CurlResult("u", True, None))
-    assert curl_ok(CurlResult("u", True, 404))  # 非 5xx 即存活
+    assert curl_ok(CurlResult("u", True, 204))
+    assert not curl_ok(CurlResult("u", True, None))
+    assert not curl_ok(CurlResult("u", True, 404))
+    assert not curl_ok(CurlResult("u", True, 412))
     assert not curl_ok(CurlResult("u", True, 503))
     assert not curl_ok(CurlResult("u", False, None, "timeout"))
 
@@ -221,8 +226,11 @@ def test_package_function_creates_staging_and_zip(tmp_path: Path) -> None:
     pkg = package_function(repo, "issue-credential", build, api)
     assert pkg.staging_dir == build / "issue_credential"
     assert (pkg.staging_dir / "handler.py").is_file()
+    assert (pkg.staging_dir / "app.py").is_file()
     assert pkg.zip_path == build / "issue_credential.zip"
     assert pkg.zip_path.is_file()
+    with zipfile.ZipFile(pkg.zip_path) as zf:
+        assert "app.py" in zf.namelist()
     assert len(pkg.sha256) == 64
     assert pkg.size_bytes > 0
     assert api.installed == []  # 无 requirements → 不装依赖
@@ -253,6 +261,13 @@ def test_package_function_missing_source(tmp_path: Path) -> None:
     build = fc_build_root(tmp_path)
     with pytest.raises(FcDeployError, match="源码目录不存在"):
         package_function(tmp_path, "issue-credential", build, FakeFcApi())
+
+
+def test_package_function_requires_custom_runtime_app(tmp_path: Path) -> None:
+    repo = _make_repo(tmp_path)
+    (repo / "apps" / "fc" / "shared" / "app.py").unlink()
+    with pytest.raises(FcDeployError, match="Custom Runtime 入口文件不存在"):
+        package_function(repo, "issue-credential", fc_build_root(repo), FakeFcApi())
 
 
 # ── 备份 / 路径 ─────────────────────────────────────────────────────────────

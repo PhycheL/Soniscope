@@ -457,11 +457,12 @@ make deploy-fc
 
 1. 下载线上旧代码并备份到 `build/fc/backup/<timestamp>/`
 2. 打包当前仓库的 `handler.py`
-3. 把 `apps/fc/shared/fc_shared` vendoring 到函数包根目录
-4. 安装函数运行依赖到包内
-5. 只更新 FC 代码包
-6. 不修改环境变量、触发器、运行时规格或公网 URL
-7. 对函数公网 URL 做 GET 存活验证
+3. 把 `apps/fc/shared/app.py` 复制为函数包根目录 `app.py`
+4. 把 `apps/fc/shared/fc_shared` vendoring 到函数包根目录
+5. 安装函数运行依赖到包内
+6. 只更新 FC 代码包
+7. 不修改环境变量、触发器、运行时规格或公网 URL
+8. 对函数公网 URL 做 GET 存活验证，只有 HTTP 2xx 才算通过
 
 如果输出里出现“备份跳过”，不要直接忽略。因为当前云上已有旧代码，正常情况下应该能备份旧代码。首次正式替换旧代码时，应优先确认备份成功后再继续。
 
@@ -600,6 +601,21 @@ make deploy-fc FUNCTION=issue-credential
 - `AccessDenied`：回到 RAM 给 `soniscope-fc-deploy` 补 FC 读取/更新函数权限
 - `InvalidArgument` 或 `BadRequest`：优先检查函数名是否是 `issue-credential` / `verify-upload`
 - 其他错误：保留 `request_id`，在阿里云 FC OpenAPI 调用记录或工单里定位
+
+### `curl` 返回 `python3: can't open file '/code/app.py'`
+
+原因：云端函数是 Custom Runtime 配置，启动命令为 `python3 app.py`，但旧部署包没有把 `app.py` 放到包根目录。
+
+处理：
+
+```bash
+uv run pytest apps/fc/tests apps/worker/tests/test_fc_deploy.py
+make deploy-fc
+curl https://issue-cedential-ottfirocds.cn-beijing.fcapp.run
+curl https://verify-upload-nnjpaoamhw.cn-beijing.fcapp.run
+```
+
+期望两个 `curl` 都返回 `{"function":"...","status":"ok"}`，HTTP 状态为 200。
 
 ### `issue-credential` 返回 `STS_ISSUE_FAILED`
 

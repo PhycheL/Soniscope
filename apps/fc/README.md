@@ -23,6 +23,7 @@ make fc-logs FUNCTION=verify-upload        # 拉取近 1 小时日志
 lazy import `alibabacloud-fc20230330`，仅部署脚本使用、不随函数代码打包）。
 
 - 打包产物：`build/fc/<function_name>/`（暂存目录）+ `build/fc/<function_name>.zip`
+- Custom Runtime 入口：`apps/fc/shared/app.py` 会被复制到每个函数包根目录，匹配云端启动命令 `python3 app.py`
 - 部署前备份：`build/fc/backup/<YYYYMMDD-HHMMSS>/<function_name>.zip`（仅记录环境变量名，不记录值）
 - 部署日志：`build/fc/logs/deploy-<YYYYMMDD-HHMMSS>.log`
 - 部署只更新**代码包**，不改环境变量 / 触发器 / 运行时规格 / 公网 URL
