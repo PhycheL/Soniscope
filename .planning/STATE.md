@@ -74,7 +74,7 @@ None yet.
 
 ### Blockers/Concerns
 
-- [Phase 1] Dirty-tree 决定阻塞:3 份 docs 已删除但未提交,Phase 1 第一天必须决定审 working tree 现状并记录,中途提交/回退会使行号证据失效
+- [Phase 1] Dirty-tree 阻塞已解除(2026-07-04,经 CONTEXT 讨论与 RESEARCH 双重核实):工作树干净,`docs/PRD_v1.md`、`docs/tech-spec.md`、`docs/deployment-guide.md` 的删除已随提交入库,内容迁至 `docs/v1.0.0 prd/` 与 `docs/runbook/`;基线事实以 `.planning/audit/CHARTER.md` 审计基线章节为准
 - [Roadmap] REQUIREMENTS.md 原统计"20 total"有误,实际 v1 需求为 23 条(CHARTER 5 + CONTRACT 4 + AUDIT 5 + RPT 9),已在 traceability 更新中修正
 
 ## Deferred Items
