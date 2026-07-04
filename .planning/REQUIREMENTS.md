@@ -69,13 +69,35 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (由 roadmap 填充) | | |
+| CHARTER-01 | Phase 1 | Pending |
+| CHARTER-02 | Phase 1 | Pending |
+| CHARTER-03 | Phase 1 | Pending |
+| CHARTER-04 | Phase 1 | Pending |
+| CHARTER-05 | Phase 1 | Pending |
+| CONTRACT-01 | Phase 2 | Pending |
+| CONTRACT-02 | Phase 2 | Pending |
+| CONTRACT-03 | Phase 2 | Pending |
+| CONTRACT-04 | Phase 2 | Pending |
+| AUDIT-01 | Phase 3 | Pending |
+| AUDIT-02 | Phase 3 | Pending |
+| AUDIT-03 | Phase 4 | Pending |
+| AUDIT-04 | Phase 4 | Pending |
+| AUDIT-05 | Phase 4 | Pending |
+| RPT-01 | Phase 5 | Pending |
+| RPT-02 | Phase 5 | Pending |
+| RPT-03 | Phase 5 | Pending |
+| RPT-04 | Phase 5 | Pending |
+| RPT-05 | Phase 5 | Pending |
+| RPT-06 | Phase 5 | Pending |
+| RPT-07 | Phase 5 | Pending |
+| RPT-08 | Phase 5 | Pending |
+| RPT-09 | Phase 5 | Pending |
 
 **Coverage:**
-- v1 requirements: 20 total
-- Mapped to phases: 0
-- Unmapped: 20 ⚠️
+- v1 requirements: 23 total(原统计 "20" 有误,实际计数 CHARTER 5 + CONTRACT 4 + AUDIT 5 + RPT 9 = 23,已修正)
+- Mapped to phases: 23
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-07-04*
-*Last updated: 2026-07-04 after initial definition*
+*Last updated: 2026-07-04 after roadmap creation (traceability mapped)*
