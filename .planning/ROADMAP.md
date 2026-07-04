@@ -13,7 +13,7 @@
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: 审计章程与基线** - 钉住审计 SHA,定稿严重度体系、工作量分档、发现 schema 与范围声明
+- [x] **Phase 1: 审计章程与基线** - 钉住审计 SHA,定稿严重度体系、工作量分档、发现 schema 与范围声明 (completed 2026-07-04)
 - [ ] **Phase 2: 契约抽取与漂移分析** - 三处实现的契约漂移矩阵、往返校验、分歧分类与重复逻辑普查
 - [ ] **Phase 3: 组件与工具链深潜** - 三层主体代码与部署工具链的债务/脆弱区盘点,人工核实进台账
 - [ ] **Phase 4: 文档配置与测试审计** - 以代码实态为基准审 docs/config/AGENTS.md 与双语言测试,关闭 CONCERNS.md 假设清单
@@ -34,11 +34,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. 范围与方法声明成文:五个审计维度、审计 SHA、明确排除项(FC 直转目标态对照、渗透测试深度)与零 diff 验收规则
   5. `.planning/codebase/CONCERNS.md` 全部线索已转为"未验证假设"清单,每条标注待验证维度,等待后续阶段证实/证伪
 
-**Plans**: 1/2 plans executed
+**Plans**: 2/2 plans complete
 
 Plans:
 
-- [ ] 01-01-PLAN.md — 审计章程 CHARTER.md(基线/严重度/工作量/schema/排除清单/范围方法)与 findings/ 五维度台账骨架
+- [x] 01-01-PLAN.md — 审计章程 CHARTER.md(基线/严重度/工作量/schema/排除清单/范围方法)与 findings/ 五维度台账骨架
 - [x] 01-02-PLAN.md — CONCERNS.md 线索分流:DO-NOT-FIX.md 预录入 + HYPOTHESES.md 假设清单 + STATE.md 过时阻塞清理
 
 ### Phase 2: 契约抽取与漂移分析
@@ -106,7 +106,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5(Phase 2 与 Phase 3 �
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. 审计章程与基线 | 1/2 | In Progress|  |
+| 1. 审计章程与基线 | 2/2 | Complete   | 2026-07-04 |
 | 2. 契约抽取与漂移分析 | 0/? | Not started | - |
 | 3. 组件与工具链深潜 | 0/? | Not started | - |
 | 4. 文档配置与测试审计 | 0/? | Not started | - |
