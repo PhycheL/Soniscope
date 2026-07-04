@@ -4,7 +4,7 @@
 >
 > **权威优先级**（冲突时按此顺序）：产品范围以 `docs/PRD_v1.md` 为准 → 技术实现 / schema / make target 以 `docs/tech-spec.md` 为准 → 真实云资源 / URL 以 `docs/runbook/cloud-setup.md` 为准 → 开发红线以 `AGENTS.md` 为准。本指南只提供"按什么顺序、跑哪条命令、看到什么算通过"的执行视角，不替代上述文档。
 >
-> 所有命令均在**仓库根目录**（`/Volumes/Data/ProjectCode/my_soniscope`）执行；顶层 `Makefile` 是唯一命令入口，**无需 `cd` 进子目录**。文中 `<YYYY-MM-DD>` 一律替换为实际日期。
+> 所有命令均在**仓库根目录**（`/Users/bemied/ProjectCode/my_soniscope`）执行；顶层 `Makefile` 是唯一命令入口，**无需 `cd` 进子目录**。文中 `<YYYY-MM-DD>` 一律替换为实际日期。
 
 ---
 
@@ -69,8 +69,8 @@ export SONISCOPE_HOME=/Volumes/Data/software/SoniScope
 ### 1.3 拉取代码
 
 ```bash
-git clone <repo-url> /Volumes/Data/ProjectCode/my_soniscope
-cd /Volumes/Data/ProjectCode/my_soniscope
+git clone <repo-url> /Users/bemied/ProjectCode/my_soniscope
+cd /Users/bemied/ProjectCode/my_soniscope
 ```
 
 ---
@@ -89,7 +89,7 @@ cd /Volumes/Data/ProjectCode/my_soniscope
 
 | 子账号 | 用途 | 绑定策略 |
 |---|---|---|
-| `soniscope-fc` | FC 函数 AssumeRole 签发 STS | `AliyunSTSAssumeRoleAccess`（且仅此一条） |
+| `soniscope-fc` | FC 函数运行时：`issue-credential` 签发 STS；`verify-upload` 对 OSS 对象做 HeadObject 校验 | `AliyunSTSAssumeRoleAccess` + 自定义策略 `soniscope-fc-recordings-headonly` |
 | `soniscope-local-reader` | Worker 从 OSS 下载音频（只读） | 自定义策略 `soniscope-bucket-readonly` |
 | `soniscope-asr` | 调用 NLS ASR | `AliyunNLSFullAccess` |
 
@@ -107,8 +107,9 @@ cd /Volumes/Data/ProjectCode/my_soniscope
 
 ### 2.4 自定义权限策略
 
-- `soniscope-bucket-readonly`：授予 `soniscope-local-reader` 对 `soniscope-audio` 的只读（`GetObject` / `HeadObject` / `ListObjects`）。
+- `soniscope-bucket-readonly`：授予 `soniscope-local-reader` 对 `soniscope-audio` 的只读（`oss:GetObject` / `oss:ListObjects`；HeadObject 按 `oss:GetObject` 授权）。
 - `soniscope-upload-template`：限定 `PutObject` 到 `soniscope-audio/recordings/*`。
+- `soniscope-fc-recordings-headonly`：授予 `soniscope-fc` 对 `soniscope-audio/recordings/*` 的 `oss:GetObject`，用于 `verify-upload` 的 HeadObject 校验；不授予写权限。
 
 ### 2.5 测试基线音频（可选，验证用）
 
@@ -149,18 +150,12 @@ make verify-prep    # 一键校验 OSS / RAM / STS / FC / NLS / fixture / 环境
 
 ### 4.1 部署期凭证（本地 `.env`）
 
-FC 部署脚本从环境变量读取部署凭证（`fc_deploy.py`）。在仓库根目录创建 `.env`（已被 `.gitignore` 覆盖）：
+FC 部署脚本会自动读取仓库根目录 `.env` 中的部署凭证（`fc_deploy.py`）。如果当前 shell 已显式导出同名变量，shell 中的值优先，`.env` 不会覆盖它。在仓库根目录创建 `.env`（已被 `.gitignore` 覆盖）：
 
 ```bash
 # .env（绝不进 git）
-ALIYUN_DEPLOY_AK_ID=<soniscope-fc 或 soniscope-fc-deploy 的 AK ID>
-ALIYUN_DEPLOY_AK_SECRET=<对应 AK Secret>
-```
-
-加载到当前 shell（`make` 命令继承）：
-
-```bash
-set -a; source .env; set +a
+ALIYUN_DEPLOY_AK_ID=<soniscope-fc-deploy 的 AK ID>
+ALIYUN_DEPLOY_AK_SECRET=<soniscope-fc-deploy 的 AK Secret>
 ```
 
 > 缺失时 `make deploy-fc` 报错：`缺少部署凭证 ALIYUN_DEPLOY_AK_ID/ALIYUN_DEPLOY_AK_SECRET（tech-spec §6.4）`。
@@ -183,7 +178,8 @@ FC 3.0 **无 service 层级**，两个顶级 Web 函数：
 | FC 版本 | FC 3.0（控制台顶部应显示「函数计算 FC 3.0」） |
 | 地域 | `cn-beijing`（必须与 OSS 同 region） |
 | 函数类型 | **Web 函数**（自动配 HTTP 触发器，非事件函数） |
-| 运行时 | Python 3.12（或 3.10 / 3.11） |
+| 运行时 / 启动入口 | Web 函数槽位；当前线上启动命令按 `python3 app.py` 验证，部署包根目录必须包含 `app.py` |
+| 监听端口 | `app.py` 优先读取 `FC_SERVER_PORT` / `PORT`，未设置时回退 `9000` |
 | 规格 | 0.35 vCPU / 512 MB |
 | HTTP 触发器认证 | **无身份认证 anonymous**（业务层 openid allowlist 兜底，禁用 sig 签名） |
 | 请求方式 | GET + POST，公网访问开启 |
@@ -222,8 +218,9 @@ make deploy-fc                             # 不传 FUNCTION 时部署两个函�
 | 产物 | 路径 |
 |---|---|
 | 打包暂存 + zip | `build/fc/<function_name>/` + `build/fc/<function_name>.zip` |
+| Custom Runtime 入口 | `apps/fc/shared/app.py` 复制到每个函数包根目录 `app.py` |
 | 部署前备份（代码 + 环境变量**名**快照） | `build/fc/backup/<YYYYMMDD-HHMMSS>/<function_name>.zip` |
-| 部署日志（函数名 / zip sha256 / 耗时 / curl 存活验证） | `build/fc/logs/deploy-<YYYYMMDD-HHMMSS>.log` |
+| 部署日志（函数名 / zip sha256 / 耗时 / curl 存活验证） | `build/fc/logs/deploy-<YYYYMMDD-HHMMSS>.log`；HTTP 2xx 才算存活通过 |
 
 ### 4.5 部署后云端联调（正例 + 反例）
 
@@ -435,7 +432,8 @@ python -m soniscope_worker retranscribe <fragment_id> [--all-from <YYYY-MM-DD>] 
 
 | 现象 | 优先排查 |
 |---|---|
-| `make deploy-fc` 报缺少部署凭证 | 未 `source .env` 或 `.env` 缺 `ALIYUN_DEPLOY_AK_ID/SECRET`（§4.1） |
+| `make deploy-fc` 报缺少部署凭证 | 仓库根目录 `.env` 缺 `ALIYUN_DEPLOY_AK_ID/SECRET`，或当前 shell 覆盖了空值（§4.1） |
+| `curl` FC URL 返回 `python3: can't open file '/code/app.py'` | 线上仍是旧代码包；重新执行 `make deploy-fc`，确认部署包根目录包含 `app.py` |
 | `make verify-prep` 不全绿 | 按输出定位 OSS/RAM/STS/FC/NLS/fixture 哪项缺失，回 §2 补齐 |
 | `make check-config` 权限告警 | `chmod 600 "$SONISCOPE_HOME/config.yaml"` |
 | Worker 启动即失败 | `ffmpeg`/`ffprobe` 缺失或 `SONISCOPE_HOME` 磁盘 < 50GB（§1.1） |
@@ -458,7 +456,7 @@ python -m soniscope_worker retranscribe <fragment_id> [--all-from <YYYY-MM-DD>] 
 - [ ] AK/Secret 全部存入 1Password
 
 **FC 部署（§4）**
-- [ ] `.env` 注入部署凭证并 `source`
+- [ ] 仓库根目录 `.env` 已写入部署凭证，且被 `.gitignore` 忽略
 - [ ] 两个 FC Web 函数槽位建好，运行时环境变量注入
 - [ ] `make deploy-fc` 两函数成功
 - [ ] `make test-fc-live` / `make test-verify-upload` 通过

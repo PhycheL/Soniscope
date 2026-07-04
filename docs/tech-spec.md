@@ -92,7 +92,7 @@ my_soniscope/
 3. 顶层 Makefile 提供统一命令入口，用户无需进入子目录。
 4. 本期不抽共享 Python 包；FC 与 Worker 如有重复逻辑各自保留。
 5. 构建产物落 `build/`，已 gitignore。
-6. **FC 3.0 命名**：阿里云侧函数是顶级 Web 函数，**没有 service 层级**；云端函数名 / URL 子域名前缀用 kebab-case（`issue-credential` / `verify-upload`）。代码目录可保留 snake_case（如 `apps/fc/issue_credential/`），但 `make deploy-fc FUNCTION=` / `make rollback-fc FUNCTION=` / `make fc-logs FUNCTION=` 以云端函数名为准（kebab-case）。
+6. **FC 3.0 命名与入口**：阿里云侧函数是顶级 Web 函数，**没有 service 层级**；云端函数名 / URL 子域名前缀用 kebab-case（`issue-credential` / `verify-upload`）。代码目录可保留 snake_case（如 `apps/fc/issue_credential/`），但 `make deploy-fc FUNCTION=` / `make rollback-fc FUNCTION=` / `make fc-logs FUNCTION=` 以云端函数名为准（kebab-case）。当前线上启动命令按 `python3 app.py` 验证，`app.py` 由部署脚本复制到每个函数包根目录并转发到函数本地 `handler.handler`。
 7. **Worker 模块清单**（`apps/worker/src/soniscope_worker/`）：`__init__.py` / `__main__.py` / `cli.py` / `config.py` / `paths.py`（后续 story 按需扩展）。
 
 ### 2.2 运行时数据目录
@@ -326,7 +326,7 @@ python -m soniscope_worker retranscribe <fragment_id> [--all-from <YYYY-MM-DD>] 
 
 ### 4.0 FC 运行时环境变量
 
-FC 函数运行时依赖以下环境变量（在 FC 控制台 → 服务配置中注入，US-001(H) 人工准备）：
+FC 函数运行时依赖以下环境变量（在 FC 3.0 控制台 → 对应函数 → 环境变量中分别注入，US-001(H) 人工准备）：
 
 | 变量名 | 说明 | 示例 / 备注 |
 |---|---|---|
@@ -557,7 +557,7 @@ class TranscriptResult:
 | 组件 | 依赖 |
 |---|---|
 | 小程序 | `miniprogram-recorder-manager`（系统 API）、`wasm-crypto`（可选，前端 sha256） |
-| FC（Python） | `alibabacloud-sts20150401`、`alibabacloud-oss-v2`(HeadObject 校验用) |
+| FC（Python） | Python 标准库 WSGI server（`apps/fc/shared/app.py` Custom Runtime 入口）、`alibabacloud-sts20150401`、`alibabacloud-oss-v2`(HeadObject 校验用) |
 | FC 部署（Python） | `alibabacloud-fc20230330`（`make deploy-fc` 脚本用，不随函数打包） |
 | Worker（Python） | `alibabacloud-oss-v2`、`pyyaml`、`pydantic>=2`、`typer`、`alibabacloud-nls20180628`；**本期不装** `faster-whisper` / `whisper.cpp` |
 | Worker（系统二进制） | `ffmpeg` + `ffprobe`（各种音频格式 → WAV 转码 + 格式检测）；缺失则启动失败并提示安装方式 |
@@ -581,7 +581,7 @@ class TranscriptResult:
 
 **备份**：部署前自动备份当前线上版本到 `build/fc/backup/<YYYYMMDD-HHMMSS>/<function_name>.zip`，含函数代码 + 环境变量快照（仅变量名，不含值）。
 
-**部署日志**：每次部署写入 `build/fc/logs/deploy-<YYYYMMDD-HHMMSS>.log`，包含函数名、zip sha256、上传耗时、curl 存活验证结果。
+**部署日志**：每次部署写入 `build/fc/logs/deploy-<YYYYMMDD-HHMMSS>.log`，包含函数名、zip sha256、上传耗时、curl 存活验证结果；存活验证只有 HTTP 2xx 才算通过，`412` / `CAExited` 等启动失败不得视为成功。
 
 **回滚**：`make rollback-fc FUNCTION=<name>` 从最新备份恢复指定函数。
 
@@ -591,10 +591,11 @@ class TranscriptResult:
 
 | 变量名 | 说明 | 注入方式 |
 |---|---|---|
-| `ALIYUN_DEPLOY_AK_ID` | FC 部署脚本使用的 AK ID（`soniscope-fc-deploy` 子账号或同 `soniscope-fc`） | 本地 `.env`（已 gitignore）或 CI secret |
+| `ALIYUN_DEPLOY_AK_ID` | FC 部署脚本使用的 AK ID，推荐使用独立部署子账号 `soniscope-fc-deploy` | 本地 `.env`（已 gitignore）或 CI secret |
 | `ALIYUN_DEPLOY_AK_SECRET` | 对应 AK Secret | 同上 |
 
 > 部署期变量与运行时变量（§4.0）分开管理：运行时变量在 FC 控制台注入，部署期变量在开发者本地 / CI 环境注入，**均不写死到代码里**。
+> 若首次验证或排障临时复用 `soniscope-fc`，完成后应收回其 FC 代码更新权限，改回独立的 `soniscope-fc-deploy`。
 
 **依赖隔离**：`alibabacloud-fc20230330` 仅用于部署脚本，不随函数代码打包上传。
 

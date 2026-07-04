@@ -105,7 +105,7 @@
 完成后，AI 将在 US-002 中提供一个 `make verify-prep` 脚本，执行下面这些检查并汇总 pass/fail 报告：
 - 跑 `aliyun oss stat oss://soniscope-audio --endpoint oss-cn-beijing.aliyuncs.com` 验证 Bucket 私有
 - 跑 4 条 STS 反例（PutObject 越界 / ListBucket / GetObject / Expired）
-- `curl` runbook 登记的两个 FC 3.0 URL（`https://issue-cedential-ottfirocds.cn-beijing.fcapp.run`、`https://verify-upload-nnjpaoamhw.cn-beijing.fcapp.run`）返回 200~499，且不是 5xx / 网络错误
+- `curl` runbook 登记的两个 FC 3.0 URL（`https://issue-cedential-ottfirocds.cn-beijing.fcapp.run`、`https://verify-upload-nnjpaoamhw.cn-beijing.fcapp.run`）返回 HTTP 2xx 健康响应；`412` / `CAExited` / 5xx / 网络错误均视为失败
 - `python3 scripts/fetch_test_fixtures.py --check` 验证 `tests/audio/` 4 个文件存在（3 wav + 1 m4a）+ sha256 与 runbook §6 匹配
 - `make check-config` 读取 `$SONISCOPE_HOME/config.yaml`（实际 `/Volumes/Data/software/SoniScope/config.yaml`）通过
 
@@ -142,7 +142,7 @@
 - [ ] `make verify-prep` 依次执行下列检查，并输出汇总 pass/fail 报告：
   1. **(A 块)** 读取 `config.yaml` → 用只读 AK 验证 Bucket 存在且 ACL = private
   2. **(B 块)** 用 FC 部署凭证（来源由实现决定，**仅本机测试用**）调 STS AssumeRole，policy 限定到单个 object key → 拿到临时凭证 → 跑 4 个反例（越界 PutObject / ListBucket / GetObject / 等待超过 tech-spec §4.1 有效期上限后 ExpiredToken）→ 全部如预期失败才算 pass
-  3. **(C 块)** `curl` FC 两个 URL → HTTP 状态码 200~499（不是 5xx / 网络错误）
+  3. **(C 块)** `curl` FC 两个 URL → HTTP 2xx 健康响应（不是 `412` / `CAExited` / 5xx / 网络错误）
   4. **(E 块)** 用 config 中的 NLS AppKey + AK，上传 `tests/audio/sample-20s.wav` → 拿到结构化转写结果 → 验证结构符合 tech-spec §3.4
   5. **(F 块)** `tests/audio/sample-{20s,54s,25min}.wav` + `sample-20s.m4a` 四个文件存在 + sha256 与 runbook 中记录的一致 + ffprobe duration 与文件名标注的时长在 ±2s 内；额外检查 `sample-20s.m4a` 的 codec=aac（m4a 容器内为 AAC，作为“非 WAV → WAV”转码 fixture）
   6. **(G 块)** Python 版本 ≥ 3.11；`SONISCOPE_HOME` 路径可写；可用磁盘 ≥ 50GB；`ffmpeg` + `ffprobe` 可用（**音频统一标准化为 WAV 的依赖**）
@@ -168,7 +168,7 @@
 
 > **AI 编程任务**：写 `/issue-credential` 的 handler 代码 + FC 部署能力首版（`make deploy-fc`）+ 在云端真实联调全部 AC。
 >
-> **前置假设（来自 US-001）**：FC 3.0 已开通；**不创建 `soniscope-svc` service**；两个顶级 Web 函数 `issue-credential` / `verify-upload` 已建好（hello world 状态），HTTP 触发器 anonymous + GET/POST + 公网 URL 已配置，微信合法域名白名单已配置，FC 环境变量已注入。本 story 不要求用户回控制台做任何配置。
+> **前置假设（来自 US-001）**：FC 3.0 已开通；**不创建 `soniscope-svc` service**；两个顶级 Web 函数 `issue-credential` / `verify-upload` 已建好并能返回 HTTP 2xx 健康响应，HTTP 触发器 anonymous + GET/POST + 公网 URL 已配置，微信合法域名白名单已配置，FC 环境变量已注入。本 story 不要求用户回控制台做任何配置。
 >
 > **本 story 完整闭环**：写完即部署到云端真实 FC、云端 AC 全部 verify 通过，故事独立可交付。
 
@@ -191,7 +191,7 @@
 **(C) FC 部署能力首版（含工程化基线）**
 - [ ] FC 函数源码组织符合 tech-spec §2.1
 - [ ] 仓库新增部署脚本和顶层 `make deploy-fc` target
-- [ ] `make deploy-fc` 的打包、上传、备份、回滚、日志机制严格符合 tech-spec §6.4；接收 `FUNCTION=<name>` 参数（不传时默认部署所有函数）；部署**不动**环境变量 / 触发器 / 运行时配置（US-001 已配好）；部署完成后自动 `curl` 做存活验证
+- [ ] `make deploy-fc` 的打包、上传、备份、回滚、日志机制严格符合 tech-spec §6.4；接收 `FUNCTION=<name>` 参数（不传时默认部署所有函数）；部署**不动**环境变量 / 触发器 / 运行时配置（US-001 已配好）；部署完成后自动 `curl` 做 HTTP 2xx 存活验证
 - [ ] 部署脚本读取 FC 部署所需的 AK 来源按 tech-spec §6.4 部署期环境变量定义注入，**不写死到代码里**
 - [ ] **工程化基线（必须在首次部署就具备，US-005 直接复用）**：备份 + 回滚 + 部署日志能力符合 tech-spec §6.4；`build/` 目录已加入 `.gitignore`
 
@@ -199,7 +199,7 @@
 
 > 下列 AC 中的错误码字面值（如 `INVALID_CODE`、`SIZE_EXCEEDED`）用于观测验证，权威定义见 tech-spec §4.1 / §4.2。
 
-- [ ] 跑 `make deploy-fc FUNCTION=issue-credential` 把 (A)(B) 代码推到云端，部署日志显示 200 + curl 存活验证通过
+- [ ] 跑 `make deploy-fc FUNCTION=issue-credential` 把 (A)(B) 代码推到云端，部署日志显示 HTTP 2xx 健康响应 + curl 存活验证通过
 - [ ] **公网 curl 拒绝匿名验证**：从任意可访问公网的终端用 `curl` 直接调用 FC 公网 URL（不带 code 或带伪造 code）**必须**被拒（400/401/403），不会拿到任何凭证
 - [ ] **wx-login 失败验证**：跑 `make test-fc-live` → 用 `tests/fixtures/wx-login-fixture.json` 中的伪造 code 调 `/issue-credential` → 验证返回 401 `INVALID_CODE`（证明 (A) 代码生效）
 - [ ] **allowlist 拒绝验证**：用真实 wx.login code（由用户在 DevTools 中临时获取并传入）调 `/issue-credential` → 验证 openid 不在 allowlist 时返回 403 `OPENID_NOT_ALLOWED`（**不需要用户回控制台**，只需 DevTools 跑 `wx.login` 一次）
@@ -245,10 +245,10 @@
 **(B) 扩展 `make deploy-fc` 支持第二个函数**
 - [ ] FC 函数源码组织符合 tech-spec §2.1（US-003 已建 workspace 配置，此处仅新增函数子目录）
 - [ ] 跑 `make deploy-fc FUNCTION=verify-upload` 能复用 US-003 已建的部署能力（备份 / 回滚 / 日志 / 工程化基线全部复用，**不应**新写一份）
-- [ ] 跑不带参的 `make deploy-fc` 能自动扫描 `apps/fc/*/` 并部署所有函数（此时应同时部署云端函数 `issue-credential` + `verify-upload`；如代码目录使用 snake_case，由部署脚本负责映射）；日志显示两个函数各自的 zip sha256 + curl 存活验证结果
+- [ ] 跑不带参的 `make deploy-fc` 能部署所有登记函数（此时应同时部署云端函数 `issue-credential` + `verify-upload`；如代码目录使用 snake_case，由部署脚本负责映射）；日志显示两个函数各自的 zip sha256 + HTTP 2xx curl 存活验证结果
 
 **(C) 云端联调（必须在云端真实 FC 上 verify）**
-- [ ] 跑 `make deploy-fc FUNCTION=verify-upload` 把 (A) 代码推到云端，部署日志显示 200 + curl 存活验证通过
+- [ ] 跑 `make deploy-fc FUNCTION=verify-upload` 把 (A) 代码推到云端，部署日志显示 HTTP 2xx 健康响应 + curl 存活验证通过
 - [ ] **真实闭环验证（脚本化）**：AI 提供 `make test-verify-upload` 脚本自动完成「上传测试对象 → 调用 `/verify-upload` 期望 `verified: true` → 删除对象（复用 `oss-delete-obj` 能力，仅测试用）→ 再次调用期望 `verified: false, reason: OBJECT_NOT_FOUND`」全流程，**用户无需手工操作 OSS 控制台**
 - [ ] **大小不一致验证**：上传一个 100 字节对象 → 用 `expected_size=200` 调 `/verify-upload` → 返回 `verified: false, reason: SIZE_MISMATCH, actual_size: 100`
 - [ ] **鉴权拒绝验证**：不带 code / 伪造 code → 同 US-003 (D)，返回 400/401
@@ -867,4 +867,3 @@
 ## 附录 C · Open Questions 决策溯源
 
 > OQ-1 ~ OQ-8 的产品决策索引见 §10，完整技术背景与影响分析见 `docs/tech-spec.md` §8（ADR-1 ~ ADR-8）。本附录不再独立维护内容。
-

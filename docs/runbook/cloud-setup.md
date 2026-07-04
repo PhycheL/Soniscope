@@ -4,7 +4,7 @@
 
 - **填写人**：`Bemied`
 - **首次完成时间**：`2026-05-28`
-- **最近修订时间**：`2026-05-30`
+- **最近修订时间**：`2026-07-04`
 - **本期 MVP 范围**：录音 → OSS 备份 → Worker 拉取 → 云端 ASR 转写 → 本地落盘
 - **实际使用 region**：`cn-beijing`（华北2 北京）。所有 endpoint / 环境变量 / 域名白名单都以北京为准。
 
@@ -23,11 +23,12 @@
 
 ## 2. 阿里云 RAM
 
-### 2.1 子账号 soniscope-fc（供 FC AssumeRole）
+### 2.1 子账号 soniscope-fc（供 FC 运行时）
 
 -  登录名：`soniscope-fc`
--  用途：FC 函数 `issue-credential` 调用 STS 签发临时凭证
--  绑定系统策略：`AliyunSTSAssumeRoleAccess`（且仅此一条）
+-  用途：FC 函数运行时凭证；`issue-credential` 用于调用 STS AssumeRole 签发临时凭证，`verify-upload` 用于对 `soniscope-audio/recordings/*` 做 HeadObject 校验
+-  绑定系统策略：`AliyunSTSAssumeRoleAccess`
+-  绑定自定义策略：`soniscope-fc-recordings-headonly`（RAM Action 使用 `oss:GetObject`，仅限 `soniscope-audio/recordings/*`）
 -  AK 保存位置：`1Password` 中 `阿里云 soniscope-fc 账户 RAM`
 
 ### 2.2 子账号 soniscope-local-reader（供 Worker 拉音频）
@@ -67,7 +68,8 @@
 -  函数 1 名（kebab-case，会成为 HTTP URL 子域名前缀）：`issue-credential`
 -  函数 2 名：`verify-upload`
 -  函数类型：**Web 函数**（自动配置 HTTP 触发器；非「事件函数」）
--  运行时：Python 3.12（或 3.10 / 3.11，按当前 FC 3.0 支持列表）
+-  运行时 / 启动入口：Web 函数槽位，当前线上启动命令按 `python3 app.py` 验证；部署包根目录必须包含 `app.py`（由 `apps/fc/shared/app.py` 复制而来）
+-  监听端口：`app.py` 优先读取 `FC_SERVER_PORT` / `PORT`，未设置时回退 `9000`
 -  规格：0.35 vCPU / 512 MB
 -  HTTP 触发器认证方式：`无身份认证（anonymous）`（业务层 openid allowlist 兜底，禁止用 sig 签名认证）
 -  公网访问 URL：已开启
@@ -431,7 +433,7 @@
 
 -  工作目录环境变量：`SONISCOPE_HOME=/Volumes/Data/software/SoniScope`
 -  工作目录可用磁盘空间：`2.38TB`
--  仓库 clone 路径：`/Volumes/Data/ProjectCode/my_soniscope`
+-  仓库 clone 路径：`/Users/bemied/ProjectCode/my_soniscope`
 
 ---
 

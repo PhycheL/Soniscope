@@ -74,8 +74,9 @@
 
 #### 职责与请求处理流程
 
-- **issue-credential**（`issue_credential/handler.py`）：GET 存活探针（:36-40）；POST 走 `load_env` → `authorize_request`（JSON 校验 → 微信 code 换 openid → allowlist，:44-45）→ `load_sts_env` → `parse_size`/`check_size` → `object_key_for`（:47-50）→ `assume_role` 传 `single_key_policy` + 900s（:72-81）→ 7 字段响应（:104-110）。
-- **verify-upload**（`verify_upload/handler.py`）：鉴权流程与 issue-credential 一致（:44-52），用子账号长期 AK 对该 key `head_object`（:73-82），`verify_upload_result` 映射 verified/OBJECT_NOT_FOUND/SIZE_MISMATCH 三态（head.py:34-55）。
+- **issue-credential**（`issue_credential/handler.py`）：GET 存活探针；POST 走 `load_env` → `authorize_request`（JSON 校验 → 微信 code 换 openid → allowlist）→ `load_sts_env` → `parse_size`/`check_size` → `object_key_for` → `assume_role` 传 `single_key_policy` + 900s → 7 字段响应。
+- **verify-upload**（`verify_upload/handler.py`）：鉴权流程与 issue-credential 一致，用子账号长期 AK 对该 key `head_object`，`verify_upload_result` 映射 verified/OBJECT_NOT_FOUND/SIZE_MISMATCH 三态。
+- **Custom Runtime 入口**（`apps/fc/shared/app.py`）：云端启动命令为 `python3 app.py`；入口启动标准库 WSGI server，监听 `FC_SERVER_PORT` / `PORT` / 默认 `9000`，再把请求委托给函数包内的 `handler.handler`。
 - 错误分层清晰：`FcConfigError`→500 `SERVER_MISCONFIGURED`（只列缺失变量名），`FcHttpError`→4xx，云调用异常→统一 500 不泄漏明文。
 
 #### 安全评估
@@ -93,12 +94,12 @@
 #### 共享代码与部署
 
 - 复用方式健康：两 handler 都 `import fc_shared`，云 SDK 全部 lazy import（sts.py:133-138、head.py:73-76），互不拖入对方依赖。
-- 打包：`fc_deploy.package_function`（fc_deploy.py:196-213）copy → `_vendor_shared` 复制共享包 → 按 requirements.txt 装依赖 → 确定性 zip；部署前自动备份、可一键回滚。
+- 打包：`fc_deploy.package_function` copy 函数目录 → 复制 Custom Runtime 入口 `app.py` → `_vendor_shared` 复制共享包 → 按 requirements.txt 装依赖 → 确定性 zip；部署前自动备份、可一键回滚；部署后 curl 存活验证只接受 HTTP 2xx。
 
 部署的坑：
 
 - **跨平台依赖（最大的坑）**：`install_deps` 用 `uv pip install --target`（fc_deploy.py:552-559）**未指定目标平台**——macOS 打包、FC 跑 Linux。当前依赖恰好纯 Python 能跑，一旦引入 C 扩展依赖就会云端 import 崩。应加 `--python-platform manylinux` 类约束。
-- **vendoring 静默跳过**：`_vendor_shared` 在共享包目录不存在时静默 return（fc_deploy.py:191-193），会打出一 import 就崩的包且部署无告警。
+- **共享包 vendoring 仍需收紧**：Custom Runtime 入口 `app.py` 缺失已改为打包时报错，但 `_vendor_shared` 在 `fc_shared` 目录不存在时仍静默 return，会打出一 import 就崩的包且部署无告警。
 - **依赖未固定版本**：两个 requirements.txt 均无 `==`，缺可复现性。
 
 #### 代码质量问题
@@ -181,7 +182,7 @@ cli.run (cli.py:24) → poller.run_worker_run (poller.py:455)
 | # | 问题 | 位置 | 修法 |
 |---|---|---|---|
 | 5 | Worker 包混装部署/联调/lint/E2E 工具 | `soniscope_worker` 全包 | 拆出 `soniscope_devtools` 包或移 `scripts/`；内嵌 `run_test_*` 抽到 tests/；NLS 客户端构造从 `verify_prep` 迁出 |
-| 6 | FC 打包跨平台无约束 + 依赖不固定 + vendoring 静默跳过 | `fc_deploy.py:552-559,191-193`、两个 requirements.txt | 加 `--python-platform manylinux`；requirements 固定版本；vendoring 缺失改报错 |
+| 6 | FC 打包跨平台无约束 + 依赖不固定 + `fc_shared` vendoring 静默跳过 | `fc_deploy.py`、两个 requirements.txt | 加 `--python-platform manylinux`；requirements 固定版本；`fc_shared` 缺失改报错 |
 | 7 | 主线程同步 SHA-256 卡 UI（ADR-2 规划未落实） | `index.js:630,580-596`、`sha256.js` | wasm 或异步分片计算 |
 | 8 | 跨页并发驱动队列缺全局互斥 | `uploads.js:40-41`、`queue_runtime.js:33-34` | 引入 app 级单例调度器统一互斥 |
 

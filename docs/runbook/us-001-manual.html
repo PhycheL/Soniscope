@@ -494,7 +494,7 @@
         <tr><th>③ 云端语音转文字 API</th><td>默认阿里云 NLS 录音文件极速版；AppKey + 调用凭证</td></tr>
         <tr><th>④ 测试音频素材</th><td>4 段标准音频（3 wav + 1 m4a），存于 OSS 私有 bucket，本地 <code class="inline">tests/audio/</code> 经脚本拉取，记录 sha256</td></tr>
         <tr><th>⑤ Worker 运行环境</th><td>任意可跑 Python 3.11+ 的主机；<code class="inline">$SONISCOPE_HOME</code> 工作目录（默认 <code class="inline">~/SoniScope/</code>）</td></tr>
-        <tr><th>⑥ 凭证注入</th><td>FC 环境变量（9 项）+ Worker <code class="inline">~/SoniScope/config.yaml</code>（chmod 600）</td></tr>
+        <tr><th>⑥ 凭证注入</th><td>FC 环境变量（10 项，含可选上传上限）+ Worker <code class="inline">~/SoniScope/config.yaml</code>（chmod 600）</td></tr>
       </table>
 
       <div class="redlines" style="margin-top: 18px;">
@@ -558,12 +558,29 @@
       <h2><span class="chip">B</span>RAM：两个子账号 + 一个角色 + STS 反例验证<span class="state" id="state-block-b"></span></h2>
       <p class="lead">目标：FC 拿一个临时凭证 → 临时凭证只能写指定 object key，不能列、不能读、不能越界，且 15 分钟后自动失效。</p>
 
-      <h3 class="step-title">B-1 创建子账号 <code class="inline">soniscope-fc</code>（供 FC AssumeRole）</h3>
+      <h3 class="step-title">B-1 创建子账号 <code class="inline">soniscope-fc</code>（供 FC 运行时）</h3>
       <ol class="steps">
         <li>RAM 控制台 → 身份管理 → 用户 → 创建用户。</li>
         <li>登录名 <code class="inline">soniscope-fc</code>，访问方式 <b>只勾选「OpenAPI 调用访问」</b>（不勾控制台登录）。</li>
         <li>创建成功后会显示 AccessKey ID + AccessKey Secret，<b>立即复制保存到密码管理器（1Password / Bitwarden）</b>。Secret 关掉后无法再次查看。</li>
-        <li>添加权限 → <b>系统策略</b> → 搜索并勾选 <code class="inline">AliyunSTSAssumeRoleAccess</code>（只这一条，不要给 OSS 任何权限）。</li>
+        <li>添加权限 → <b>系统策略</b> → 搜索并勾选 <code class="inline">AliyunSTSAssumeRoleAccess</code>，供 <code class="inline">issue-credential</code> 调 STS AssumeRole。</li>
+        <li>RAM → 权限管理 → 权限策略 → 创建权限策略，名称 <code class="inline">soniscope-fc-recordings-headonly</code>，脚本编辑模式贴入：
+<pre>{
+  "Version": "1",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "oss:GetObject"
+      ],
+      "Resource": [
+        "acs:oss:*:*:soniscope-audio/recordings/*"
+      ]
+    }
+  ]
+}</pre>
+        </li>
+        <li>给 <code class="inline">soniscope-fc</code> 添加权限 → 自定义策略 → 勾选 <code class="inline">soniscope-fc-recordings-headonly</code>，供 <code class="inline">verify-upload</code> 做 HeadObject 校验。</li>
       </ol>
 
       <h3 class="step-title">B-2 创建子账号 <code class="inline">soniscope-local-reader</code>（供 Worker 拉音频）</h3>
@@ -577,7 +594,6 @@
       "Effect": "Allow",
       "Action": [
         "oss:GetObject",
-        "oss:HeadObject",
         "oss:ListObjects"
       ],
       "Resource": [
@@ -593,7 +609,7 @@
 
       <div class="callout danger">
         <span class="title">✗ 红线提醒</span>
-        FC 用的 <code class="inline">soniscope-fc</code> 子账号 <b>绝不</b> 直接绑 OSS 写权限。FC 写 OSS 必须走 STS AssumeRole 流程，临时凭证精确到单 object key。
+        FC 用的 <code class="inline">soniscope-fc</code> 子账号 <b>绝不</b> 直接绑 OSS 写权限。它只能 AssumeRole 和读取对象头信息；小程序写 OSS 必须走 STS AssumeRole 流程，临时凭证精确到单 object key。
       </div>
 
       <h3 class="step-title">B-3 创建角色 <code class="inline">soniscope-uploader-role</code>（FC 扮演它来签发 STS）</h3>
@@ -668,7 +684,7 @@ export OSS_TOKEN=&lt;tmp security token&gt;</pre>
 
       <h3 class="step-title">验收清单</h3>
       <ul class="checklist" data-block="block-b">
-        <li><input type="checkbox" id="b1"><label for="b1">子账号 <code class="inline">soniscope-fc</code> 已创建，AK 已保存到密码管理器，仅有 <code class="inline">AliyunSTSAssumeRoleAccess</code> 系统策略。</label></li>
+        <li><input type="checkbox" id="b1"><label for="b1">子账号 <code class="inline">soniscope-fc</code> 已创建，AK 已保存到密码管理器，已绑定 <code class="inline">AliyunSTSAssumeRoleAccess</code> 与 <code class="inline">soniscope-fc-recordings-headonly</code>，没有 OSS 写权限。</label></li>
         <li><input type="checkbox" id="b2"><label for="b2">子账号 <code class="inline">soniscope-local-reader</code> 已创建，AK 已保存，仅绑自定义 <code class="inline">soniscope-bucket-readonly</code>。</label></li>
         <li><input type="checkbox" id="b3"><label for="b3">角色 <code class="inline">soniscope-uploader-role</code> 已创建，信任策略 Principal 精确到 <code class="inline">acs:ram::&lt;UID&gt;:user/soniscope-fc</code>。</label></li>
         <li><input type="checkbox" id="b4"><label for="b4">角色绑定的权限策略 <code class="inline">soniscope-upload-template</code> Resource 限定 <code class="inline">soniscope-audio/recordings/*</code>。</label></li>
@@ -684,7 +700,7 @@ export OSS_TOKEN=&lt;tmp security token&gt;</pre>
     <!-- ============== C ============== -->
     <section class="block" id="block-c">
       <h2><span class="chip">C</span>函数计算 FC 3.0：两个 Web 函数 + HTTP 触发器<span class="state" id="state-block-c"></span></h2>
-      <p class="lead">目标：留好两个 hello-world 函数 URL。<b>真实业务代码 + 部署由 US-003（issue-credential）和 US-005（verify-upload）AI 实现</b>，本块仅准备槽位。</p>
+      <p class="lead">目标：留好两个 FC 3.0 Web 函数 URL。<b>真实业务代码 + 部署由 US-003（issue-credential）和 US-005（verify-upload）AI 实现</b>，本块仅准备槽位；当前项目部署包按 <code class="inline">python3 app.py</code> 启动。</p>
 
       <div class="callout warn">
         <span class="title">⚠ FC 3.0 与 PRD 原文差异</span>
@@ -700,11 +716,11 @@ export OSS_TOKEN=&lt;tmp security token&gt;</pre>
           <table class="kv" style="margin-top: 8px;">
             <tr><th>创建方式</th><td>选择 <b>「Web 函数」</b>（FC 3.0 推荐方式，会自动配置 HTTP 触发器；选「事件函数」也行但要再手动加触发器）</td></tr>
             <tr><th>函数名</th><td><code class="inline">issue-credential</code>（kebab-case，会出现在 HTTP URL 子域名前缀里）</td></tr>
-            <tr><th>运行时</th><td>Python 3.11（或 3.10 / 3.12，按当前 FC 3.0 支持列表）</td></tr>
-            <tr><th>代码上传方式</th><td>使用示例代码（hello world）—— 业务代码由 US-003 用 SDK / s.yaml 部署覆盖</td></tr>
-            <tr><th>启动命令 / 监听端口</th><td>保持默认（Python Web 函数默认 <code class="inline">9000</code> 端口）</td></tr>
+            <tr><th>运行时</th><td>Web 函数槽位（按控制台当前可选 Python / Custom Runtime 形态创建；本项目线上已验证启动命令 <code class="inline">python3 app.py</code>）</td></tr>
+            <tr><th>代码上传方式</th><td>使用示例代码占位—— 业务代码由 <code class="inline">make deploy-fc</code> 覆盖为 <code class="inline">app.py</code> + <code class="inline">handler.py</code> + 依赖</td></tr>
+            <tr><th>启动命令 / 监听端口</th><td>启动命令 <code class="inline">python3 app.py</code>；监听端口由 <code class="inline">FC_SERVER_PORT</code> / <code class="inline">PORT</code> 指定，未设置时回退 <code class="inline">9000</code></td></tr>
             <tr><th>请求处理程序类型</th><td>处理 HTTP 请求</td></tr>
-            <tr><th>规格</th><td>0.35 vCPU / 512 MB（最小配置即可，hello world 占用极小）</td></tr>
+            <tr><th>规格</th><td>0.35 vCPU / 512 MB（最小配置即可，健康检查入口占用极小）</td></tr>
             <tr><th>触发器（自动创建）</th><td>认证方式 = <b>无身份认证（anonymous）</b>，请求方式 = GET + POST，<b>公网访问 URL = 开启</b>（FC 3.0 默认会同时给一个内网 URL，本期只需公网）</td></tr>
           </table>
         </li>
@@ -729,11 +745,11 @@ export OSS_TOKEN=&lt;tmp security token&gt;</pre>
       <h3 class="step-title">验收清单</h3>
       <ul class="checklist" data-block="block-c">
         <li><input type="checkbox" id="c1"><label for="c1">FC 控制台顶部 banner 显示「函数计算 FC 3.0」，地域 = <code class="inline">cn-beijing</code>。</label></li>
-        <li><input type="checkbox" id="c2"><label for="c2">函数 <code class="inline">issue-credential</code> 状态 = 已发布 / 正常，类型 = Web 函数，运行时 = Python 3.11。</label></li>
+        <li><input type="checkbox" id="c2"><label for="c2">函数 <code class="inline">issue-credential</code> 状态 = 已发布 / 正常，类型 = Web 函数，启动命令与部署包入口匹配（<code class="inline">python3 app.py</code>）。</label></li>
         <li><input type="checkbox" id="c3"><label for="c3">函数 <code class="inline">verify-upload</code> 同上配置正常。</label></li>
         <li><input type="checkbox" id="c4"><label for="c4">两个函数的 HTTP 触发器 <b>认证方式 = 无身份认证（anonymous）</b>，公网访问 URL 已开启。</label></li>
-        <li><input type="checkbox" id="c5"><label for="c5"><code class="inline">curl -i &lt;issue-credential URL&gt;</code> 返回 HTTP/2 200 + hello world 文本，<b>不是</b> 404 / 403 / 502 / 网络错误。</label></li>
-        <li><input type="checkbox" id="c6"><label for="c6"><code class="inline">curl -i &lt;verify-upload URL&gt;</code> 返回 HTTP/2 200 + hello world 文本。</label></li>
+        <li><input type="checkbox" id="c5"><label for="c5"><code class="inline">curl -i &lt;issue-credential URL&gt;</code> 返回 HTTP 2xx；部署真实代码后响应为 <code class="inline">{"function":"issue-credential","status":"ok"}</code>，<b>不是</b> 412 / 404 / 403 / 502 / 网络错误。</label></li>
+        <li><input type="checkbox" id="c6"><label for="c6"><code class="inline">curl -i &lt;verify-upload URL&gt;</code> 返回 HTTP 2xx；部署真实代码后响应为 <code class="inline">{"function":"verify-upload","status":"ok"}</code>。</label></li>
         <li><input type="checkbox" id="c7"><label for="c7">两个 <code class="inline">.fcapp.run</code> 公网 URL 已记录到 <code class="inline">docs/runbook/cloud-setup.md §3.2</code>。</label></li>
       </ul>
 
@@ -741,8 +757,8 @@ export OSS_TOKEN=&lt;tmp security token&gt;</pre>
 curl -i https://issue-credential-xxxxxxxx.cn-beijing.fcapp.run/
 curl -i https://verify-upload-yyyyyyyy.cn-beijing.fcapp.run/
 
-<span class="cmt"># 期望：HTTP/2 200 + hello world 内容（FC Web 函数默认返回 "Hello, World!"）</span>
-<span class="cmt"># 注意：path 留空或写 / 都可，FC 3.0 Web 函数会把所有请求转发到函数 9000 端口</span></pre>
+<span class="cmt"># 期望：HTTP 2xx；部署真实代码后返回 {"function":"...","status":"ok"}</span>
+<span class="cmt"># 注意：path 留空或写 / 都可；当前项目部署包通过 app.py 启动 WSGI server 并转发到 handler.py</span></pre>
     </section>
 
     <!-- ============== D ============== -->
@@ -965,9 +981,9 @@ cd my_soniscope</pre>
       <h2><span class="chip">H</span>凭证注入：FC 环境变量 + Worker config.yaml<span class="state" id="state-block-h"></span></h2>
       <p class="lead">目标：把 A~E 块拿到的所有凭证 / ID / endpoint 注入两个目标位置。<b>明文 AK 一律不进 git</b>。</p>
 
-      <h3 class="step-title">H-1 FC 环境变量（共 9 项）</h3>
+      <h3 class="step-title">H-1 FC 环境变量（共 10 项）</h3>
       <p style="font-size: 13.5px;">FC 3.0 控制台 → 函数列表 → 函数 <code class="inline">issue-credential</code> → <b>配置 → 环境变量</b>。逐项填入。<br>
-      <b>注意</b>：FC 3.0 取消了"服务"层级，<b>没有"服务级共享环境变量"概念</b>，必须在 <code class="inline">verify-upload</code> 函数下<b>再配一份完全相同的 9 项</b>。建议用 <code class="inline">jq</code> 或 s.yaml 模板批量同步，避免手抖漏键。后续 US-003 / US-005 部署脚本会用阿里云 SDK 一次性写入两个函数，无需手工维护。</p>
+      <b>注意</b>：FC 3.0 取消了"服务"层级，<b>没有"服务级共享环境变量"概念</b>，必须在 <code class="inline">verify-upload</code> 函数下<b>再配一份完全相同的 10 项</b>。建议用 <code class="inline">jq</code> 或控制台复制配置批量同步，避免手抖漏键。后续 <code class="inline">make deploy-fc</code> 只更新代码包，不会改环境变量；环境变量变更仍需在控制台维护。</p>
       <table class="kv">
         <tr><th>Key</th><th>说明 / 取值</th></tr>
         <tr><td><code class="inline">OSS_BUCKET</code></td><td>来自 A 块，固定值 <code class="inline">soniscope-audio</code></td></tr>
@@ -979,6 +995,7 @@ cd my_soniscope</pre>
         <tr><td><code class="inline">WX_APPID</code></td><td>D-1 拿到的小程序 AppID</td></tr>
         <tr><td><code class="inline">WX_APP_SECRET</code></td><td>D-1 拿到的 AppSecret</td></tr>
         <tr><td><code class="inline">OPENID_ALLOWLIST</code></td><td>D-4 拿到的真机 openid（单值或逗号分隔多值）</td></tr>
+        <tr><td><code class="inline">MAX_UPLOAD_BYTES</code></td><td>上传上限，建议填 <code class="inline">52428800</code>（50MB）；不填时代码使用默认值</td></tr>
       </table>
 
       <h4 class="sub-title">JSON 模板（用于批量录入 / 同步）</h4>
@@ -991,7 +1008,8 @@ cd my_soniscope</pre>
   "ALIYUN_AK_SECRET": "&lt;B-1 soniscope-fc 的 AK Secret&gt;",
   "WX_APPID": "&lt;D-1 小程序 AppID&gt;",
   "WX_APP_SECRET": "&lt;D-1 小程序 AppSecret&gt;",
-  "OPENID_ALLOWLIST": "&lt;D-4 真机 openid，多个用英文逗号分隔&gt;"
+  "OPENID_ALLOWLIST": "&lt;D-4 真机 openid，多个用英文逗号分隔&gt;",
+  "MAX_UPLOAD_BYTES": "52428800"
 }</pre>
       <p style="font-size: 13.5px; color: var(--muted);">这份 JSON 只作为录入模板；实际文件和 runbook 中不要保存明文 Secret。填好后分别同步到 <code class="inline">issue-credential</code> 与 <code class="inline">verify-upload</code> 两个函数。</p>
 
@@ -1037,8 +1055,8 @@ grep -c '^[a-z]' ~/SoniScope/config.yaml
 
       <h3 class="step-title">验收清单</h3>
       <ul class="checklist" data-block="block-h">
-        <li><input type="checkbox" id="h1"><label for="h1">FC 控制台 → <code class="inline">issue-credential</code> → 配置 → 环境变量：能看到 9 个键都已填值（脱敏显示）。</label></li>
-        <li><input type="checkbox" id="h2"><label for="h2"><code class="inline">verify-upload</code> 函数 <b>独立</b>配置了同样 9 个环境变量（FC 3.0 无服务级共享，两份必须各自填全）。</label></li>
+        <li><input type="checkbox" id="h1"><label for="h1">FC 控制台 → <code class="inline">issue-credential</code> → 配置 → 环境变量：能看到 10 个键都已填值（脱敏显示）。</label></li>
+        <li><input type="checkbox" id="h2"><label for="h2"><code class="inline">verify-upload</code> 函数 <b>独立</b>配置了同样 10 个环境变量（FC 3.0 无服务级共享，两份必须各自填全）。</label></li>
         <li><input type="checkbox" id="h3"><label for="h3">Worker 主机：<code class="inline">~/SoniScope/config.yaml</code> 存在，且 <code class="inline">grep -c '^[a-z]' </code> ≥ 8。</label></li>
         <li><input type="checkbox" id="h4"><label for="h4"><code class="inline">ls -la ~/SoniScope/config.yaml</code> 权限为 <code class="inline">-rw-------</code>（chmod 600）。</label></li>
         <li><input type="checkbox" id="h5"><label for="h5"><b>回头确认（US-002 完成后）</b>：跑 <code class="inline">make check-config</code> 输出"所有必填字段已就绪"。</label></li>
@@ -1054,7 +1072,7 @@ grep -c '^[a-z]' ~/SoniScope/config.yaml
       <ol class="steps">
         <li><b>## 阿里云 OSS</b>：Bucket 名 / region / Endpoint / 创建日期</li>
         <li><b>## 阿里云 RAM</b>：两个子账号名 / 角色名 / 角色 ARN / AK 保存位置（如「1Password vault: soniscope」）</li>
-        <li><b>## 阿里云 FC</b>：服务名 / 两个函数名 / 两个 HTTP URL / 9 个环境变量名（<b>只列名字不列值</b>）</li>
+        <li><b>## 阿里云 FC</b>：两个函数名 / 两个 HTTP URL / 10 个环境变量名（<b>只列名字不列值</b>）</li>
         <li><b>## 微信小程序</b>：AppID / AppSecret 保存位置 / 体验者列表 / 自己的 openid</li>
         <li><b>## 云端 ASR 服务</b>：服务商名 / 项目名 / AppKey / API endpoint / 免费额度信息 / 月度成本估算 / 联调基线 JSON 片段</li>
         <li><b>## 测试音频素材</b>：4 个 fixture 文件的相对路径 + sha256 + duration</li>
@@ -1076,7 +1094,7 @@ git status docs/runbook/cloud-setup.md</pre>
         <li><input type="checkbox" id="i2"><label for="i2">8 个章节齐全（OSS / RAM / FC / 小程序 / ASR / 测试音频 / Worker 环境 / 凭证约定）。</label></li>
         <li><input type="checkbox" id="i3"><label for="i3"><code class="inline">grep -E 'LTAI|sk-|aliyun_ak' docs/runbook/cloud-setup.md</code> <b>无匹配</b>（无明文 AK 泄漏）。</label></li>
         <li><input type="checkbox" id="i4"><label for="i4"><code class="inline">git status</code> 显示 runbook 已被跟踪。</label></li>
-        <li><input type="checkbox" id="i5"><label for="i5">FC 9 个环境变量章节中<b>只列 key 名，不列 value</b>。</label></li>
+        <li><input type="checkbox" id="i5"><label for="i5">FC 10 个环境变量章节中<b>只列 key 名，不列 value</b>。</label></li>
         <li><input type="checkbox" id="i6"><label for="i6">ASR 联调基线 JSON 片段已贴入。</label></li>
         <li><input type="checkbox" id="i7"><label for="i7">4 个 fixture 文件的 sha256 已记录。</label></li>
       </ul>

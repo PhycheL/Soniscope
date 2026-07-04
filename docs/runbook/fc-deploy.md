@@ -456,7 +456,7 @@ make deploy-fc
 部署脚本会执行：
 
 1. 下载线上旧代码并备份到 `build/fc/backup/<timestamp>/`
-2. 打包当前仓库的 `handler.py`
+2. 打包当前仓库的函数代码目录（含 `handler.py`）
 3. 把 `apps/fc/shared/app.py` 复制为函数包根目录 `app.py`
 4. 把 `apps/fc/shared/fc_shared` vendoring 到函数包根目录
 5. 安装函数运行依赖到包内
