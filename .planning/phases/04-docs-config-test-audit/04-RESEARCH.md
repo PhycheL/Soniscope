@@ -354,17 +354,19 @@ git worktree list                                  # 确认专区已清理
 | A2 | pytest-cov 的 repo 为 github.com/pytest-dev/pytest-cov(官方组织) | Package Legitimacy Audit | seam 未返回 repo 字段;若不实,风险极低(PyPI 15 年版本链已核) |
 | A3 | 基线上 `make test` 为绿 | Architecture Patterns | 未预跑(执行留给阶段任务);若非绿,D-05 裁量条款已定:按 CHARTER 正常定级入台账,不阻塞 |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **DOC 声明清单的总条数规模**
    - What we know:深核对象共约 4,050 行文档 + 41 行 config.js;runbook 类命令/路径声明密度高。
    - What's unclear:四态销号清单最终会有多少条(估 100-200 条量级)。
    - Recommendation:planner 按文档拆任务(PRD+tech-spec 一组、runbook 4 份一组、AGENTS+README×3+config 三份一组),避免单任务清单过长;抽取粒度属 Claude 裁量,叙事句可按声明句合并。
+   - **RESOLVED:** 已被计划采纳 — 04-03(PRD + tech-spec)/ 04-04(runbook 4 份)/ 04-05(AGENTS + README×3 + config 三份与收口)正是按本条建议的分组拆任务;抽取粒度按 Claude 裁量落入各任务 action。
 
 2. **`project.config.json` appid 与文档口径**
    - What we know:CLAUDE.md 记 appid `wx3f973c7297728b0c`、libVersion 3.5.5;普审即可(D-08)。
    - What's unclear:appid 是否算"无法静态核实"的云端事实(微信平台侧登记不可静读)。
    - Recommendation:文档↔配置互对可静态核实;配置↔微信平台真值标"无法静态核实",不猜测。
+   - **RESOLVED:** 已被计划采纳 — 04-05 Task 2 逐字落实本口径:文档↔配置互对静态核实;配置↔微信平台真值(appid 登记、合法域名平台侧配置)标『无法静态核实』,不猜测。
 
 ## Environment Availability
 
