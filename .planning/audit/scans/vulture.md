@@ -28,7 +28,7 @@ apps/worker/src/soniscope_worker/miniprogram_lint.py:121: unused variable 'rel_p
 
 | # | 命中(path:line @ 5927f36) | 规则/模式 | 销号 | 理由/去向 |
 |---|---------------------------|-----------|------|-----------|
-| 1 | apps/worker/src/soniscope_worker/miniprogram_lint.py:121 | unused variable 'rel_path'(100% confidence) | 确认 | scan_hardcoded_secrets 声明 rel_path 形参却未使用,调用方(:190)传入 str(file) 落空——非 Protocol/typer/WSGI 动态引用误报类(RESEARCH A1 预记核对不符合),系真实未使用参数,与 ruff 扩展集 ARG001 同点命中互证 → 深挖线索(03-05 miniprogram_lint 普审,HYP-15) |
+| 1 | apps/worker/src/soniscope_worker/miniprogram_lint.py:121 | unused variable 'rel_path'(100% confidence) | 确认 | scan_hardcoded_secrets 声明 rel_path 形参却未使用,调用方(:190)传入 str(file) 落空——非 Protocol/typer/WSGI 动态引用误报类(RESEARCH A1 预记核对不符合),系真实未使用参数,与 ruff 扩展集 ARG001 同点命中互证 → 深挖线索(03-05 miniprogram_lint 普审,HYP-15)。**03-05 人工核实下落(降级理由,不立发现):** 死参数属实,但报告路径上下文由调用方 `_issue(root, file, finding)` 包装提供(`miniprogram_lint.py:190-191,203 @ 5927f36`),无操作者影响;详见 scans/ruff-extended.md #49 同点下落 |
 
 **对账等式:** 确认 1 + 误报 0 + 移交 0 = 命中总数 1 ✓
 

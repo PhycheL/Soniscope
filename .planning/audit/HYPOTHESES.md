@@ -46,8 +46,9 @@
 - **来源:** CONCERNS.md §Tech Debt / FC deploy tooling only supports code updates
 - **假设:** `fc_deploy.py` 仅实现 `update_code`;函数创建、OSS 事件触发器、env 配置、域名登记均为一次性手工 runbook 步骤,环境重建/灾备完全依赖 runbook 保真度。
 - **待验证维度:** TOOL
-- **状态:** 未验证
-- **备注:** CONCERNS.md 自评可接受("Acceptable for single-developer MVP"),待 Phase 3/4 核实该判断是否成立(RESEARCH A4 分流依据)。
+- **状态:** 证实 — 部署工具能力面确为"备份/打包/仅代码更新/回滚/日志诊断"五项,无函数创建/触发器/env 配置/域名登记任何入口;环境重建依赖 runbook 保真度属实。
+- **证据:** `apps/worker/src/soniscope_worker/fc_deploy.py:13 @ 5927f36`(docstring 自述"部署只更新代码包,不改 FC 环境变量/触发器/运行时规格/公网 URL")、`fc_deploy.py:106-119 @ 5927f36`(FcApi Protocol 全部 6 方法:download_code/env_var_names/install_deps/update_code/curl/fetch_logs,无 create/config 面)、`fc_deploy.py:667-672 @ 5927f36`(update_code 显式只传 UpdateFunctionInput(code=...),行内注释"只更新代码,不传 environment_variables / triggers / 运行规格")、`fc_deploy.py:611 @ 5927f36`("疑似首次部署"错误文案佐证首次创建不在工具能力内)
+- **备注:** CONCERNS.md 自评可接受经 D-10 上线语境裁定**成立**:两函数已部署在线,工具完整覆盖高频操作(代码更新+备份+回滚+存活验证),一次性 setup 已完成;灾备重建依赖 runbook 保真度的口径核对属 Phase 4 DOC(runbook 审计)——记 RPT-06 优点候选兼 DNF 候选,不占发现 ID(D-12)。同模块顺带发现 F-TOOL-02(备份失败不阻断部署)独立立项,不影响本条裁定。03-05 回填。
 
 ### HYP-05: Vendored Aliyun FC sample repository committed
 
@@ -146,7 +147,9 @@
 - **来源:** CONCERNS.md §Fragile Areas / Home-grown miniprogram lint instead of ESLint
 - **假设:** `miniprogram_lint.py` 自研 Python 静态检查器只捕获被教会的规则,ESLint 级别的缺陷类(未使用变量、作用域问题等)在小程序 JS 中静默通过。
 - **待验证维度:** TOOL
-- **状态:** 未验证
+- **状态:** 细化 — "只捕获被教会的规则"半句证实:规则面仅五族(appid/页面四件套/合法域名+拼写守卫/JSON 可解析/硬编码密钥启发式),零 JS 语义规则,ESLint 级缺陷类结构性静默通过;"静默通过即有漏报实害"半句在基线上证伪:ESLint 量化底数为 0 error / 29 warning 且逐条核实全为仓库惯例误报(无一真实缺陷)。
+- **证据:** `apps/worker/src/soniscope_worker/miniprogram_lint.py:65-77,80-104,107-118,182-186,42-46,121-128 @ 5927f36`(规则清单全集五族,逐条行号见 COVERAGE 行备注);量化底数引 `scans/eslint.md` 尾部"HYP-15 量化小结":增量检出 0 error / 29 warning(no-unused-vars ×21 / eqeqeq ×7 / 遗留 eslint-disable ×1,全数误报),两工具规则面完全不重叠;`apps/miniprogram/utils/logger.js:40 @ 5927f36` 遗留 eslint-disable 注释旁证开发期曾预期 ESLint 存在
+- **备注:** 覆盖缺口本身按 CHARTER LOW 锚点"lint/typecheck 覆盖缺口"立发现 F-TOOL-04(风险面在未来变更而非存量,修复给双选项:增补语义检查或引入零依赖 eslint 配置);判据遵守 CHARTER 双语言适配——ESLint 是线索底数不是标准。03-05 回填。
 
 ## Scaling Limits
 
@@ -237,4 +240,4 @@
 
 ---
 
-*未验证假设清单: 2026-07-04(25 条 HYP + 1 条 Known Bugs 显式无线索记录;对账 25 + 4 DNF = 29,Phase 4 AUDIT-05 逐条回填)。回填进度:已回填 9 条(03-03:HYP-10 证实、HYP-16 细化、HYP-19 证实;03-04:HYP-01 证实、HYP-08 细化、HYP-09 证实、HYP-12 证实、HYP-17 证实、HYP-20 证实,2026-07-05),余 16 条未验证(CODE 维度仅余 HYP-03,留待 03-07 微基准)。*
+*未验证假设清单: 2026-07-04(25 条 HYP + 1 条 Known Bugs 显式无线索记录;对账 25 + 4 DNF = 29,Phase 4 AUDIT-05 逐条回填)。回填进度:已回填 11 条(03-03:HYP-10 证实、HYP-16 细化、HYP-19 证实;03-04:HYP-01 证实、HYP-08 细化、HYP-09 证实、HYP-12 证实、HYP-17 证实、HYP-20 证实;03-05:HYP-04 证实、HYP-15 细化,2026-07-05),余 14 条未验证(CODE 维度仅余 HYP-03 留待 03-07 微基准;TOOL 维度余 HYP-07/HYP-18 留待 03-06 scripts 侧)。*

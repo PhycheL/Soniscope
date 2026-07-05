@@ -15,4 +15,4 @@
 
 ## TEST 维度移交
 
-(03-03~03-07 追加。)
+- **(移交 Phase 4 TEST,HYP-22):** 联调工具侧证据——fc_live 与 verify_upload_live 的全部真实鉴权/签发/校验场景依赖手工传入一次性 `wx.login` code,缺 code 即 SKIP(本地 CI exit 0 但活体路径零覆盖),与 HYP-22"CI 无法运行活体路径"假设同源 — `apps/worker/src/soniscope_worker/fc_live.py:15-16 @ 5927f36`(docstring:code 一次性、缺失场景标 SKIP)、`apps/worker/src/soniscope_worker/verify_upload_live.py:14 @ 5927f36`(同口径)(03-05 采证,HYP-22 状态未动)。
