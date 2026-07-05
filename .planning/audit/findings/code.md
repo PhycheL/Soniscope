@@ -97,3 +97,33 @@
 - **关联发现:** 无;关联线索: 无(队列状态机普审产出)
 - **上线判定:** (Phase 5 填,留空)
 - **状态:** draft
+
+> 03-07 判定产物(D14-1~6 三要素逐条裁定,D-15 六条各自独立下落、聚类留 Phase 5;严重度按 D-14:纯维护成本类默认 LOW~MEDIUM,重复落点多不自动拔高):CODE 侧五条(D14-1/2/4/5/6)裁定结果——2 条立发现(D14-2 → F-CODE-07、D14-4 → F-CODE-08)+ 3 条"不构成债务"结论(D14-1/5/6,三要素理由与行号证据落 COVERAGE.md 深挖点登记节对应行,不占 F-ID;其中 D14-6 的债务实体已由 Phase 2 F-CON-03 完整承载,不重复立);D14-3 属 TOOL 维度,裁定入 findings/toolchain.md(F-TOOL-08)。每条三要素(①结构必要性 ②兜底机制 ③漂移后果)写入证据字段裁定段。
+
+### F-CODE-07: 重试退避约定(5s/15s/45s、最多 3 次)四处独立落点,Worker 侧数值无字面断言锁定,跨端节奏可静默漂移
+
+- **维度:** 组件代码 (CODE)
+- **严重度:** LOW — 影响:纯维护成本类跨端约定重复——任一端修改重试节奏不会同步其余落点,各端重试独立执行(小程序对 FC/OSS,Worker 对 NLS),漂移后果限于跨端退避节奏不一致与 AGENTS/CLAUDE 文档口径失准,无数据丢失或静默失败面;Worker 侧数值本体漂移不会触发任何测试失败,只能靠人工比对发现;可能性:仅在有人修改任一端重试参数时触发,基线四落点数值当前一致
+- **证据:** `apps/worker/src/soniscope_worker/nls.py:45-46 @ 5927f36`、`apps/miniprogram/utils/uploader.js:28-29 @ 5927f36`、`apps/miniprogram/utils/verify.js:16-17 @ 5927f36`
+  > `RETRY_DELAYS_SECONDS: tuple[float, ...] = (5.0, 15.0, 45.0)` / `MAX_RETRIES = 3`(nls.py,两者均独立字面量,MAX 非 len 派生)——对照 JS 侧 `RETRY_DELAYS_MS = [5000, 15000, 45000]` + `MAX_UPLOAD_RETRIES = RETRY_DELAYS_MS.length`(uploader.js)与 `VERIFY_RETRY_DELAYS_MS = [5000, 15000, 45000]` + `MAX_VERIFY_RETRIES = VERIFY_RETRY_DELAYS_MS.length`(verify.js):同一约定四处落点(3 份延时表 + Worker 独立 MAX 字面量)。
+  >
+  > **三要素裁定(D-13):** ① 结构必要性:Worker(Python)与小程序(JS)跨部署单元跨语言,常量无法共享 = 跨语言镜像系故意重复;但 JS 侧 uploader.js 与 verify.js 为**同包内两份**独立字面量表(可疑——同包可提取共享常量模块),且 Worker `MAX_RETRIES` 与延时表长度无结构绑定(JS 侧均为 `.length` 派生)。② 兜底机制:存在但覆盖不对称——JS 侧两份均有**字面值**测试锁定(`apps/miniprogram/test/uploader.test.js:55-56 @ 5927f36` 断言 `[5000, 15000, 45000]` 与 `MAX_UPLOAD_RETRIES === 3`;`apps/miniprogram/test/verify.test.js:54-55 @ 5927f36` 同构断言);Worker 侧测试(`apps/worker/tests/test_nls.py:401,449-450 @ 5927f36`)以**导入常量**做行为断言,间接锁定 MAX_RETRIES == len(RETRY_DELAYS_SECONDS)(不等即断言失败或 IndexError),但数值本体无字面断言——RETRY_DELAYS_SECONDS 改值不会有任何测试变红。CLAUDE.md"双语言镜像且有测试断言"声明经核实为**半真**:JS 侧值锁定成立,Python 侧仅结构锁定。③ 漂移后果:仅节奏失准(工具/体验层)——重试各自独立执行,无跨端协同依赖,数值漂移不产生数据丢失、静默失败或功能故障。
+- **修复建议:** JS 侧提取共享常量模块(utils 内单一 `RETRY_DELAYS_MS` 供 uploader.js/verify.js 复用,消除同包双份);Worker 侧 `MAX_RETRIES` 改为 `len(RETRY_DELAYS_SECONDS)` 派生(与 JS 侧同构),并在 test_nls.py 增补数值字面断言(与 JS 测试对称,恢复 CLAUDE.md 声明口径)。
+- **工作量:** S(两文件各一处小改 + 测试增补,均单文件粒度)
+- **关联发现:** 无;关联线索: D14-2(CONTRACT-MATRIX ③移交记录第 2 条销号)、HYP-13(跨端约定同族);矩阵组③ 行 44-45
+- **上线判定:** (Phase 5 填,留空)
+- **状态:** draft
+
+### F-CODE-08: 小程序 FC 请求组装(STS/verify)在 utils 与 pages 两份同构实现,仅注释约定"保持一致",无共享源或同步测试
+
+- **维度:** 组件代码 (CODE)
+- **严重度:** LOW — 影响:纯维护成本——FC 请求体形态(字段名/组装逻辑/故障注入分支)改动需人工同步两处,漏改使自动驱动路径(queue_runtime)与上传页手动路径(uploads 页)对 FC 发出不同形态请求;漏改侧收 FC 400 INVALID_REQUEST 显式失败(4xx 不重试,进入 manual_retry 用户可见),无静默数据丢失面;可能性:仅在 FC 请求契约变更(加字段/改名)时触发,基线两份逐字段一致({code, fragment_id, size} / {code, fragment_id, expected_size})
+- **证据:** `apps/miniprogram/utils/queue_runtime.js:94-128 @ 5927f36`、`apps/miniprogram/pages/uploads/uploads.js:330-345,347-370 @ 5927f36`
+  > queue_runtime `wxRequestSts`/`wxRequestVerify` 与 uploads 页 `_wxRequestSts`/`_wxRequestVerify` 逐行同构:同 URL 常量、同 method/header、同 data 字段集(`:105`/`:340` 与 `:125`/`:365`)、同故障注入前置分支。docstring 自述(`queue_runtime.js:5-6 @ 5927f36`):"与 pages/uploads/uploads.js 的内联编排保持一致(uploads 页为既有单测的参照实现,故其控制器不改;本模块承载录音页历史弹层)"——重复系已声明状态。
+  >
+  > **三要素裁定(D-13):** ① 结构必要性:不成立——同端同包内重复(小程序单部署单元),wx.request 编排完全可提取为共享 util("纯逻辑 + 注入 wx 适配器"模式本已是仓库核心模式);docstring 给出的保留理由是测试保守性取舍("参照实现不改"),非结构约束。② 兜底机制:仅注释锚点(`queue_runtime.js:5-6`),无共享常量、无两份同步断言测试,字段集一致性完全靠人工。③ 漂移后果:显式失败非静默——FC `http.py` 缺字段统一 400 INVALID_REQUEST(`apps/fc/shared/fc_shared/http.py:54-79 @ 5927f36`),且两路径互相独立,单侧漂移不影响另一侧;后果限维护成本与单路径可用性,不触及主链数据可见性。
+- **修复建议:** 把 STS/verify 请求组装提取为共享 util(如 `utils/fc_request.js`,注入 wx 与 config),queue_runtime 与 uploads 页均改为消费共享实现——uploads 页既有单测锁定行为,重构后测试可直接回归;或最小改动:uploads 页控制器改为 delegate 到 queue_runtime 的同名函数。
+- **工作量:** S(同包两文件 + 既有测试回归)
+- **关联发现:** 无;关联线索: D14-4(CONTRACT-MATRIX ③移交记录第 4 条销号,普查扫描 9 注记)
+- **上线判定:** (Phase 5 填,留空)
+- **状态:** draft
