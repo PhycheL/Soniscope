@@ -59,3 +59,63 @@
 - **关联发现:** 无;关联线索: HYP-14(证实方向:发布文档未覆盖翻转步骤;结论行 DOC-CLAIMS.md FD-16,04-09 回填锚点);销号引 HANDOFF-PHASE4.md DOC 节第 2、3 条
 - **上线判定:** (Phase 5 填,留空)
 - **状态:** draft
+
+> 04-05 判定产物(AGENTS.md + README×3 + config.js 深核、两 JSON 普审、普审级 5 文档、目标态 2 文档引用级、存在级 3 组登记与 DOC 收口):共 **5 条发现**——F-DOC-04(AGENTS.md 配置回退声明失实,LOW)、F-DOC-05(AGENTS.md 与两份子 README 现状叙述滞后于实施进度,LOW)、F-DOC-06(HYP-02 聚合:权威文档迁移后旧路径引用全仓死链,LOW)、F-DOC-07(HYP-05:vendored Aliyun FC 示例仓 1003 文件 ≈28 MB 入库,INFO)、F-DOC-08(HYP-06:四套 agent 工具目录独立副本已实际漂移,INFO)。DNF 对照命中(issue-cedential 拼写 DNF-02 ×4:CF-02 核实结论行 + AG-29/AG-38/RF-01/RM-03;whisper-local 桩 DNF-01 ×2:AG-21/AG-34)按负面清单核实闭环不立发现;wasm-crypto 与 nls20180628 两处 AGENTS.md 同款失实声明判 drift 共证既有 F-DOC-01/F-DOC-02 不另立条(HYP-03 已裁定不复判)。ROADMAP 成功判据 1 两条点名线索核实结论均落档:issue-cedential 拼写域名(DOC-CLAIMS CF-02,agree 闭环 DNF-02 不立 F-DOC)、AGENTS.md 引用已删除文档(AG-01~17 逐处登记 → F-DOC-06 聚合)。销号底稿见 `.planning/audit/DOC-CLAIMS.md` §AGENTS.md / §README.md ×3 / §config.js / §project.config.json / §app.json / §普审级 5 文档 / §目标态 2 文档 / §存在级登记 / §DOC 总机械对账 各节(AG-01~39 + R-01 + RF-01~06 + RM-01~06 + CF-01~08 + PC-01~03 + AJ-01~03,共 66 条;阶段累计 198 条)。
+
+### F-DOC-04: AGENTS.md 声称未设置 SONISCOPE_HOME 时回退 `~/SoniScope/config.yaml`,实态无任何固定兜底(直接报错)
+
+- **维度:** 文档配置一致性 (DOC)
+- **严重度:** LOW — 影响:AGENTS.md 是 AI 编码代理的首要工作规则文档,其配置加载顺序声明与实态相反——实态为进程 env → 向上搜索仓库根 .env → 抛 `RuntimeHomeError`(无任何 `~/SoniScope` 分支),且与 tech-spec §2.3"加载顺序 env → 仓库根 .env,无固定兜底"(T-09)、deployment-guide §1.2"脚本不兜底固定目录"(DG-06)双文档口径同时冲突;按 AGENTS.md 排查"未设置 SONISCOPE_HOME"问题或新环境搭建时会误以为存在家目录兜底;可能性:配置排障/新环境搭建/AI agent 按文档理解装载逻辑时触发;实际报错文案本身给出正确指引(export 或写 .env),误导窗口有限
+- **证据:** `AGENTS.md:108-110 @ 5927f36`
+  > 「配置加载顺序：1. `$SONISCOPE_HOME/config.yaml` 2. 未设置 `SONISCOPE_HOME` 时回退 `~/SoniScope/config.yaml`」——实态:`apps/worker/src/soniscope_worker/paths.py:49-63 @ 5927f36`(`soniscope_home()`:env 有值即用 → `_find_dotenv()` 向上搜索 .env → 否则 `raise RuntimeHomeError("未设置 SONISCOPE_HOME。请先 export……或在仓库根目录 .env 中写入……")`,无 `~/SoniScope` 分支);文档侧同款正确口径:`docs/v1.0.0 prd/tech-spec.md:121-145 @ 5927f36`(T-09)、`docs/runbook/deployment-guide.md:61-73 @ 5927f36`(DG-06)
+- **修复建议:** 修订 AGENTS.md「运行时目录与配置」节配置加载顺序两行,对齐实态与 tech-spec/deployment-guide 口径:"1. 进程环境变量 `SONISCOPE_HOME` 2. 仓库根(向上搜索).env 中的 `SONISCOPE_HOME`;均未设置时报错退出,无固定目录兜底"。
+- **工作量:** S(AGENTS.md 单文件两行措辞)
+- **关联发现:** F-DOC-05(同文件 AGENTS.md 滞后声明);关联线索: 无
+- **上线判定:** (Phase 5 填,留空)
+- **状态:** draft
+
+### F-DOC-05: AGENTS.md 与两份子 README 的"现状/后续 story"叙述滞后于实施进度,声称占位/骨架而基线已全量实现
+
+- **维度:** 文档配置一致性 (DOC)
+- **严重度:** LOW — 影响:三处"现状"叙述停留在早期 story 时点,与基线全量实现实态相反——AGENTS.md 称"仓库仍处于 MVP 初期,`apps/`、`Makefile`、`pyproject.toml` 等会在对应 story 中创建"(三者全部实存并承载 45 个 make 目标与 26 个 worker 模块);apps/fc/README.md 称"`handler.py` 为占位 WSGI 处理器,真实业务逻辑在 US-006/007/009 实现"(两 handler 均已是含鉴权三步 + STS 签发 / HeadObject 三态校验的全量实现);apps/miniprogram/README.md 称"本 story(US-011)只交付骨架与环境配置"(基线已是三页 + 16 个 utils 模块的完整实现)——新读者或 AI agent 按 README 判断组件成熟度会得出与实态相反的结论(项目已处部署上线阶段);可能性:onboarding、代码走读或 AI agent 读 README 建立上下文时触发,不影响运行时行为
+- **证据:** `AGENTS.md:25,89 @ 5927f36`、`apps/fc/README.md:31-34 @ 5927f36`、`apps/miniprogram/README.md:33-35 @ 5927f36`
+  > AGENTS.md:89「`apps/`、`Makefile`、`pyproject.toml` 等会在对应 story 中创建」——实态 `git ls-tree --name-only 5927f36`(三者均在,另 .claude/.codex/ 也不在"已存在目录"清单);fc/README:33「`handler.py` 为占位 WSGI 处理器」——实态 `apps/fc/issue_credential/handler.py:71-81 @ 5927f36`(全量鉴权 + AssumeRole 签发)、`apps/fc/verify_upload/handler.py:40 @ 5927f36`;miniprogram/README:35「本 story（US-011）只交付骨架与环境配置」——实态 `git ls-tree -r --name-only 5927f36 apps/miniprogram/utils/`(16 个 utils 模块,录音/分片/8 状态队列/OSS V4 签名/verify/故障注入全在)
+- **修复建议:** 三文件"现状/后续 story"节改写为部署阶段实态:AGENTS.md 项目类型节删去"MVP 初期/会在对应 story 中创建"叙述并更新已存在目录清单;apps/fc/README.md「现状(US-005)」节改述两函数已全量实现;apps/miniprogram/README.md「后续 story」节改述 US-012~US-020 已交付。均为叙述性修订,无代码改动。
+- **工作量:** S(三文件各一节措辞)
+- **关联发现:** F-DOC-04(同文件 AGENTS.md);关联线索: 无
+- **上线判定:** (Phase 5 填,留空)
+- **状态:** draft
+
+### F-DOC-06: 【HYP-02 聚合】权威文档迁移至 `docs/v1.0.0 prd/` 后,全仓 10 文件的旧路径引用未随迁——AGENTS.md 17 处死链为主体,权威文档链首两环全部指向不存在的路径
+
+- **维度:** 文档配置一致性 (DOC)
+- **严重度:** LOW — 影响:`docs/PRD_v1.md` 与 `docs/tech-spec.md` 旧路径在基线不存在(实体在 `docs/v1.0.0 prd/`),而 AGENTS.md 优先级链(:5,6)、四份 runbook 权威链、PRD/tech-spec 自引用、设计/对比文档引用全部仍指旧路径——按引用寻文一律落空;AGENTS.md 是 AI 编码代理首要规则文档,其"关键文件"与"按需查阅"两张导航表(:405-424)整体失效,代理与新读者循径找不到权威文档,需靠全仓搜索自救;另有 cloud-setup §5.4 联调脚本旧路径 `./test/test_asr.py`(实存 `scripts/test_asr.py`,CS-15)与 PRD 引用的不存在 fixture 文件(P-26)两处异源死链;可能性:每次按文档链寻源必触发,是审计中命中面最广的单一文档问题(10 文件 ≈47 处命中)——对应 CHARTER LOW 锚点『文档死链/路径失效』
+- **证据:** `git grep -n 'docs/PRD_v1.md\|docs/tech-spec.md\|docs/deployment-guide.md' 5927f36 -- AGENTS.md docs/`(排除 vendored docs/example/)全量命中 census:
+  > **AGENTS.md ×17**(:5,6,69,157,337,375,405,406,416,417,418,419,420,421,422,423,424——逐处登记见 DOC-CLAIMS.md AG-01~AG-17);**设计文档 ×4**:`docs/fc-transcribe-design.md:5`、`docs/multi-user-design.md:5,599,600`(04-RESEARCH 预核 3 处,实测 :600 亦命中,census +1);**runbook ×4**:`docs/runbook/cloud-setup.md:83`(CS-09)、`docs/runbook/mvp-acceptance.md:3,5`(MA-01)、`docs/runbook/deployment-guide.md:5`(DG-01);**普审文档 ×1**:`docs/transcribe-approach-comparison.md:5`;**存在级对象 ×1**:`docs/runbook/us-001-manual.html:471`(census 计入,内容未审);**权威文档自引用**:`docs/v1.0.0 prd/PRD_v1.md` ×19(:5,63,122,177,188,236,365,389,413,476,509,534,565,596,598,714,784,847,869——P-27)、`docs/v1.0.0 prd/tech-spec.md:3,80-81`(T-05)。存在性判定:`git ls-tree -r --name-only 5927f36 docs`(顶层无 PRD_v1.md/tech-spec.md,实体在 `docs/v1.0.0 prd/`;旧路径 `docs/deployment-guide.md` 全仓零命中)。附注两处异源死链同锚点并档:`docs/runbook/cloud-setup.md:151 @ 5927f36`(`./test/test_asr.py`,实存 `scripts/test_asr.py`,CS-15)、`docs/v1.0.0 prd/PRD_v1.md:204 @ 5927f36`(`tests/fixtures/wx-login-fixture.json` 基线不存在,fc_live 实现自造伪造 code,P-26)
+- **修复建议:** 批量路径替换:`docs/PRD_v1.md` → `docs/v1.0.0 prd/PRD_v1.md`、`docs/tech-spec.md` → `docs/v1.0.0 prd/tech-spec.md`(10 文件 ≈45 处,机械可完成;注意新路径含空格,Markdown 链接需引号/转义处理,html 内 1 处同步);cloud-setup:151 改 `scripts/test_asr.py`;PRD:204 fixture 引用改述为 fc_live 自造伪造 code 的实际口径(或补建 fixture,二选一由修复里程碑决策)。替代方案:把两权威文档迁回 `docs/` 顶层(改动面更小但需用户对目录布局重新决策)。
+- **工作量:** S(批量机械替换 + 2 处措辞;若选迁回方案则为目录决策 + 2 次 git mv)
+- **关联发现:** F-DOC-04/F-DOC-05(AGENTS.md 同文件);关联线索: HYP-02(证实方向:引用失效半句全量坐实;"deletions uncommitted"半句已被基线核实推翻——CHARTER 基线章节,04-09 回填锚点)
+- **上线判定:** (Phase 5 填,留空)
+- **状态:** draft
+
+### F-DOC-07: 【HYP-05】vendored Aliyun FC 示例仓 `docs/example/start-fc-main/` 以 1,003 个跟踪文件、约 28 MB 整仓入库
+
+- **维度:** 文档配置一致性 (DOC)
+- **严重度:** INFO — 影响:存在级观察(CHARTER INFO 锚点逐字点名"vendored 仓库膨胀"):完整第三方示例仓入库造成仓库体积膨胀与全仓检索噪声——本审计全程 grep 均需显式排除 `docs/example/`,未排除时旧路径/常量检索会混入大量无关命中;可能性:全仓搜索、clone、依赖扫描类操作必然经过,无运行时影响
+- **证据:** `git ls-tree -r --name-only 5927f36 docs/example/start-fc-main | wc -l` → **1003**;`git ls-tree -r -l 5927f36 docs/example/start-fc-main` blob 合计 **28,227,670 字节(≈28 MB)**——与 HYP-05 假设"29 MB、1,003 个跟踪文件"文件数逐一吻合(字节数为 blob 合计口径,量级一致)
+- **修复建议:** 移除 vendored 副本,以 README 一行登记上游仓库 URL + 所需参考的具体文件/commit 替代(或 git submodule/sparse 引用);若确需离线保留,至少在 `.gitattributes` 标 `linguist-vendored` 并在检索惯例中固化排除口径。按 D-09 存在级处置,不逐文件审计。
+- **工作量:** S(单目录删除 + 一行登记;历史体积不回收属 git 常识,不在本条范围)
+- **关联发现:** 无;关联线索: HYP-05(证实方向:存在级底数坐实,04-09 回填锚点)
+- **上线判定:** (Phase 5 填,留空)
+- **状态:** draft
+
+### F-DOC-08: 【HYP-06】agent 工具脚手架在 `.agents/`、`.claude/`、`.codex/`、`.cursor/` 四处重复,独立副本已实际漂移
+
+- **维度:** 文档配置一致性 (DOC)
+- **严重度:** INFO — 影响:存在级观察(CHARTER INFO 锚点逐字点名"四套 AI 工具目录漂移"):同一 agent 脚手架四处副本(.agents 54 / .claude 440 / .codex 420 / .cursor 468 个跟踪文件)各自独立演进,单处修复会静默遗漏其余三处——抽样已见实际漂移:同名工作流文件在三目录 blob 各异;可能性:任何对 agent 规则/工作流的修改必触发同步问题,无运行时影响(均为工具目录,审计范围排除区,per D-09 存在级照记)
+- **证据:** `git ls-tree -d --name-only 5927f36` → `.agents/`、`.claude/`、`.codex/`、`.cursor/` 四目录并存(文件数 54/440/420/468);漂移抽样:`gsd-core/workflows/execute-plan.md` 在 .claude/.codex/.cursor 三处 blob **各异**(`774f39f` / `92d5572` / `b418a23`,`git ls-tree 5927f36 <dir>/gsd-core/workflows/execute-plan.md`);结构漂移:`commands/prime.md` 在 .agents/.claude/.cursor 三处同 blob(`93515c0`)而 .codex 布局完全不同(无 commands/ 同名文件)
+- **修复建议:** 收敛为单一权威源(如 `.agents/` 或独立 tooling 仓)+ 各工具目录由安装/同步脚本生成;短期最小动作:在 AGENTS.md 登记"四目录副本关系与权威侧"约定,修改时四处同步。按 D-09 存在级处置,不逐文件审计。
+- **工作量:** M(需盘点四目录差异并定权威侧;同步机制属工具链改动)
+- **关联发现:** 无;关联线索: HYP-06(证实方向:四目录并存与独立漂移坐实,04-09 回填锚点)
+- **上线判定:** (Phase 5 填,留空)
+- **状态:** draft

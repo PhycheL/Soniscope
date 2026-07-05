@@ -42,18 +42,18 @@
 | `apps/fc/README.md` | 深核 | §apps/fc/README.md(04-05) | 已审:6 条销号;drift ×1 → F-DOC-05 |
 | `apps/miniprogram/README.md` | 深核 | §apps/miniprogram/README.md(04-05) | 已审:6 条销号;drift ×1 → F-DOC-05 |
 | `apps/miniprogram/config.js` | 深核 | §config.js(04-05) | 已审:8 条销号无发现级 drift;issue-cedential 核实结论闭环 DNF-02;ENV 现值 → HYP-14 证据行 |
-| `docs/architecture/architecture-review-2026-07-02.md` | 普审 | (04-05) | 待审 |
-| `docs/transcribe-approach-comparison.md` | 普审 | (04-05) | 待审 |
-| `docs/agents/domain.md` | 普审 | (04-05) | 待审 |
-| `docs/agents/issue-tracker.md` | 普审 | (04-05) | 待审 |
-| `docs/agents/triage-labels.md` | 普审 | (04-05) | 待审 |
+| `docs/architecture/architecture-review-2026-07-02.md` | 普审 | §普审级 5 文档(04-05) | 已审无发现(模块引用全部实存;ENV 风险记载与 F-DOC-03 证据互证) |
+| `docs/transcribe-approach-comparison.md` | 普审 | §普审级 5 文档(04-05) | 已审:dead-ref ×1(:5 → HYP-02,F-DOC-06 聚合);其余引用有效 |
+| `docs/agents/domain.md` | 普审 | §普审级 5 文档(04-05) | 已审无发现(CONTEXT.md/docs/adr 懒创建语义自证,非死链) |
+| `docs/agents/issue-tracker.md` | 普审 | §普审级 5 文档(04-05) | 已审无发现(.scratch/ 惯例自带按需创建语义) |
+| `docs/agents/triage-labels.md` | 普审 | §普审级 5 文档(04-05) | 已审无发现(纯标签映射,无路径/代码引用) |
 | `apps/miniprogram/project.config.json` | 普审(配置) | §project.config.json(04-05) | 已审:3 条销号无发现;平台侧真值标『无法静态核实』 |
 | `apps/miniprogram/app.json` | 普审(配置) | §app.json(04-05) | 已审:3 条销号无发现;页面四件套静态复核通过 |
-| `docs/fc-transcribe-design.md` | 只审引用与自洽 | (04-05) | 待审(目标态对照未审,章程排除) |
-| `docs/multi-user-design.md` | 只审引用与自洽 | (04-05) | 待审(目标态对照未审,章程排除) |
-| `docs/小程序原型/`(PixPin PNG ×4) | 只记存在 | (04-05) | 待审 |
-| `docs/architecture/soniscope-mvp-architecture.drawio` | 只记存在 | (04-05) | 待审 |
-| `docs/runbook/us-001-manual.html` | 只记存在 | (04-05) | 待审 |
+| `docs/fc-transcribe-design.md` | 只审引用与自洽 | §目标态 2 文档(04-05) | 已审(引用级;目标态对照未审,章程排除):dead-ref ×1(:5 → HYP-02,F-DOC-06 聚合);无明显自相矛盾 |
+| `docs/multi-user-design.md` | 只审引用与自洽 | §目标态 2 文档(04-05) | 已审(引用级;目标态对照未审,章程排除):dead-ref ×3 行(:5,599,600 → HYP-02,F-DOC-06 聚合);现状代码引用实存核对通过 |
+| `docs/小程序原型/`(PixPin PNG ×4) | 只记存在 | §存在级登记(04-05) | 已登记(只记存在,不审内容):4 文件在列 |
+| `docs/architecture/soniscope-mvp-architecture.drawio` | 只记存在 | §存在级登记(04-05) | 已登记(只记存在,不审内容) |
+| `docs/runbook/us-001-manual.html` | 只记存在 | §存在级登记(04-05) | 已登记(只记存在,不审内容;:471 旧路径机械命中计入 F-DOC-06 底数) |
 
 ## §PRD_v1.md 深核(04-03)
 
@@ -385,3 +385,80 @@
 | AJ-03 | window 导航栏标题"日观声记"与深色样式、`sitemapLocation: "sitemap.json"` | `apps/miniprogram/app.json:7-17 @ 5927f36` | 标题与 cloud-setup §4.1 小程序名称"日观声记"同值;sitemap.json 基线实存(引用有效) | `docs/runbook/cloud-setup.md:94 @ 5927f36`、`git ls-tree --name-only 5927f36 apps/miniprogram/`(sitemap.json 在) | agree |
 
 **app.json 节机械对账:** 清单条目总数 **3**(AJ-01 ~ AJ-03);四态计数:agree **3** + drift **0** + dead-ref **0** + 无法静态核实 **0**;复算:3 + 0 + 0 + 0 = 3 ✓。
+
+## §普审级 5 文档(04-05,D-05 第二层)
+
+> 普审口径:只抓死链(引用路径存在性)与明显过期声明,不做逐声明深核。取证:`git show 5927f36:<path>` + 引用路径逐一 `git ls-tree` 存在性核对。
+
+### docs/architecture/architecture-review-2026-07-02.md(217 行 @ 5927f36)
+
+引用检查:全文引用均为模块名:行号形态(app.py/head.py/wechat.py/env.py/audio.py/manifest.py/nls.py/poller.py/pipeline.py/recovery.py/locks.py/fc_deploy.py/oss_admin.py 等),被引模块基线全部实存(`git ls-tree -r --name-only 5927f36 apps/`);无任何文档路径引用,零 dead-ref。过期声明扫读:本文档系基线前 3 天(2026-07-02)的架构评审,其 ENV 单点风险记载(:58,70,193)与故障注入门控描述与 04-04 核实的实态一致(F-DOC-03 的"风险已知未落实"证据主体即此文档,FD-16 已引用);未见与基线实态相悖的过期声明。**结论行:已审无发现。**
+
+### docs/transcribe-approach-comparison.md(124 行 @ 5927f36)
+
+引用检查:`:5` 引 `docs/tech-spec.md` ——基线该路径无文件,实存 `docs/v1.0.0 prd/tech-spec.md`(与 P-27/T-05 同源迁移未随迁)→ **dead-ref 登记 ×1 → HYP-02(F-DOC-06 聚合)**;`:6,118` 引 `docs/fc-transcribe-design.md`、`:93,112` 引 `docs/multi-user-design.md` 均实存有效。过期声明扫读:文档主体为 FC 直转方案对比与决策记录(目标态议题,内容对照按 D-06 不展开);"现状 Worker 轮询转写"的现状描述与 HYP-01/HYP-10 证实实态一致。**结论行:dead-ref ×1,其余无发现。**
+
+### docs/agents/domain.md(35 行 @ 5927f36)
+
+引用检查:引用 `CONTEXT.md`(仓库根)与 `docs/adr/` ——基线两者均不存在(`git ls-tree --name-only 5927f36` 根无 CONTEXT.md;docs/ 无 adr/),但文档 :12 明示"If any of these files don't exist, **proceed silently**……creates them lazily"——懒创建语义自证,非死链。**结论行:已审无发现。**
+
+### docs/agents/issue-tracker.md(30 行 @ 5927f36)
+
+引用检查:约定 issue 存 `.scratch/<feature-slug>/` ——基线根无 `.scratch/`,但 :15 明示"creating the directory if needed"(按需创建语义自证,非死链);`:10` 引 `triage-labels.md`(同目录)实存。**结论行:已审无发现。**
+
+### docs/agents/triage-labels.md(15 行 @ 5927f36)
+
+引用检查:纯标签字符串映射表(五 triage 角色 ↔ Status: 行),无任何路径/命令/代码引用。过期声明扫读:与 AGENTS.md :446-448 的 triage 标签口径一致。**结论行:已审无发现。**
+
+## §目标态 2 文档 引用级(04-05,D-06)
+
+> **目标态对照未审(章程排除)**:`docs/fc-transcribe-design.md` 与 `docs/multi-user-design.md` 系未来态设计文档(CHARTER 排除项 + D-06),本节**只登记引用有效性(dead-ref)与明显自相矛盾**,不做任何"设计 vs 代码实态"判定(Pitfall 8)——两文档描述的 transcribe-audio 函数、多用户 user_id 方案等目标态内容均不以基线代码现状评判。
+
+### docs/fc-transcribe-design.md(153 行 @ 5927f36)——目标态对照未审(章程排除)
+
+| # | 引用/自洽项 | 证据 | 存在性/自洽判定 | 判定 |
+|---|-------------|------|----------------|------|
+| FT-01 | `:5` 现状权威来源引 `docs/tech-spec.md` | `docs/fc-transcribe-design.md:5 @ 5927f36` | 基线该路径无文件,实存 `docs/v1.0.0 prd/tech-spec.md`(`git ls-tree -r --name-only 5927f36 docs`) | dead-ref → HYP-02(F-DOC-06 聚合) |
+| FT-02 | 其余引用与自洽:`:3` 引 `docs/transcribe-approach-comparison.md`(实存)、`:13` 引 `apps/worker/src/soniscope_worker/nls.py`(实存);`:148` 引 `apps/fc/transcribe_audio/handler.py` 系**目标态待建文件**(设计产物路径,非现状引用,不计 dead-ref);文内决策状态(:3"已决策,部署阶段立即实施")与 transcribe-approach-comparison §6 决策记录互指一致,无明显自相矛盾 | `docs/fc-transcribe-design.md:3,13,148 @ 5927f36` | 引用有效;自洽 | agree(引用级) |
+
+### docs/multi-user-design.md(616 行 @ 5927f36)——目标态对照未审(章程排除)
+
+| # | 引用/自洽项 | 证据 | 存在性/自洽判定 | 判定 |
+|---|-------------|------|----------------|------|
+| MU-01 | `:5` 关联文档引 `docs/PRD_v1.md` 与 `docs/tech-spec.md`(同行双旧路径) | `docs/multi-user-design.md:5 @ 5927f36` | 基线两路径均无文件,实体在 `docs/v1.0.0 prd/`;同行第三引 `docs/runbook/cloud-setup.md` 实存有效 | dead-ref → HYP-02(F-DOC-06 聚合) |
+| MU-02 | `:599` 影响面表引 `docs/tech-spec.md`、`:600` 引 `docs/PRD_v1.md` | `docs/multi-user-design.md:599,600 @ 5927f36` | 同 MU-01(04-RESEARCH 预核记 :5,599 两处,实测 :600 亦命中——census 修正 +1) | dead-ref → HYP-02(F-DOC-06 聚合) |
+| MU-03 | 现状引用与自洽:文内"现状"锚点引用的代码路径逐一实存——`utils/queue_runtime.js`/`uploader.js`/`verify.js`(:60)、`fc_shared/wechat.py`(:61)、`auth.py`/`env.py`(:62)、`audit.py`(:63)、`sts.py`(:70)、`utils/device.js`(:80)、`poller.py`(:85)、`utils/oss_sign.js`(:112)、`issue_credential/handler.py`(:247)、`:601` 引 `docs/runbook/cloud-setup.md`;无明显自相矛盾 | `docs/multi-user-design.md:60-63,70,80,85,112,247,601 @ 5927f36`、`git ls-tree -r --name-only 5927f36 apps/` | 引用有效;自洽 | agree(引用级) |
+
+## §存在级登记(04-05,D-05 第四层 + D-09)
+
+> 只记存在,不审内容。取证:`git ls-tree -r --name-only 5927f36 <path>`。
+
+- **docs/小程序原型/(PixPin PNG ×4):** `PixPin_2026-07-02_16-05-58.png`、`PixPin_2026-07-02_16-06-11.png`、`PixPin_2026-07-02_16-06-42.png`、`PixPin_2026-07-02_16-34-53.png` ——基线 4 文件在列,只记存在。
+- **docs/architecture/soniscope-mvp-architecture.drawio:** 基线实存,只记存在。
+- **docs/runbook/us-001-manual.html:** 基线实存,只记存在;HYP-02 全量机械检索命中其 `:471`(`docs/PRD_v1.md` 旧路径)——按 census 完整性计入 F-DOC-06 底数,不展开内容审计。
+- **HYP-05 存在级证据(vendored 仓底数):** `git ls-tree -r --name-only 5927f36 docs/example/start-fc-main | wc -l` → **1003** 个跟踪文件;`git ls-tree -r -l 5927f36 docs/example/start-fc-main` 合计 **28,227,670 字节(≈28 MB)**——与 HYP-05 假设"29 MB、1,003 个跟踪文件"量级一致(文件数逐一吻合,字节数为 blob 合计口径)→ HYP-05(F-DOC-07 立条,04-09 回填锚点)。
+- **HYP-06 存在级证据(四套 agent 工具目录):** `git ls-tree -d --name-only 5927f36` 确认 `.agents/`(54 文件)、`.claude/`(440 文件)、`.codex/`(420 文件)、`.cursor/`(468 文件)四目录并存;同名文件抽样佐证独立副本已实际漂移——`commands/prime.md` 在 .agents/.claude/.cursor 三处同 blob(`93515c0`)而 .codex 布局完全不同(无该文件);`gsd-core/workflows/execute-plan.md` 在 .claude/.codex/.cursor 三处 blob **各异**(`774f39f`/`92d5572`/`b418a23`,`git ls-tree 5927f36 <dir>/gsd-core/workflows/execute-plan.md`)→ HYP-06(F-DOC-08 立条,04-09 回填锚点)。
+
+## DOC 总机械对账(04-05 收口)
+
+**四层对象计数(D-05):** 深核 **11**(PRD/tech-spec/cloud-setup/deployment-guide/fc-deploy/mvp-acceptance/AGENTS/README/fc README/miniprogram README/config.js)+ 普审 **7**(架构评审/转写对比/domain/issue-tracker/triage-labels + project.config.json/app.json)+ 引用级 **2**(fc-transcribe-design/multi-user-design,均标"目标态对照未审(章程排除)")+ 存在级 **3**(原型 PNG ×4 / drawio / us-001-manual.html)= **23** 对象,覆盖总表 23 行全部终态 ✓(11 + 7 + 2 + 3 = 23 ✓)。
+
+**编号清单条目总数:** 04-03 **66**(P 30 + T 36)+ 04-04 **66**(CS 19 + MA 12 + DG 19 + FD 16)+ 04-05 **66**(AG 39 + R 1 + RF 6 + RM 6 + CF 8 + PC 3 + AJ 3)= **198** 条。
+
+**四态分布合计(198 条):**
+
+| 批次 | agree | drift | dead-ref | 无法静态核实 | 小计 |
+|------|-------|-------|----------|--------------|------|
+| 04-03(P+T) | 58 | 2 | 3 | 3 | 66 |
+| 04-04(CS+MA+DG+FD) | 47 | 1 | 4 | 14 | 66 |
+| 04-05(AG+R+RF+RM+CF+PC+AJ) | 41 | 6 | 17 | 2 | 66 |
+| **合计** | **146** | **9** | **24** | **19** | **198** |
+
+复算:146 + 9 + 24 + 19 = 198 ✓。编号清单之外的登记行:普审级 dead-ref 登记 **1** 处(transcribe-approach-comparison.md:5)+ 引用级登记 **5** 行(FT ×2 + MU ×3,内含 dead-ref 登记 4 行)+ 存在级登记 **5** 条(3 组对象 + HYP-05/HYP-06 证据)。
+
+**F-DOC 立条数:** 8 条(F-DOC-01~08;schema 示例 F-DOC-00 不计)——04-03 立 2(F-DOC-01/02)、04-04 立 1(F-DOC-03)、04-05 立 5(F-DOC-04/05/06/07/08,见 findings/docs-config.md)。drift 去向核对:9 处 drift 中 T-27/AG-19 → F-DOC-01(共证)、T-29/AG-20 → F-DOC-02(共证)、FD-16 → F-DOC-03、AG-23 → F-DOC-04、AG-22/RF-06/RM-06 → F-DOC-05,全部闭环 ✓。dead-ref 去向核对:编号清单 24 处 + 普审/引用级登记 5 行 + 存在级 census 1 处(us-001-manual.html:471),除 P-26(fixture 引用,记 F-DOC-06 底数附注)外全部 → HYP-02,聚合立条 F-DOC-06 ✓。
+
+**HYP 回填锚点就位核对(6 条 DOC HYP,04-09 回填引用):** HYP-02(AG-01~17 + F-DOC-06 聚合条 + 各节 dead-ref 登记行)、HYP-05(§存在级登记 vendored 底数 + F-DOC-07)、HYP-06(§存在级登记四目录证据 + F-DOC-08)、HYP-14(FD-16 文档侧 + CF-08 配置侧 + F-DOC-03)、HYP-16(P-29 + T-36 结论行)、HYP-21(P-28 结论行)——全部就位 ✓。HYP-11(FC 直转轮询计费)属目标态章程排除,本清单引用级节未涉其内容对照(D-14 定"细化:范围外",04-09 关闭)。
+
+---
+*DOC 声明核对清单: 2026-07-05(23 对象四层收口;声明 198 条四态销号(146 agree / 9 drift / 24 dead-ref / 19 无法静态核实);F-DOC 8 条;HYP-02/05/06/14/16/21 锚点齐备)*
