@@ -24,13 +24,13 @@ SoniScope 是一条个人录音转写流水线:WeChat 小程序录音 → Aliyun
 - ✓ 契约一致性审计:51 行漂移矩阵(FC/Worker/小程序三列,236 处 `@ 5927f36` 行号证据)、18 样本往返校验佐证、12 个分歧格四类判定(F-CON-01~06)、重复逻辑普查与跨语言契约测试配方 — Validated in Phase 2: 契约抽取与漂移分析
 - ✓ 代码质量与技术债审计:三层主体代码 63 对象(47 CODE + 16 TOOL)全覆盖普审 + 深挖,COVERAGE.md 台账 + F-CODE-01~08 发现,258 条扫描命中三态销号,14 条假设回填 — Validated in Phase 3: 组件与工具链深潜
 - ✓ 脚本与工具链审计:scripts/ 三文件与 Makefile 45 目标普审,F-TOOL-01~08 发现(含 HYP-07 过期预签名 URL 证实、mypy 门禁结构性恒红)— Validated in Phase 3: 组件与工具链深潜
+- ✓ 文档与配置一致性审计:DOC-CLAIMS.md 23 对象四层收口,198 条声明四态销号(146 一致/9 drift/24 死链/19 无法静态核实),F-DOC-01~08 发现(`issue-cedential` 线索闭环 DNF-02,AGENTS.md 死链 AG-01~17 聚合 F-DOC-06)— Validated in Phase 4: 文档配置与测试审计
+- ✓ 测试代码审计:TEST-AUDIT.md 41 测试模块 8 面台账、双语言覆盖率实测(pytest 73% / node 92.73%)、D-11 门禁三方对照,F-TEST-01~10 发现;HYPOTHESES.md 25/25 全闭环(证实 17/细化 7/证伪 1)— Validated in Phase 4: 文档配置与测试审计
 
 ### Active
 
 <!-- 本里程碑:审计,仅产出报告,不做修复。 -->
 
-- [ ] 文档与配置一致性审计:docs/、config.js、AGENTS.md 等与代码实态的一致性(含已知的 `issue-cedential` 拼写域名、AGENTS.md 引用已删除文档等线索)
-- [ ] 测试代码审计:现有测试质量与覆盖缺口盘点
 - [ ] 产出结构化审计报告:每个发现带严重度分级、文件/行号证据、修复建议与工作量估计,可直接作为下一个里程碑(修复)的输入
 
 ### Out of Scope
@@ -83,4 +83,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-05 after Phase 3 completion*
+*Last updated: 2026-07-05 after Phase 4 completion*
