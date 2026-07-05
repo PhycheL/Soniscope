@@ -29,10 +29,10 @@
 
 | 路径 | 行数 | 维度 | 深度 | 已过面 | 产出 | 备注 |
 |------|------|------|------|--------|------|------|
-| `apps/worker/src/soniscope_worker/pipeline.py` | 875 | CODE | 待审 | 待审 | 待审 | 深挖:HYP-10(串行吞吐) |
-| `apps/worker/src/soniscope_worker/nls.py` | 740 | CODE | 待审 | 待审 | 待审 | 深挖:HYP-19(2018 版 NLS API)、D14-2(重试常量) |
-| `apps/worker/src/soniscope_worker/cli.py` | 601 | CODE | 待审 | 待审 | 待审 | TOOL 子命令入口,实体逻辑见 TOOL 侧对应模块,整体归 CODE 审一次(RESEARCH Open Question 2 裁决) |
-| `apps/worker/src/soniscope_worker/poller.py` | 531 | CODE | 待审 | 待审 | 待审 | 深挖:HYP-10、HYP-16;D14-1(sha256 比对流程) |
+| `apps/worker/src/soniscope_worker/pipeline.py` | 875 | CODE | 深挖 | 9/9 | 无发现 | 深挖 HYP-10 证实:串行 for 循环 `pipeline.py:407-441 @ 5927f36` + 单线程主循环 `:485-506`(回填见 HYPOTHESES.md)。`.done` 最后写(`:274`/`:367`)、任一阶段失败不建 `.done`、原子写协议核查通过;F-CODE-02 消费端证据 `:412-422` |
+| `apps/worker/src/soniscope_worker/nls.py` | 740 | CODE | 深挖 | 9/9 | 无发现 | 深挖 HYP-19 证据:filetrans 域名+版本经 `verify_prep.NLS_FILETRANS_VERSION = "2018-08-17"`(`verify_prep.py:87 @ 5927f36`,消费 `nls.py:454-455 @ 5927f36`),legacy `aliyunsdkcore` AcsClient(`verify_prep.py:775-776`)。D14-2 证据(D-15 只记不裁):`RETRY_DELAYS_SECONDS = (5.0, 15.0, 45.0)` 与 `MAX_RETRIES = 3` 均为独立字面量(`nls.py:45-46 @ 5927f36`),MAX 非 `len()` 派生;`_with_retries`(`:268-270`)当前 3 == len 自洽。RESIGN_THRESHOLD 续签逻辑(`:314-326`)无静默失败;秘密仅经 `.get_secret_value()` 入 SDK 参数,错误信息只含类名/错误码(`:428`/`:579`) |
+| `apps/worker/src/soniscope_worker/cli.py` | 601 | CODE | 普审 | 9/9 | 无发现 | TOOL 子命令入口,实体逻辑见 TOOL 侧对应模块,整体归 CODE 审一次(RESEARCH Open Question 2 裁决)。全部子命令统一 `(lines, exit_code)` → `typer.Exit` 转换完整;`oss-delete-obj` 双闸门(--yes/SONISCOPE_ALLOW_OSS_DELETE)测试专用;face7 轻微:模块 docstring(`cli.py:1-5 @ 5927f36`)"主轮询与 retranscribe 等在后续 story 实现"滞后于实态(两者已实现 `:24-29`/`:401-423`),不立发现 |
+| `apps/worker/src/soniscope_worker/poller.py` | 531 | CODE | 深挖 | 9/9 | F-CODE-01、F-CODE-02 | 深挖 HYP-10/16 证实:`poll_loop` 单线程 while 循环 `poller.py:378-391 @ 5927f36`,单机单配置 RealOssSource(`:395-451`)。D14-1 证据(只记不裁):Worker 侧 sha256 比对流程 `poller.py:261,272-284 @ 5927f36`,经 `fixtures.sha256_of`(stdlib hashlib)。契约观察移交:`fragment_id_from_key` 往返校验(`:47-61`)已由 Phase 2 矩阵覆盖(F-CON-02/03 引用行),本维度不判断。OssSource Protocol 结构性无删除能力(`:215-231`)红线核查通过 |
 | `apps/worker/src/soniscope_worker/manifest.py` | 473 | CODE | 待审 | 待审 | 待审 | — |
 | `apps/worker/src/soniscope_worker/recovery.py` | 465 | CODE | 待审 | 待审 | 待审 | — |
 | `apps/worker/src/soniscope_worker/audio.py` | 412 | CODE | 待审 | 待审 | 待审 | — |
