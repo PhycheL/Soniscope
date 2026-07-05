@@ -813,15 +813,15 @@ No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` opti
 | 38 | apps/worker/src/soniscope_worker/audio.py:73 | S607 | 误报 | 系统 ffmpeg 为文档化平台前提(verify_prep REQUIRED_TOOLS 校验其存在),部分路径系故意 |
 | 39 | apps/worker/src/soniscope_worker/audio.py:140 | TRY300 | 误报 | 风格建议(TRY 规则集非项目门禁),现写法带 pragma 注释语义清晰 |
 | 40 | apps/worker/src/soniscope_worker/e2e_scenarios.py:62 | S105 | 误报 | 结果状态常量("PASS")非口令 |
-| 41 | apps/worker/src/soniscope_worker/fc_deploy.py:419 | ARG001 | 确认 | rollback_one 接受 timestamp 形参但函数体始终回滚 find_latest_backup 结果——参数语义与实现不符,指定时间戳回滚可能被静默忽略 → 深挖线索(03-05 fc_deploy 普审) |
+| 41 | apps/worker/src/soniscope_worker/fc_deploy.py:419 | ARG001 | 确认 | rollback_one 接受 timestamp 形参但函数体始终回滚 find_latest_backup 结果——参数语义与实现不符,指定时间戳回滚可能被静默忽略 → 深挖线索(03-05 fc_deploy 普审)。**03-05 人工核实下落(降级理由,不立发现):** timestamp 形参确未使用(`fc_deploy.py:418-427 @ 5927f36`),但操作者面一致——CLI `rollback-fc` 仅暴露 --function 且 help 即"从最新备份恢复"(`cli.py:97-107 @ 5927f36`),run_rollback 的 ts 仅用于日志文件名;误导面限模块内 API 签名(face6 死参数),无操作者可触发的静默忽略路径 |
 | 42 | apps/worker/src/soniscope_worker/fc_deploy.py:463 | DTZ005 | 误报 | naive now() 仅生成备份目录时间戳文件名,单机本地语义无时区契约 |
 | 43 | apps/worker/src/soniscope_worker/fc_deploy.py:611 | TRY301 | 误报 | 风格建议,现写法(条件 raise + 显式重抛)语义清晰 |
 | 44 | apps/worker/src/soniscope_worker/fc_deploy.py:634 | TRY300 | 误报 | 风格建议,同 #39 |
-| 45 | apps/worker/src/soniscope_worker/fc_deploy.py:688 | ARG002 | 确认 | fetch_logs 接受 hours 时间窗形参但 688-730 区间函数体未使用——日志拉取窗口被静默忽略 → 深挖线索(03-05 fc_deploy 普审) |
+| 45 | apps/worker/src/soniscope_worker/fc_deploy.py:688 | ARG002 | 确认 | fetch_logs 接受 hours 时间窗形参但 688-730 区间函数体未使用——日志拉取窗口被静默忽略 → 深挖线索(03-05 fc_deploy 普审)。**03-05 人工核实下落(降级理由,不立发现):** fetch_logs 系自述故意桩——恒抛 FcApiError,已配置 SLS 时给"需 aliyun-log-python-sdk(本期未集成,US-008 联调时补全)"可操作诊断(`fc_deploy.py:702-707 @ 5927f36`),run_fc_logs 显式处理该错误路径(`:559-569`);hours 未使用是桩的结构性结果,CLI 亦未暴露 hours 参数(`cli.py:110-120 @ 5927f36`),无操作者误导面 |
 | 46 | apps/worker/src/soniscope_worker/fc_live.py:121 | S105 | 误报 | 结果状态常量("PASS")非口令 |
 | 47 | apps/worker/src/soniscope_worker/fixtures.py:131 | S603 | 误报 | 同 #37,ffprobe 固定参数列表 |
 | 48 | apps/worker/src/soniscope_worker/fixtures.py:132 | S607 | 误报 | 同 #38,系统 ffprobe 文档化前提 |
-| 49 | apps/worker/src/soniscope_worker/miniprogram_lint.py:121 | ARG001 | 确认 | scan_hardcoded_secrets 声明 rel_path 形参却未使用,调用方(:190)传入 str(file) 落空——findings 文本不含路径上下文,与 vulture 唯一命中同点 → 深挖线索(03-05 miniprogram_lint 普审,HYP-15) |
+| 49 | apps/worker/src/soniscope_worker/miniprogram_lint.py:121 | ARG001 | 确认 | scan_hardcoded_secrets 声明 rel_path 形参却未使用,调用方(:190)传入 str(file) 落空——findings 文本不含路径上下文,与 vulture 唯一命中同点 → 深挖线索(03-05 miniprogram_lint 普审,HYP-15)。**03-05 人工核实下落(降级理由,不立发现):** rel_path 确为死参数(`miniprogram_lint.py:121 @ 5927f36`),但"findings 不含路径上下文"的担忧不成立——调用方经 `_issue(root, file, finding)` 包装(`:190-191`),LintIssue.path 携带相对路径并进入报告行(`:203`),操作者输出完整;纯 face6 死参数,HYP-15 回填(HYPOTHESES.md)与 F-TOOL-04 不依赖此点 |
 | 50 | apps/worker/src/soniscope_worker/nls.py:251 | DTZ011 | 误报 | _today_iso 仅作当日成本累计的分日键(nls.py:381 counter.record),单机自洽,无跨组件日期契约参与 |
 | 51 | apps/worker/src/soniscope_worker/pipeline.py:582 | ARG002(fragment_id) | 误报 | _StubTranscriber(make test 占位桩)须契合 Transcriber Protocol 签名,桩实现故意忽略参数 |
 | 52 | apps/worker/src/soniscope_worker/pipeline.py:582 | ARG002(audio_path) | 误报 | 同 #51 |
