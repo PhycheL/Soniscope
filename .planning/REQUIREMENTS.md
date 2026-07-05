@@ -17,9 +17,9 @@ Requirements for this milestone's audit report. Each maps to roadmap phases.
 
 ### 契约一致性 (CONTRACT)
 
-- [ ] **CONTRACT-01**: fragment_id / object key / `x-oss-meta-*` 契约在 FC(`fc_shared`)、Worker(`oss_admin.py`/`poller.py`)、小程序(`utils/`)三处实现逐字段抽取为漂移矩阵(行=契约要素,列=实现,格=agree/diverge/absent + 行号)
+- [x] **CONTRACT-01**: fragment_id / object key / `x-oss-meta-*` 契约在 FC(`fc_shared`)、Worker(`oss_admin.py`/`poller.py`)、小程序(`utils/`)三处实现逐字段抽取为漂移矩阵(行=契约要素,列=实现,格=agree/diverge/absent + 行号)
 - [x] **CONTRACT-02**: 完成往返校验(FC 签发的 object key → Worker `fragment_id_from_key` 可否解析),所有分歧按 良性/潜伏/活跃失配/覆盖洞 四类分类,含生产者-消费者宽严分析
-- [ ] **CONTRACT-03**: 重复逻辑普查:系统排查已知三处之外的契约相关跨语言重复实现(sha256、日期格式、配置解析等),仅限承载契约的逻辑
+- [x] **CONTRACT-03**: 重复逻辑普查:系统排查已知三处之外的契约相关跨语言重复实现(sha256、日期格式、配置解析等),仅限承载契约的逻辑
 - [x] **CONTRACT-04**: 若矩阵发现真实分歧,产出共享黄金样本跨语言契约测试(pytest + node:test 共用样本)的设计配方 — 仅设计,不实现
 
 ### 各维度审计 (AUDIT)
@@ -74,9 +74,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CHARTER-03 | Phase 1 | Complete |
 | CHARTER-04 | Phase 1 | Complete |
 | CHARTER-05 | Phase 1 | Complete |
-| CONTRACT-01 | Phase 2 | Pending |
+| CONTRACT-01 | Phase 2 | Complete |
 | CONTRACT-02 | Phase 2 | Complete |
-| CONTRACT-03 | Phase 2 | Pending |
+| CONTRACT-03 | Phase 2 | Complete |
 | CONTRACT-04 | Phase 2 | Complete |
 | AUDIT-01 | Phase 3 | Pending |
 | AUDIT-02 | Phase 3 | Pending |
