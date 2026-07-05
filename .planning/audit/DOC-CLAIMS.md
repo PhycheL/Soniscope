@@ -37,10 +37,10 @@
 | `docs/runbook/deployment-guide.md` | 深核 | §deployment-guide.md(04-04) | 已审:19 条销号;HYP-14 专项 drift → F-DOC-03;dead-ref ×1 → HYP-02(04-05 聚合) |
 | `docs/runbook/fc-deploy.md` | 深核 | §fc-deploy.md(04-04) | 已审:16 条销号;drift ×1(FD-16 → F-DOC-03,HYP-14 专项) |
 | `docs/runbook/mvp-acceptance.md` | 深核 | §mvp-acceptance.md(04-04) | 已审:12 条销号无发现级 drift;dead-ref ×1 → HYP-02(04-05 聚合) |
-| `AGENTS.md` | 深核 | (04-05) | 待审 |
-| `README.md` | 深核 | (04-05) | 待审 |
-| `apps/fc/README.md` | 深核 | (04-05) | 待审 |
-| `apps/miniprogram/README.md` | 深核 | (04-05) | 待审 |
+| `AGENTS.md` | 深核 | §AGENTS.md(04-05) | 已审:39 条销号;dead-ref ×17 → HYP-02(F-DOC-06 聚合);drift ×4(→ F-DOC-01/F-DOC-02 共证、F-DOC-04、F-DOC-05) |
+| `README.md` | 深核 | §README.md(04-05) | 已审:1 条销号无发现 |
+| `apps/fc/README.md` | 深核 | §apps/fc/README.md(04-05) | 已审:6 条销号;drift ×1 → F-DOC-05 |
+| `apps/miniprogram/README.md` | 深核 | §apps/miniprogram/README.md(04-05) | 已审:6 条销号;drift ×1 → F-DOC-05 |
 | `apps/miniprogram/config.js` | 深核 | (04-05) | 待审 |
 | `docs/architecture/architecture-review-2026-07-02.md` | 普审 | (04-05) | 待审 |
 | `docs/transcribe-approach-comparison.md` | 普审 | (04-05) | 待审 |
@@ -254,3 +254,93 @@
 | **合计** | **66** | **47** | **1** | **4** | **14** | 47+1+4+14=66 ✓ |
 
 批次要点:drift 发现级 **1** 条(FD-16 → F-DOC-03,HYP-14 专项——发布文档未覆盖 ENV 生产翻转步骤);dead-ref **4** 处登记 → HYP-02(CS-09、CS-15、MA-01、DG-01,04-05 聚合立条);DNF-02 命中 ×5(CS-08/MA-02/DG-09/DG-16/FD-12)全部核实闭环;HYP 结论锚点 ×2(FD-09 → HYP-04 runbook 保真度闭环、FD-16 → HYP-14,均待 04-09 回填引用);阶段累计销号 66(04-03)+ 66(04-04)= **132** 条。
+
+## §AGENTS.md 深核(04-05)
+
+> 对象:`AGENTS.md`(452 行 @ 5927f36)。取证命令:`git show 5927f36:AGENTS.md`。本文档系 HYP-02 主战场——权威文档旧路径引用全量取证命令:`git grep -n 'docs/PRD_v1.md\|docs/tech-spec.md\|docs/deployment-guide.md' 5927f36 -- AGENTS.md docs/`(排除 vendored docs/example/),AGENTS.md 命中恰 **17 处**(行 5,6,69,157,337,375,405,406,416-424,与 04-RESEARCH 预核一致);存在性判定:`git ls-tree -r --name-only 5927f36 docs`(顶层无 PRD_v1.md/tech-spec.md,实体在 `docs/v1.0.0 prd/`;旧路径 `docs/deployment-guide.md` 全仓零命中)。17 处逐行登记为 AG-01~AG-17(每行 → HYP-02,F-DOC-06 聚合);其余可核声明按段落合并销号(AG-18 起)。wasm-crypto 处方与 nls20180628 依赖两处与 tech-spec 同款失实声明判 drift 共证既有 F-DOC-01/F-DOC-02,不另立条(HYP-03 已裁定不复判)。
+>
+> **dead-ref 逐处登记(AG-01~AG-17,判定列均 dead-ref,去向均 → HYP-02(F-DOC-06 聚合);代码侧证据同源:`git ls-tree -r --name-only 5927f36 docs` 顶层无此两文件):**
+
+| # | 文档侧声明 | 文档证据 | 代码/配置侧实态 | 代码证据 | 判定 |
+|---|-----------|----------|----------------|----------|------|
+| AG-01 | 优先级链第 1 环"产品范围与验收:`docs/PRD_v1.md`" | `AGENTS.md:5 @ 5927f36` | 基线该路径无文件,实存 `docs/v1.0.0 prd/PRD_v1.md` | `git ls-tree -r --name-only 5927f36 docs`(无顶层 PRD_v1.md) | dead-ref → HYP-02 |
+| AG-02 | 优先级链第 2 环"技术实现、协议、数据模型:`docs/tech-spec.md`" | `AGENTS.md:6 @ 5927f36` | 基线该路径无文件,实存 `docs/v1.0.0 prd/tech-spec.md` | 同上(无顶层 tech-spec.md) | dead-ref → HYP-02 |
+| AG-03 | "目标结构以 `docs/tech-spec.md` §2.1 为准" | `AGENTS.md:69 @ 5927f36` | 同 AG-02 | 同上 | dead-ref → HYP-02 |
+| AG-04 | "新增命令时遵循 `docs/tech-spec.md` §6.5 的 target 命名" | `AGENTS.md:157 @ 5927f36` | 同 AG-02 | 同上 | dead-ref → HYP-02 |
+| AG-05 | "转写抽象接口按 `docs/tech-spec.md` §5.3" | `AGENTS.md:337 @ 5927f36` | 同 AG-02 | 同上 | dead-ref → HYP-02 |
+| AG-06 | "最终 MVP 验收按 `docs/PRD_v1.md` §4" | `AGENTS.md:375 @ 5927f36` | 同 AG-01 | 同上 | dead-ref → HYP-02 |
+| AG-07 | 关键文件表行"`docs/PRD_v1.md` \| 产品需求、User Stories、最终验收、Non-goals" | `AGENTS.md:405 @ 5927f36` | 同 AG-01 | 同上 | dead-ref → HYP-02 |
+| AG-08 | 关键文件表行"`docs/tech-spec.md` \| 架构、数据模型、API……技术权威" | `AGENTS.md:406 @ 5927f36` | 同 AG-02 | 同上 | dead-ref → HYP-02 |
+| AG-09 | 按需查阅表"User Story 具体 AC \| `docs/PRD_v1.md` §3" | `AGENTS.md:416 @ 5927f36` | 同 AG-01 | 同上 | dead-ref → HYP-02 |
+| AG-10 | 按需查阅表"Feature 最终验收 \| `docs/PRD_v1.md` §4" | `AGENTS.md:417 @ 5927f36` | 同 AG-01 | 同上 | dead-ref → HYP-02 |
+| AG-11 | 按需查阅表"Non-goals / 范围红线 \| `docs/PRD_v1.md` §6" | `AGENTS.md:418 @ 5927f36` | 同 AG-01 | 同上 | dead-ref → HYP-02 |
+| AG-12 | 按需查阅表"Fragment / manifest / transcript schema \| `docs/tech-spec.md` §3" | `AGENTS.md:419 @ 5927f36` | 同 AG-02 | 同上 | dead-ref → HYP-02 |
+| AG-13 | 按需查阅表"FC API 协议 \| `docs/tech-spec.md` §4" | `AGENTS.md:420 @ 5927f36` | 同 AG-02 | 同上 | dead-ref → HYP-02 |
+| AG-14 | 按需查阅表"音频格式与 ASR 策略 \| `docs/tech-spec.md` §5" | `AGENTS.md:421 @ 5927f36` | 同 AG-02 | 同上 | dead-ref → HYP-02 |
+| AG-15 | 按需查阅表"Make target 清单 \| `docs/tech-spec.md` §6.5" | `AGENTS.md:422 @ 5927f36` | 同 AG-02 | 同上 | dead-ref → HYP-02 |
+| AG-16 | 按需查阅表"前端 8 状态上传状态机 \| `docs/tech-spec.md` §6.7" | `AGENTS.md:423 @ 5927f36` | 同 AG-02 | 同上 | dead-ref → HYP-02 |
+| AG-17 | 按需查阅表"架构决策记录 \| `docs/tech-spec.md` §8" | `AGENTS.md:424 @ 5927f36` | 同 AG-02 | 同上 | dead-ref → HYP-02 |
+| AG-18 | 优先级链第 3/4 环(`docs/runbook/cloud-setup.md`、本文件)+ 四层架构表(小程序/FC 3.0 两顶级 Web 函数/OSS 私有桶 soniscope-audio cn-beijing/Python Worker)+ 三关键原则(OSS object 唯一数据契约、本地硬盘状态机权威、FC 3.0 无 service 层勿建 soniscope-svc) | `AGENTS.md:7,33-38,42-44 @ 5927f36` | cloud-setup.md 实存;基线 apps/ 三分、fc/ 仅两函数目录无 service 层;桶/region 常量同值;数据契约与文件状态机同 P-01/T-03/P-20 判 | `git ls-tree -r --name-only 5927f36 docs/runbook/`、`git ls-tree 5927f36 apps/ apps/fc/`、`apps/miniprogram/config.js:12,15 @ 5927f36` | agree |
+| AG-19 | 技术栈表"小程序 sha256 \| `wasm-crypto` 或同类 wasm 库 \| 前端计算原始音频 sha256,避免主线程卡顿" | `AGENTS.md:53 @ 5927f36` | 实态为手写纯 JS SHA-256 于主线程同步全量哈希,无任何 wasm(与 tech-spec :539,549 同款失实声明;HYP-03 已裁定系 docstring 自述本期取舍,不复判) | `apps/miniprogram/utils/sha256.js:4-5,9-18,66-135 @ 5927f36`、`apps/miniprogram/pages/index/index.js:30,640 @ 5927f36` | drift → F-DOC-01(共证,不另立条) |
+| AG-20 | 技术栈表"Worker 依赖 \| ……`alibabacloud-nls20180628`" | `AGENTS.md:58 @ 5927f36` | Worker 声明依赖无该包;NLS 实经 legacy `aliyun-python-sdk-core`(与 tech-spec §6.3 同款失实清单) | `apps/worker/pyproject.toml:8-15 @ 5927f36`、`apps/worker/src/soniscope_worker/nls.py:441-448,454-455 @ 5927f36` | drift → F-DOC-02(共证,不另立条) |
+| AG-21 | 技术栈表其余行:FC SDK(sts20150401/oss-v2)、FC 部署 SDK fc20230330 仅部署脚本不随打包、Worker Python 3.11+、系统工具 ffmpeg/ffprobe 必须、uv workspace 根不装业务依赖、质量工具 mypy strict/ruff/pytest;+ :63 禁引 faster-whisper/whisper.cpp,本地 Whisper 只留占位骨架 | `AGENTS.md:55-61,63 @ 5927f36` | 两函数 requirements 同款;fc20230330 仅 fc_deploy 消费;requires-python/mypy 钉 3.11;REQUIRED_TOOLS 恰 ffmpeg/ffprobe;根 pyproject workspace + package=false;whisper-local 占位抛 NotImplementedError,全仓无 faster-whisper/whisper.cpp 依赖 | `apps/fc/issue_credential/requirements.txt:3-4 @ 5927f36`、`apps/worker/src/soniscope_worker/fc_deploy.py:13 @ 5927f36`、`pyproject.toml:32,50 @ 5927f36`、`verify_prep.py:51 @ 5927f36`、`transcriber.py:144-165 @ 5927f36` | agree(闭环 DNF-01) |
+| AG-22 | 仓库状态叙述:"当前仓库仍处于 MVP 初期:部分目标目录会随 US-002+ 逐步创建"(:25);"当前已存在的重要目录:docs/、scripts/、tests/audio/、.agents/、.cursor/。`apps/`、`Makefile`、`pyproject.toml` 等会在对应 story 中创建"(:89) | `AGENTS.md:25,89 @ 5927f36` | 基线 apps/、Makefile、pyproject.toml 全部实存且承载全量实现(45 个 make 目标、26 个 worker 模块);已存在目录清单还漏 .claude/、.codex/——声明描述的"未创建"状态与仓库实态相反 | `git ls-tree --name-only 5927f36`(apps/Makefile/pyproject.toml/.claude/.codex 均在) | drift → F-DOC-05 |
+| AG-23 | 配置加载顺序:"1. `$SONISCOPE_HOME/config.yaml` 2. 未设置 `SONISCOPE_HOME` 时回退 `~/SoniScope/config.yaml`" | `AGENTS.md:110 @ 5927f36` | 实态无任何 `~/SoniScope` 回退:paths.py 装载顺序为进程 env → 向上搜索仓库根 .env → 直接抛 RuntimeHomeError("未设置 SONISCOPE_HOME……"),与 tech-spec §2.3"无固定兜底"(T-09)及 deployment-guide §1.2"脚本不兜底固定目录"(DG-06)双文档口径同时冲突 | `apps/worker/src/soniscope_worker/paths.py:49-63 @ 5927f36`(env → .env → raise,无 ~/SoniScope 分支) | drift → F-DOC-04 |
+| AG-24 | 运行时目录布局(inbox/fragments/<date>/<id>/、tmp/、config.yaml 不进 repo、代码仓与运行时数据分离)+ config.yaml Pydantic v2 校验、权限必须 chmod 600、敏感字段日志仅前后 4 位脱敏 | `AGENTS.md:95-106,112 @ 5927f36` | 三目录布局同 pipeline/recovery 实现(T-08 同判);Pydantic v2 模型 + 恰 600 判定 + MaskedSecret 前后 4 位(T-10/CS-19 同判);.gitignore 覆盖 config.yaml | `apps/worker/src/soniscope_worker/pipeline.py:11-13 @ 5927f36`、`config.py:31-35,51-75,148-150 @ 5927f36`、`.gitignore:127,188-189 @ 5927f36` | agree |
+| AG-25 | 常用命令块 22 个 make 目标(install/check-config/init-dirs/verify-prep/typecheck/lint/test/worker-run/retranscribe ×2 口径/deploy-fc ×3 口径/rollback-fc/fc-logs/test-fc-live/test-verify-upload/test-sts-escape/test-transcribe/test-crash-recovery/verify-e2e-integrity/-sha256/-fields/verify-no-stale/verify-oss-retention) | `AGENTS.md:116-155 @ 5927f36` | Makefile 45 目标逐名核对全部在列(含易漏的 test-transcribe :116、test-crash-recovery :88;其余同 P-25 抽查行号) | `Makefile:26,29,32,35,38,41,44,47,50,57,70,88,116,119,134,137,140,143,146,149,163,166,170 @ 5927f36` | agree |
+| AG-26 | Fragment ID 格式 `<YYYYMMDDTHHMMSS>_<deviceShortId>_<ulid>`、分片共享 session_id、chunk_seq 从 1 递增、阈值 `CHUNK_MAX_DURATION_SECONDS = 600`;OSS key `recordings/<YYYY-MM-DD>/<fragment_id>.wav` 恒 .wav 扩展;7 键 `x-oss-meta-*` 元数据清单 + Worker HeadObject 读回写 manifest | `AGENTS.md:179-209 @ 5927f36` | 三处正则同语义(T-11);key 模板与 0↔null 约定同 T-12;7 键同名 buildOssMetadata 写、META_* 读回(T-03 同判) | `apps/fc/shared/fc_shared/sts.py:29-33,46-59 @ 5927f36`、`apps/miniprogram/config.js:22-23 @ 5927f36`、`utils/audio.js:157-169 @ 5927f36`、`apps/worker/src/soniscope_worker/poller.py:34-41,139-141 @ 5927f36` | agree |
+| AG-27 | Worker 完成态 5 文件(audio.wav/manifest.json/transcript.json/transcript.txt/.done);"当且仅当 .done 存在视为完整完成";轮询 .done 存在即跳过,不因模型或 params_version 变化自动重转 | `AGENTS.md:211-223 @ 5927f36` | 五产物与 .done 幂等同 pipeline 实现(P-21/P-22/T-15 同判) | `apps/worker/src/soniscope_worker/pipeline.py:11-16,273-275 @ 5927f36` | agree |
+| AG-28 | FC API 约定:issue-credential 请求三字段(code/fragment_id/size)+ 鉴权四步(code→openid 失败 401 INVALID_CODE、allowlist 403 OPENID_NOT_ALLOWED、size 400 SIZE_EXCEEDED、AssumeRole 单 key 仅 oss:PutObject ≤900s);verify-upload 请求三字段 + 三态返回(OBJECT_NOT_FOUND/SIZE_MISMATCH+actual_size/verified:true+etag+size+last_modified)、鉴权同 issue-credential | `AGENTS.md:227-258 @ 5927f36` | 流程/错误码/policy/时效/三态响应逐一同实现(T-20/T-21/P-09/P-11 同判) | `apps/fc/shared/fc_shared/auth.py:39-52 @ 5927f36`、`errors.py:13-24 @ 5927f36`、`sts.py:62-73,24-25 @ 5927f36`、`head.py:34-55 @ 5927f36` | agree |
+| AG-29 | 真实云资源速查表静态可核字面值:桶 soniscope-audio、region cn-beijing、endpoint oss-cn-beijing.aliyuncs.com、上传域名、两 FC URL(含 :282 issue-cedential 拼写警示)、AppID wx3f973c7297728b0c | `AGENTS.md:266-274,280,282 @ 5927f36` | config.js 三 URL/region 逐字符同值;project.config.json appid 同值(P-02/P-04/P-05 同判) | `apps/miniprogram/config.js:8-15 @ 5927f36`、`apps/miniprogram/project.config.json:2 @ 5927f36` | agree(闭环 DNF-02) |
+| AG-30 | 速查表云端/机器侧真值:RAM Role ARN `acs:ram::…:role/soniscope-uploader-role`、ASR Provider NLS/项目 soniscope/模型识音石 V1、Worker 主机三元组(Mac Studio M4 Max/macOS 26.5/Python 3.13.2)、`$SONISCOPE_HOME = /Volumes/Data/software/SoniScope` 固定路径(:100 同);+ 技术栈表 FC 运行时"Python 3.12(或 FC 支持的 3.10/3.11)"(:54) | `AGENTS.md:54,100,270,275-280 @ 5927f36` | 均为控制台/平台/机器侧事实,代码仅经 env/config.yaml 消费变量名,真值仓外(P-03/P-30/CS-04/CS-13/CS-18 同判);跨文档与 cloud-setup 登记口径一致自洽 | `apps/fc/shared/fc_shared/env.py:16-38 @ 5927f36`、`apps/worker/src/soniscope_worker/config.py:63-75 @ 5927f36`(变量名装载,真值云端/机器侧) | 无法静态核实 |
+| AG-31 | 安全红线八条:小程序无长期 AK/明文凭证不进 git/FC 凭证只读环境变量+部署凭证 ALIYUN_DEPLOY_AK_*/Worker 凭证 600 与 repo 分离/STS 单 key 仅 PutObject 无通配/Worker 业务绝不调 DeleteObject 且 oss-delete-obj 标仅测试用/FC 日志 openid 哈希不记完整凭证/anonymous 触发器业务层 allowlist 兜底 | `AGENTS.md:286-295 @ 5927f36` | 逐条代码承载:AK 扫描守卫、.gitignore、DEPLOY_ENV_KEYS、600 判定、single_key_policy、OssSource 无删除面 + oss-delete-obj help 自标【仅测试用】、hash_openid 洗涤、authorize_request 兜底(CS-19/DG-03/MA-12/P-06/P-10 同判) | `apps/worker/src/soniscope_worker/miniprogram_lint.py:42,124-125 @ 5927f36`、`fc_deploy.py:52 @ 5927f36`、`sts.py:62-73 @ 5927f36`、`poller.py:215-231 @ 5927f36`、`Makefile:63 @ 5927f36`、`audit.py:14-45 @ 5927f36`、`auth.py:39-52 @ 5927f36` | agree |
+| AG-32 | 错误处理重试表:网络/5xx 退避 3 次 5s→15s→45s、4xx 立即失败、离线切"待上传(离线排队)"、上传/verify 重试尽切人工态红提示、Worker 下载失败删 .part 下轮重下 | `AGENTS.md:299-311 @ 5927f36` | 双语言常量与语义逐条一致(P-12/T-04/MA-10 同判) | `apps/miniprogram/utils/uploader.js:28-29 @ 5927f36`、`apps/worker/src/soniscope_worker/nls.py:45,262 @ 5927f36`、`poller.py:272-284 @ 5927f36` | agree |
+| AG-33 | 小程序开发约定:极薄前端不做业务鉴权/不转码记录真实 original_format/草稿显式确认/中断自动 stop 保存草稿/verified 保留 ≥48h、未通过永不自动删、手动删除二次确认/8 状态清单/故障注入三开关生产不可见/UI 验证用 DevTools+真机 | `AGENTS.md:314-324 @ 5927f36` | 8 状态常量、三开关名、48h 清理与二次确认逐一同实现(P-13/P-14/T-26/MA-05 同判;门控实效取决于 ENV 发布取值,HYP-14 专项见 FD-16/CF-06) | `apps/miniprogram/utils/upload_queue.js:9-27 @ 5927f36`、`pages/uploads/uploads.js:289-300 @ 5927f36`、`test/fault_injection.test.js:27-28 @ 5927f36` | agree |
+| AG-34 | Worker 开发约定:包名/模块清单五件套/三段式写协议/三目录同文件系统/启动恢复扫描三类临时文件/ffprobe 检测 ffmpeg 标准化/转码失败留档 inbox/failed//ASR 默认 oss-url 降级直传/whisper-local 只允许 NotImplementedError 占位(:337)/成本结构化日志/retranscribe 三 flag | `AGENTS.md:327-339 @ 5927f36` | 逐条同实现(T-07/T-15/T-16/T-23/T-24/T-35/T-17 同判);whisper-local 占位与"只允许占位"红线一致 | `apps/worker/src/soniscope_worker/pipeline.py:5-20 @ 5927f36`、`recovery.py:196-250 @ 5927f36`、`audio.py:5-14,221-235 @ 5927f36`、`nls.py:49-50,165-181 @ 5927f36`、`transcriber.py:144-165 @ 5927f36`、`cli.py:403-410 @ 5927f36` | agree(闭环 DNF-01) |
+| AG-35 | FC 部署约定:make 参数统一 kebab-case/deploy-fc 必须独立打包+备份+日志+curl 存活/部署不改 env/触发器/运行时配置/产物 build/fc/ 三路径且 build/ 必须 gitignore/fc20230330 只在部署脚本 | `AGENTS.md:343-350 @ 5927f36` | kebab→snake 映射、五能力面、只更新代码、四产物路径逐一同实现(DG-09/DG-12/FD-09/FD-11 同判,引 HYP-04 证据行);.gitignore:15 恰 `build/` | `apps/worker/src/soniscope_worker/fc_deploy.py:35,124-125,185-194,208-216 @ 5927f36`、`.gitignore:15 @ 5927f36` | agree |
+| AG-36 | 测试与验证规则:单测必须 mock 云端依赖、真云调用只放 live/e2e 具名 target、提交前质量门三命令、FC story 配套 live 验证命令、Worker story 至少覆盖七场景 | `AGENTS.md:353-377 @ 5927f36` | 质量门/联调目标均实存(MA-04/DG-07 同判);"单测 mock 云端"与仓库测试设计口径一致(pytest 单测全 mock,live 场景独立 target——惯例声明,实跑核对属 TEST 维度 04-06/04-07) | `Makefile:41,50,57,163,166,170 @ 5927f36`、`pyproject.toml:56-58 @ 5927f36` | agree |
+| AG-37 | 测试音频 fixture:二进制不进 git、权威清单在 runbook §6 与 tech-spec §6.3.1、fetch/--check 两命令、4 文件 sha256 表 | `AGENTS.md:379-397 @ 5927f36` | 基线 tests/audio/ 无二进制;4 条 sha256 与 fixtures.manifest.json 逐字符一致(b07dee76…828/9c454b…cde/34db50…d27/d3d286…0fd);fetch 脚本与 --check flag 实存(T-31/CS-16 同源) | `tests/audio/fixtures.manifest.json:12,20,28,36 @ 5927f36`、`scripts/fetch_test_fixtures.py:24,175-176 @ 5927f36` | agree |
+| AG-38 | 关键文件表其余两行(cloud-setup.md/us-001-manual.html)与按需查阅表 cloud-setup 两行(:425-426)引用有效;工作方式约定(:430-441,含 :436"不要纠正 issue-cedential-ottfirocds") | `AGENTS.md:407-408,425-426,430-441 @ 5927f36` | 两文件基线实存;拼写警示与 config.js :8 注释同款 | `git ls-tree -r --name-only 5927f36 docs/runbook/`(两文件在)、`apps/miniprogram/config.js:8-10 @ 5927f36` | agree(闭环 DNF-02) |
+| AG-39 | Agent skills 三节:issue 以 Markdown 存 `.scratch/<feature>/`、五 triage 标签记 Status: 行、单一上下文布局 CONTEXT.md + docs/adr/ 由 /domain-modeling 按需懒创建;引用 docs/agents/ 三文件 | `AGENTS.md:440-452 @ 5927f36` | docs/agents/ 三文件实存;`.scratch/`、`CONTEXT.md`、`docs/adr/` 基线不存在,但声明自带懒创建语义(domain.md:12 明示"If any of these files don't exist, proceed silently……creates them lazily";issue-tracker.md:15"creating the directory if needed"),非 dead-ref | `git ls-tree -r --name-only 5927f36 docs/agents/`(三文件在)、`git ls-tree --name-only 5927f36`(根无 .scratch/CONTEXT.md;docs/ 无 adr/) | agree |
+
+**AGENTS.md 节机械对账:** 清单条目总数 **39**(AG-01 ~ AG-39);四态计数:agree **17**(内含闭环 DNF-01 ×2、DNF-02 ×2)+ drift **4**(AG-19 → F-DOC-01 共证、AG-20 → F-DOC-02 共证、AG-22 → F-DOC-05、AG-23 → F-DOC-04)+ dead-ref **17**(AG-01 ~ AG-17,全部 → HYP-02)+ 无法静态核实 **1**(AG-30);复算:17 + 4 + 17 + 1 = 39 ✓。
+
+## §README.md 深核(04-05)
+
+> 对象:根 `README.md`(2 行 @ 5927f36)。取证命令:`git show 5927f36:README.md`。基线仅项目名 + 一句产品定位,无命令/路径/常量声明,照实登记(04-RESEARCH 预核:工作量趋零)。
+
+| # | 文档侧声明 | 文档证据 | 代码/配置侧实态 | 代码证据 | 判定 |
+|---|-----------|----------|----------------|----------|------|
+| R-01 | 项目名 Soniscope + 产品定位一句("voice-first observation log that listens to your day") | `README.md:1-2 @ 5927f36` | 纯产品愿景叙事,无可对照字面值;定位与 PRD"个人语音流水账记录工具"口径一致,无引用无命令 | `docs/v1.0.0 prd/PRD_v1.md:3 @ 5927f36`(跨文档口径一致) | agree |
+
+**README.md 节机械对账:** 清单条目总数 **1**(R-01);四态计数:agree **1** + drift **0** + dead-ref **0** + 无法静态核实 **0**;复算:1 + 0 + 0 + 0 = 1 ✓。
+
+## §apps/fc/README.md 深核(04-05)
+
+> 对象:`apps/fc/README.md`(34 行 @ 5927f36)。取证命令:`git show 5927f36:apps/fc/README.md`。
+
+| # | 文档侧声明 | 文档证据 | 代码/配置侧实态 | 代码证据 | 判定 |
+|---|-----------|----------|----------------|----------|------|
+| RF-01 | 两函数表:代码目录(snake_case)↔ 云端函数名(kebab-case)↔ 两公网 URL;"无 service 层级";:10 issue-cedential 拼写警示 | `apps/fc/README.md:3-10 @ 5927f36` | 基线 fc/ 恰两函数目录;URL 与 config.js 逐字符同值;kebab→snake 映射同 fc_deploy(DG-09 同判) | `git ls-tree 5927f36 apps/fc/`、`apps/miniprogram/config.js:8-11 @ 5927f36`、`apps/worker/src/soniscope_worker/fc_deploy.py:35,124-125 @ 5927f36` | agree(闭环 DNF-02) |
+| RF-02 | 部署/运维五命令(deploy-fc FUNCTION= ×2、deploy-fc 缺省两函数、rollback-fc 最新备份回滚、fc-logs 近 1 小时) | `apps/fc/README.md:14-20 @ 5927f36` | 三目标实存且 help/实现同口径(缺省全部函数 :131、find_latest_backup、近 1 小时日志)(DG-12/DG-13 同判) | `Makefile:41,44,47 @ 5927f36`、`apps/worker/src/soniscope_worker/fc_deploy.py:131,236-244 @ 5927f36` | agree |
+| RF-03 | 部署逻辑在 `apps/worker/src/soniscope_worker/fc_deploy.py`,纯逻辑可单测、云端 IO lazy import fc20230330、仅部署脚本使用不随函数打包 | `apps/fc/README.md:22-23 @ 5927f36` | 文件实存;fc20230330 lazy import 且不入函数 requirements(T-30/DG-11 同判) | `git ls-tree -r --name-only 5927f36 apps/worker/src/soniscope_worker/`(fc_deploy.py 在)、`apps/fc/issue_credential/requirements.txt:3-4 @ 5927f36`(无 fc20230330) | agree |
+| RF-04 | 打包产物两路径 + app.py 复制入包根匹配 `python3 app.py` + 备份路径(仅记环境变量名不记值)+ 部署日志路径 | `apps/fc/README.md:25-28 @ 5927f36` | 四路径构造与 app.py 复制、env-names.txt 仅名快照逐一同实现(FD-11/DG-12/CS-05 同判) | `apps/worker/src/soniscope_worker/fc_deploy.py:185-194,208-216 @ 5927f36` | agree |
+| RF-05 | "部署只更新代码包,不改环境变量 / 触发器 / 运行时规格 / 公网 URL" | `apps/fc/README.md:29 @ 5927f36` | 与 fc_deploy docstring 及 update_code 实现逐字口径一致(引 HYP-04 证据行;DG-11 同判) | `apps/worker/src/soniscope_worker/fc_deploy.py:13,667-672 @ 5927f36` | agree |
+| RF-06 | 现状(US-005)节:"本期仅建立目录约定与可部署骨架;`handler.py` 为占位 WSGI 处理器,真实业务逻辑在 US-006/007(issue-credential)与 US-006/009(verify-upload)实现" | `apps/fc/README.md:31-34 @ 5927f36` | 基线两 handler.py 均为全量业务实现(鉴权三步 + STS 签发 / HeadObject 三态校验),绝非占位——"现状"叙述停留在 US-005 时点未随实现更新 | `apps/fc/issue_credential/handler.py:71-81 @ 5927f36`、`apps/fc/verify_upload/handler.py:40 @ 5927f36`(GET 存活 + POST 全量逻辑) | drift → F-DOC-05 |
+
+**apps/fc/README.md 节机械对账:** 清单条目总数 **6**(RF-01 ~ RF-06);四态计数:agree **5**(内含闭环 DNF-02 ×1)+ drift **1**(RF-06 → F-DOC-05)+ dead-ref **0** + 无法静态核实 **0**;复算:5 + 1 + 0 + 0 = 6 ✓。
+
+## §apps/miniprogram/README.md 深核(04-05)
+
+> 对象:`apps/miniprogram/README.md`(35 行 @ 5927f36)。取证命令:`git show 5927f36:apps/miniprogram/README.md`。
+
+| # | 文档侧声明 | 文档证据 | 代码/配置侧实态 | 代码证据 | 判定 |
+|---|-----------|----------|----------------|----------|------|
+| RM-01 | 极薄前端定位(录音→草稿→STS→直传→verify→列表);"小程序源码中绝不出现长期 AccessKey / AppSecret / 业务密钥" | `apps/miniprogram/README.md:3-4 @ 5927f36` | 自研 lint AK 扫描守卫 + Phase 3 秘密扫描零命中(T-02 同判);业务鉴权确全在 FC 侧 | `apps/worker/src/soniscope_worker/miniprogram_lint.py:42,124-125 @ 5927f36`、`apps/fc/shared/fc_shared/auth.py:39-52 @ 5927f36` | agree |
+| RM-02 | DevTools 导入目录 `apps/miniprogram/`、AppID 已登记 `wx3f973c7297728b0c`(见 project.config.json)、编译后含「录音」「上传列表」两页 | `apps/miniprogram/README.md:8-10 @ 5927f36` | appid 同值;app.json 注册 index/uploads/dev 三页(README 只提示用户可见两页,dev 页系开发者菜单门控项,口径不冲突);平台侧登记状态本身云端(CS-10 同判可核部分 agree) | `apps/miniprogram/project.config.json:2 @ 5927f36`、`apps/miniprogram/app.json:2-6 @ 5927f36` | agree |
+| RM-03 | 服务器合法域名表三条(request ×2 + uploadFile ×1),"单一真实来源为 config.js,需在公众平台后台配置一致";:22 issue-cedential 拼写警示 | `apps/miniprogram/README.md:12-22 @ 5927f36` | 三域名与 config.js 常量逐字符一致(CS-12 同判);公众平台实际登记状态平台侧不可静读(域名字面值可核部分判 agree) | `apps/miniprogram/config.js:10-12,17-20 @ 5927f36` | agree(闭环 DNF-02) |
+| RM-04 | `make lint` = ruff(Python)+ 小程序源码静态检查(lint-miniprogram) | `apps/miniprogram/README.md:26-28 @ 5927f36` | Makefile lint 目标恰两步:`ruff check apps/` + `python -m soniscope_worker lint-miniprogram`,口径逐字一致 | `Makefile:166-168 @ 5927f36` | agree |
+| RM-05 | lint-miniprogram 校验清单五项:JSON 配置可解析、AppID 正确、合法域名齐全且未被错误修正、页面文件完整、源码无硬编码密钥 | `apps/miniprogram/README.md:30-31 @ 5927f36` | miniprogram_lint.py 规则面恰五族逐一对应(JSON 可解析/appid/合法域名+拼写守卫/页面四件套/硬编码密钥启发式,引 HYP-15 证据行) | `apps/worker/src/soniscope_worker/miniprogram_lint.py:65-77,80-104,107-118,182-186,42-46,121-128 @ 5927f36` | agree |
+| RM-06 | 后续 story 节:"录音/草稿/上传/状态机等在 US-012 ~ US-020 逐步实现;本 story(US-011)只交付骨架与环境配置" | `apps/miniprogram/README.md:33-35 @ 5927f36` | 基线小程序为全量实现:三页 + 16 个 utils 模块(录音/草稿/分片/上传队列 8 状态/OSS V4 签名/verify/故障注入全在)——"现状"叙述停留在 US-011 时点未随实现更新 | `git ls-tree -r --name-only 5927f36 apps/miniprogram/utils/`(16 模块)、`apps/miniprogram/utils/upload_queue.js:9-27 @ 5927f36` | drift → F-DOC-05 |
+
+**apps/miniprogram/README.md 节机械对账:** 清单条目总数 **6**(RM-01 ~ RM-06);四态计数:agree **5**(内含闭环 DNF-02 ×1)+ drift **1**(RM-06 → F-DOC-05)+ dead-ref **0** + 无法静态核实 **0**;复算:5 + 1 + 0 + 0 = 6 ✓。
