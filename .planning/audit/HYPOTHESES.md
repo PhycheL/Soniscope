@@ -31,8 +31,9 @@
 - **来源:** CONCERNS.md §Tech Debt / Authoritative docs moved but deletions uncommitted and references stale
 - **假设:** `AGENTS.md`(及 `docs/fc-transcribe-design.md` 等多份文档)仍以旧路径引用 `docs/PRD_v1.md`、`docs/tech-spec.md`、`docs/deployment-guide.md`,而内容已迁至 `docs/v1.0.0 prd/` 与 `docs/runbook/`,权威文档链存在死链。
 - **待验证维度:** DOC
-- **状态:** 未验证
-- **备注:** 条目中"deletions uncommitted"半句已被基线核实推翻(钉定时工作树干净、删除已随提交入库,见 CHARTER 基线章节);待验证的仅是"引用失效"半句。
+- **状态:** 证实 — "引用失效"半句全量坐实:权威文档迁至 `docs/v1.0.0 prd/` 后,全仓 10 文件 ≈47 处旧路径引用未随迁,AGENTS.md 17 处为主体(优先级链首两环与"关键文件"/"按需查阅"两张导航表整体失效),权威文档链按引用寻文一律落空。
+- **证据:** DOC-CLAIMS.md §AGENTS.md 节 AG-01~AG-17 逐处登记(`AGENTS.md:5,6,69,157,337,375,405,406,416-424 @ 5927f36`)+ 设计文档 4 处(`docs/fc-transcribe-design.md:5`、`docs/multi-user-design.md:5,599,600 @ 5927f36`;04-RESEARCH 预核 3 处,04-05 全量 grep 实测 :600 census +1)+ 各节 dead-ref 登记行(P-27/T-05/CS-09/MA-01/DG-01 等);存在性佐证 `git ls-tree -r --name-only 5927f36 docs` → 顶层无 PRD_v1.md/tech-spec.md(实体在 `docs/v1.0.0 prd/`),旧路径 `docs/deployment-guide.md` 全仓零命中;census 全量行号见 findings/docs-config.md F-DOC-06 证据字段。
+- **备注:** 条目中"deletions uncommitted"半句已被基线核实推翻(钉定时工作树干净、删除已随提交入库,见 CHARTER 基线章节),该边界保留在此;经核验证的仅"引用失效"半句(如上证实)。去向 → F-DOC-06(LOW,HYP-02 聚合条,04-05 立)。04-09 回填。
 
 ### HYP-03: Pure-JS SHA-256 on the recording thread
 
@@ -57,16 +58,18 @@
 - **来源:** CONCERNS.md §Tech Debt / Vendored Aliyun FC sample repository committed
 - **假设:** `docs/example/start-fc-main/` 为 29 MB、1,003 个跟踪文件的完整 vendored 副本,造成仓库膨胀、grep 噪声与误导性搜索命中。
 - **待验证维度:** DOC
-- **状态:** 未验证
-- **备注:** 存在级问题(D-09):不逐文件审计,预计定级 LOW/INFO。
+- **状态:** 证实 — vendored 仓整仓入库属实(存在级,D-09):基线跟踪文件恰 **1,003** 个、blob 合计 **28,227,670 字节(≈28 MB)**,与假设"29 MB、1,003 个跟踪文件"量级一致(文件数逐一吻合,字节数为 blob 合计口径);仓库膨胀/grep 噪声/误导性搜索命中的影响面以 CHARTER 扫描排除清单第 1 行为佐证(该目录已从常规扫描排除并点名"其存在本身作为一条发现")。
+- **证据:** DOC-CLAIMS.md §存在级登记 HYP-05 底数行(`git ls-tree -r --name-only 5927f36 docs/example/start-fc-main | wc -l` → 1003;`git ls-tree -r -l 5927f36 docs/example/start-fc-main` 合计 28,227,670 字节)。
+- **备注:** 存在级问题(D-09):不逐文件审计,按预计定级 INFO。去向 → F-DOC-07(INFO,04-05 立)。04-09 回填。
 
 ### HYP-06: Quadruplicated agent tooling directories
 
 - **来源:** CONCERNS.md §Tech Debt / Quadruplicated agent tooling directories
 - **假设:** GSD/agent 脚手架在 `.claude/`、`.cursor/`、`.codex/`、`.agents/` 四处重复,四份副本独立漂移,单处修复会静默遗漏其余三处。
 - **待验证维度:** DOC
-- **状态:** 未验证
-- **备注:** 存在级问题(D-09):不逐文件审计,预计定级 LOW/INFO。
+- **状态:** 证实 — 四目录并存属实且"独立漂移"已实证:`.agents/`(54 文件)、`.claude/`(440 文件)、`.codex/`(420 文件)、`.cursor/`(468 文件)四处并存;同名工作流文件 `gsd-core/workflows/execute-plan.md` 在 .claude/.codex/.cursor 三处 blob 各异(`774f39f`/`92d5572`/`b418a23`),单处修复静默遗漏其余副本的风险成立。
+- **证据:** DOC-CLAIMS.md §存在级登记 HYP-06 证据行(`git ls-tree -d --name-only 5927f36` 四目录并存 + 文件计数;`git ls-tree 5927f36 <dir>/gsd-core/workflows/execute-plan.md` 三处 blob 各异实证漂移;抽样对照 `commands/prime.md` 在 .agents/.claude/.cursor 三处同 blob 93515c0 而 .codex 布局完全不同)。
+- **备注:** 存在级问题(D-09):不逐文件审计,按预计定级 INFO。去向 → F-DOC-08(INFO,04-05 立)。04-09 回填。
 
 ## Known Bugs
 
@@ -117,8 +120,9 @@
 - **来源:** CONCERNS.md §Performance Bottlenecks / FC-direct will pay for NLS poll wait time
 - **假设:** 规划中的 `transcribe-audio` 函数在 FC 调用内轮询 NLS(设计 §3.3),FC 计费将包含每片段 1–3 分钟的空转等待。
 - **待验证维度:** DOC
-- **状态:** 未验证
-- **备注:** 涉 FC 直转目标态设计,属章程排除项(契约审计不引入目标态基准),预计 Phase 4 以"细化:范围外"关闭。
+- **状态:** 细化 — 章程范围外:假设指向规划中 `transcribe-audio` 函数的 FC 直转目标态设计(设计 §3.3),CHARTER 明确排除项表首行写定"契约一致性以小程序、FC、Worker 三处实现的现状互相对照为准,不引入目标态设计;切换障碍分析归 FC 直转切换里程碑",本审计不对目标态设计内容下判(D-14 引用回填)。
+- **证据:** `.planning/audit/CHARTER.md:43`(明确排除项表首行:FC 直转目标态对照排除)+ DOC-CLAIMS.md 目标态 2 文档引用级审计节(`docs/fc-transcribe-design.md` 节首显式标"目标态对照未审(章程排除)";其引用有效性与明显自相矛盾已按 D-06 引用级审毕)。
+- **备注:** 按 D-14 以"细化:章程范围外"关闭:不占发现 ID,留 Phase 5 RPT 范围声明呈现(与 RPT-07 分维度置信声明连带,呈现口径同 CHARTER 排除理由原文)。04-09 回填。
 
 ### HYP-12: `wsgiref.simple_server` as the FC custom runtime server
 
@@ -136,14 +140,18 @@
 - **来源:** CONCERNS.md §Fragile Areas / Duplicated fragment_id ↔ object_key contract logic
 - **假设:** `recordings/<YYYY-MM-DD>/<fragment_id>.wav` 契约在 FC(`fc_shared/sts.py`)、Worker(`oss_admin.py`/`poller.py`)、小程序(`utils/audio.js`)三处独立实现;三处现状是否互相一致待逐字段对照,且无单一跨组件契约测试兜底(失配后果:上传对 Worker 静默永久不可见)。
 - **待验证维度:** CON
-- **状态:** 未验证
+- **状态:** 证实 — 三处独立实现属实(Phase 2 普查另发现小程序 `upload_queue.js` `fragmentIdFromObjectKey` 第四处反推);逐字段对照结论:FC↔Worker 主链在样本域内无漂移(15 个 python 样本同收同拒、签发产出逐字符相等、往返等式全部成立),分叉全部位于小程序声部——①日期合法性校验缺失 ②`buildObjectKeyPreview` 双独立入参 + 本地时区日期推导可产出目录日期≠前缀日期的 key ③第四处反推无任何格式/日期/往返校验;"无单一跨组件契约测试兜底"属实(镜像常量/派生函数零对称锁定),"失配后果:上传对 Worker 静默永久不可见"获行为级实证(错位 key 经 `fragment_id_from_key` 返回 None 即不入处理队列,数据滞留 OSS 无告警)。
+- **证据:** CONTRACT-MATRIX.md §往返校验结论(:276 起)与总结论(:307-309:"FC↔Worker 主链无行为分叉,分叉全部位于小程序声部,执行结果与静态判定零矛盾");组① 行 2/4/5 判定行(:38 覆盖洞、:40 潜伏、:41 潜伏,各含 `fc_shared/sts.py:54-58`、`oss_admin.py:45-49`、`utils/audio.js:95-96,104-105`、`upload_queue.js:38-44 @ 5927f36` 行级证据);静默跳过实证:高价值对照点 (c)(S-18/S-07 样本,`poller.py:57 @ 5927f36` 往返等式拒,JS 侧照单全收,双 TZ 同果)。
+- **备注:** D-14 引用回填(Pitfall 7:不立任何新 F-*、不新开台账文件)——小程序侧三条分叉已由 Phase 2 立 F-CON-01/02/03,同一基线 SHA 下证据仍新鲜,不重复采证;跨组件测试兜底缺口面已由 F-TEST-05 承载(契约镜像常量/派生函数无对称锁定,04-08 立)。去向闭环 → F-CON-01/02/03(既有)。04-09 回填。
 
 ### HYP-14: `ENV = 'development'` hardcoded in miniprogram config
 
 - **来源:** CONCERNS.md §Fragile Areas / `ENV = 'development'` hardcoded in miniprogram config
 - **假设:** `apps/miniprogram/config.js` 的 `ENV` 常量硬编码为 `'development'`,生产发布依赖手工翻转一处常量;该常量现值、发布清单与文档对其的口径是否一致待验证(带 `development` 上线会向最终用户暴露开发者菜单与故障注入开关)。
 - **待验证维度:** DOC
-- **状态:** 未验证
+- **状态:** 证实 — ENV 常量基线现值即 `'development'`(配置侧证实);发布清单与文档口径核对结论:四份 runbook 与 AGENTS.md 全文档检索零命中 ENV 生产翻转步骤,deployment-guide 发布流程(§6.3-6.4)与附录 A 小程序清单均无该项(§6.3 仅要求核对 FC/OSS URL)——发布文档缺该必要步骤,照文档逐步执行即把 development 原样发布,"带 development 上线暴露开发者菜单与故障注入开关"的风险面成立(门控三重兜底实现自身完备,代码侧无发现;唯一记载该风险的 architecture-review 建议未落入任何 runbook)。
+- **证据:** 配置侧 DOC-CLAIMS.md CF-08(`apps/miniprogram/config.js:28-29 @ 5927f36`,ENV 现值登记行);文档侧 DOC-CLAIMS.md FD-16(全文档检索判定:`docs/runbook/deployment-guide.md:357-365,479-482 @ 5927f36` 发布流程未命中主证、`docs/architecture/architecture-review-2026-07-02.md:70,193 @ 5927f36` 风险已知未落实);门控代码证据直引 HANDOFF-PHASE4.md DOC 节第 2、3 条(`apps/miniprogram/config.js:29`、`pages/dev/dev.js:18,28,52`、`utils/fault_injection.js:38-40,82-107 @ 5927f36`,03-04 采证)——该两条移交在此显式销号。
+- **备注:** 去向 → F-DOC-03(MEDIUM,04-04 立:发布文档未覆盖 ENV 生产翻转步骤,对应 CHARTER MEDIUM 锚点"可诱发高危误操作的误导性文档")。04-09 回填。
 
 ### HYP-15: Home-grown miniprogram lint instead of ESLint
 
@@ -163,7 +171,7 @@
 - **待验证维度:** CODE
 - **状态:** 细化 — 代码实态半句证实(单机单进程轮询、离线即滞留、本地盘权威且无副本);"与文档声明的一致性"半句属 Phase 4 DOC,已移交(HANDOFF-PHASE4.md DOC 节),本计划未核对文档侧。
 - **证据:** `apps/worker/src/soniscope_worker/poller.py:378-391 @ 5927f36`(单线程轮询循环,Worker 离线即无扫描)、`poller.py:395-407 @ 5927f36`(RealOssSource 单 config 单桶,无多实例协调)、`apps/worker/src/soniscope_worker/pipeline.py:15-18 @ 5927f36`(docstring:对象永不删除,重启按硬盘状态续,音频可自 OSS 重下补全)
-- **备注:** CONCERNS.md 自评可接受经 D-10 上线语境裁定**成立**:音频有 OSS 长期备份、转写产物可经 retranscribe 自 OSS 重建,盘毁仅损失转写成本而非录音数据,个人 MVP 边界可辩护——记 RPT-06 优点候选兼 DNF 候选,不占发现 ID。持久失败对象的无界重试面另立 F-CODE-02(关联本条)。03-03 回填。
+- **备注:** CONCERNS.md 自评可接受经 D-10 上线语境裁定**成立**:音频有 OSS 长期备份、转写产物可经 retranscribe 自 OSS 重建,盘毁仅损失转写成本而非录音数据,个人 MVP 边界可辩护——记 RPT-06 优点候选兼 DNF 候选,不占发现 ID。持久失败对象的无界重试面另立 F-CODE-02(关联本条)。03-03 回填。文档口径半句已于 Phase 4 核对(DOC-CLAIMS.md PRD/tech-spec/runbook 各节 HYP-16 结论行:P-29、T-36,runbook 侧 04-04 同口径——PRD/tech-spec 均未声明超出单机单用户实态的能力,agree),销号 HANDOFF-PHASE4.md DOC 节第 1 条。04-09 补注。
 
 ### HYP-17: No FC rate limiting or quota per openid
 
@@ -210,7 +218,9 @@
 - **来源:** CONCERNS.md §Missing Critical Features / Transcript consumption/display
 - **假设:** 转写产物(本地 `transcript.txt`/`transcript.json` 或切换后的 OSS `transcripts/*.md`)无任何读取 UI;CONCERNS.md 称此为明示 MVP 范围外(无日稿展示、无 LLM 润色),该定位与 PRD 范围声明的一致性待核实。
 - **待验证维度:** DOC
-- **状态:** 未验证
+- **状态:** 证实 — "无任何读取 UI"属实且定位与 PRD 范围声明一致:PRD 明示"本期不做 LLM 润色、不做日稿展现"(:15),NG-1/NG-2 逐条把 LLM 润色/日稿呈现界面列为 Non-goals 且明言"手机端不需要查看历史 Fragment 或日稿"(:722-723);代码实态互证:小程序仅 index/uploads/dev 三页,全仓 miniprogram 源码零 `transcript` 命中(无任何转写产物读取 UI),Worker 无展示面(NG-8 口径)。
+- **证据:** DOC-CLAIMS.md P-28 结论行(【HYP-21 专项】,文档侧 `docs/v1.0.0 prd/PRD_v1.md:15,722-723 @ 5927f36`;代码侧 `apps/miniprogram/app.json:2-6 @ 5927f36`、`git grep -ln 'transcript' 5927f36 -- apps/miniprogram/` → 0 文件)。
+- **备注:** 缺失系明示 MVP 范围外的已决策范围落差,按 D-12 存在级口径处理(与 HYP-01/20 同款):不占发现 ID,记 RPT 汇总呈现。04-09 回填。
 
 ## Test Coverage Gaps
 
@@ -219,30 +229,175 @@
 - **来源:** CONCERNS.md §Test Coverage Gaps / No automated cross-component E2E without manual WeChat codes
 - **假设:** 真实小程序→FC→OSS→Worker 链路需手工传入新鲜 `wx.login` code(`make test-fc-live CODE=...`),CI 无法运行活体路径,微信认证握手或线上 FC 配置的回归只能在手工验收时暴露。
 - **待验证维度:** TEST
-- **状态:** 未验证
+- **状态:** 证实 — 活体路径零自动化覆盖属实:fc_live 与 verify_upload_live 的全部真实鉴权/签发/校验场景依赖手工传入一次性 `wx.login` code,缺 code 即全 SKIP 且本地 CI exit 0;仓库无 CI 管线(无 `.github/`),微信认证握手/线上 FC 配置的回归只能在手工验收时暴露。
+- **证据:** TEST-AUDIT.md §门禁完整性三方对照(D-11)行 5(活体路径:声称/静态/判定三列终态);`apps/worker/src/soniscope_worker/fc_live.py:15-16 @ 5927f36`(docstring:code 一次性、缺失场景标 SKIP)、`apps/worker/src/soniscope_worker/verify_upload_live.py:14 @ 5927f36`(缺 code 即 SKIP,docstring 自述"本地 CI 也能 exit 0");销号引 HANDOFF-PHASE4.md TEST 节第 1 条(03-05 采证移交,在此消费)。
+- **备注:** 去向 → F-TEST-01(LOW,04-08 立:活体路径零自动化覆盖)。04-09 回填。
 
 ### HYP-23: FC `handler.py` files outside mypy strict
 
 - **来源:** CONCERNS.md §Test Coverage Gaps / FC `handler.py` files outside mypy strict
 - **假设:** 两个面向公网的 WSGI 入口 `handler.py` 无类型级检查;`apps/fc/tests/` 行为测试对该缺口的补偿是否充分待核实。
 - **待验证维度:** TEST
-- **状态:** 未验证
-- **备注:** 豁免本身系故意设计,见 DO-NOT-FIX.md DNF-03(两侧以 ID 交叉引用);本条**仅**验证"行为测试补偿充分"这一判断,不质疑豁免本身。
+- **状态:** 细化 — "无类型级检查"半句证实(DNF-03 故意豁免,本条不质疑豁免本身);"行为测试补偿是否充分"半句经 04-07 逐错误码补偿事实清单核实为**充分**:9/9 错误码(以 `errors.py` 实际枚举为准,计划预列 7 个另有 INVALID_REQUEST/HEAD_OBJECT_FAILED 两码)均有 fc/tests 行为测试且全部在 handler 入口级被驱动(双 handler 经 importlib 唯一模块名动态加载为 WSGI callable 真实调用);GET 存活/POST 成功/异常分支三类入口路径均被驱动;`fc_shared`(逻辑下沉层)本身在 mypy strict 范围内。
+- **证据:** TEST-AUDIT.md §HYP-23 专项(9 错误码 × 行为覆盖 × 入口级驱动三列事实清单与结论行;错误码全集 `apps/fc/shared/fc_shared/errors.py:13-24 @ 5927f36`;入口驱动主证 `apps/fc/tests/test_fc_handlers.py:41-45,70,83-133 @ 5927f36`、两侧上游失败 500 无泄漏 `test_issue_credential.py:215-228`、`test_verify_upload.py:194-202 @ 5927f36`)。
+- **备注:** 豁免本身系故意设计,见 DO-NOT-FIX.md DNF-03(两侧以 ID 交叉引用);本条**仅**验证"行为测试补偿充分"这一判断,不质疑豁免本身——判断结论:补偿充分,缺口不成立,显式无发现记录(不链 F-TEST)。04-09 回填。
 
 ### HYP-24: Miniprogram page-level code (`pages/index/index.js`, 796 lines) tested only via extracted pure modules
 
 - **来源:** CONCERNS.md §Test Coverage Gaps / Miniprogram page-level code (`pages/index/index.js`, 796 lines) tested only via extracted pure modules
 - **假设:** 页面文件中的 wx-API 胶水层(录音回调、storage IO、showModal 流程)无自动化测试,node 测试仅覆盖其委托的纯 `utils/` 模块;页面与 utils 之间的接线缺陷只能真机暴露。
 - **待验证维度:** TEST
-- **状态:** 未验证
+- **状态:** 证伪 — 假设前提"页面胶水层无自动化测试、node 测试仅覆盖纯 utils 模块"与实态不符:app.json 注册 3 页全部被 node 测试经 Page harness(global.Page 捕获配置 + mock wx + require.cache 清理)真实加载,index.js(796 行)被 4 个测试文件驱动——录音中断回调(interruption)、草稿确认(draft_confirm)、分片(chunking)、ID 生成(ids)四条流程的 handler 被 mock wx 真实驱动(录音中断回调恰是假设点名"只能真机暴露"的路径之一);残余事实缩窄为"选择性驱动":四条流程之外的胶水路径(showModal 确认流、storage IO 全路径等)无自动化驱动。
+- **证据:** TEST-AUDIT.md §HYP-24 专项(加载矩阵 3/3 与结论行:`chunking.test.js:17,105`、`draft_confirm.test.js:14,74`、`ids.test.js:19,211`、`interruption.test.js:13,53 @ 5927f36` 四文件 harness 加载 index 页;uploads/dev 页加载行同表);scans/coverage-node.md pages/ 数据行(index.js 行 87.94% / 分支 67.62% / 函数 68.25%,uploads.js 行 89.66%,dev.js 行 95.00%;node `--experimental-test-coverage` 标注连带,数字仅证据引用)。
+- **备注:** 证伪后按实态缩窄立条(04-08 批次导语显式记录原表述证伪),去向 → F-TEST-02(LOW,"pages 选择性驱动",04-08 立);TESTING.md 仅记 uploader.test.js 加载 uploads 页、漏记 index 页 4 处 harness 加载的口径滞后随 F-TEST-02 正文登记。04-09 回填。
 
 ### HYP-25: `scripts/` excluded from lint/typecheck
 
 - **来源:** CONCERNS.md §Test Coverage Gaps / `scripts/` excluded from lint/typecheck
 - **假设:** `scripts/test_asr.py`(355 行)与 `scripts/fetch_test_fixtures.py` 在 `pyproject.toml` 的 mypy/ruff 范围之外,静态质量无门禁。
 - **待验证维度:** TEST
-- **状态:** 未验证
+- **状态:** 证实 — scripts/ 确在全部静态门禁之外:mypy `files` 与 ruff `src` 均只含 apps/ 四路径,Makefile lint 目标实际只跑 `ruff check apps/` 且行内注释自认"遗留 scripts/ 由各自 story 收口";门禁缺席已有实害样本:test_asr.py 存在门禁规则集(E,F,I,UP,B)内真实违例 6 条(UP009 ×1 / E501 ×4 / B904 ×1)与已提交签名 URL(仅引位置+模式名,值本体不引),均在 `make lint` 全绿下入库;fetch_test_fixtures.py 以 `# type: ignore`/`noqa` 自我豁免。
+- **证据:** TEST-AUDIT.md §门禁完整性三方对照(D-11)行 3(静态门禁范围:`pyproject.toml:32,50 @ 5927f36`、`Makefile:166-167 @ 5927f36`;实害样本 `scripts/test_asr.py:2,38,166,197,275,283 @ 5927f36` 六违例逐条见 scans/gates-baseline.md #2-7 + `scripts/test_asr.py:80 @ 5927f36` 签名 URL 位置,per CHARTER 秘密红线只引位置+模式名;`scripts/fetch_test_fixtures.py:42,103,108 @ 5927f36` 自我豁免);销号引 HANDOFF-PHASE4.md TEST 节第 2、3 条(03-06 采证移交,在此消费)。
+- **备注:** 去向 → F-TEST-03(MEDIUM,参照 F-TOOL-05,04-08 立:scripts/ 全静态门禁外 + 实害样本);签名 URL 本体的发现面在 F-TOOL-05(HYP-07 已闭环,不重复立条)。04-09 回填。
 
 ---
 
-*未验证假设清单: 2026-07-04(25 条 HYP + 1 条 Known Bugs 显式无线索记录;对账 25 + 4 DNF = 29,Phase 4 AUDIT-05 逐条回填)。回填进度:已回填 14 条(03-03:HYP-10 证实、HYP-16 细化、HYP-19 证实;03-04:HYP-01 证实、HYP-08 细化、HYP-09 证实、HYP-12 证实、HYP-17 证实、HYP-20 证实;03-05:HYP-04 证实、HYP-15 细化;03-06:HYP-07 证实、HYP-18 细化;03-07:HYP-03 细化,2026-07-05)——Phase 3 回填集 14 条(CODE 10:HYP-01/03/08/09/10/12/16/17/19/20 + TOOL 4:HYP-04/07/15/18)累计 14/14 全部闭环 ✓;余 11 条未验证(均属 Phase 4 维度:DOC 6 + TEST 4 + CON 1)。*
+## 总对账(Phase 4 收官,per D-15)
+
+> 本章节是 Phase 5 RPT-08 可追溯映射表的直接输入。D-13 机械对账结论(14 条既有回填:HYP-01/03/04/07/08/09/10/12/15/16/17/18/19/20):逐条形式核验通过——状态行存在且均为三态之一、证据行均含 `@ 5927f36`、备注去向均闭环到 F-* 编号 / RPT 候选标注 / DNF 候选 / HANDOFF 引用之一;未发现计数或格式出入,无需勘误行(内容不复判,per D-13)。
+
+### 25/25 状态分布(回填后实测)
+
+| 状态 | 计数 | 条目 |
+|------|------|------|
+| 证实 | 17 | HYP-01/02/04/05/06/07/09/10/12/13/14/17/19/20/21/22/25 |
+| 细化 | 7 | HYP-03/08/11/15/16/18/23 |
+| 证伪 | 1 | HYP-24 |
+| **合计** | **25** | 17 + 7 + 1 = 25 ✓(与逐条状态行 grep 实测一致) |
+
+### 机械验证命令
+
+```bash
+grep -c '^### HYP-' .planning/audit/HYPOTHESES.md              # 期望 25(条目底数)
+grep -c '^- \*\*状态:\*\*' .planning/audit/HYPOTHESES.md        # 期望 25(每条恰一行状态)
+grep -c '^- \*\*状态:\*\* 未验证' .planning/audit/HYPOTHESES.md # 期望 0(负向残留检查;grep 计数 0 时退出码 1 属预期)
+grep -c '^### DNF-' .planning/audit/DO-NOT-FIX.md               # 期望 4(25 + 4 = 29 对账)
+```
+
+### 29 条溯源闭环声明(25 HYP + 4 DNF)
+
+| ID | 状态 | 去向 |
+|----|------|------|
+| HYP-01 | 证实 | D-12 存在级不占发现 ID → RPT 汇总呈现(FC 直转落差,XL 档;与 HYP-20 同根) |
+| HYP-02 | 证实 | → F-DOC-06(LOW,聚合条) |
+| HYP-03 | 细化 | RPT-06/加固候选,不占发现 ID(性能面可辩护取舍,正确性有测试锁定) |
+| HYP-04 | 证实 | RPT-06 优点候选兼 DNF 候选,不占发现 ID(同模块顺带 F-TOOL-02 独立立项) |
+| HYP-05 | 证实 | → F-DOC-07(INFO) |
+| HYP-06 | 证实 | → F-DOC-08(INFO) |
+| HYP-07 | 证实 | → F-TOOL-05(MEDIUM) |
+| HYP-08 | 细化 | RPT-06 优点候选;两处细化边界记加固候选不占发现 ID |
+| HYP-09 | 证实 | RPT-06 优点候选兼 DNF 候选;无限流面 → F-CODE-05(关联 HYP-17) |
+| HYP-10 | 证实 | RPT-06 优点候选兼 DNF 候选,不占发现 ID |
+| HYP-11 | 细化 | 章程范围外(D-14),不占发现 ID → RPT 范围声明呈现 |
+| HYP-12 | 证实 | DNF 候选,不占发现 ID |
+| HYP-13 | 证实 | → F-CON-01/02/03(既有,D-14 引用回填不新立条) |
+| HYP-14 | 证实 | → F-DOC-03(MEDIUM) |
+| HYP-15 | 细化 | → F-TOOL-04(LOW) |
+| HYP-16 | 细化 | RPT-06 优点候选兼 DNF 候选;无界重试面 → F-CODE-02(关联);文档口径半句 P-29/T-36 agree |
+| HYP-17 | 证实 | → F-CODE-05(LOW) |
+| HYP-18 | 细化 | 工具级无独立发现(发现面在 F-TOOL-05);两代 SDK 并存债务观察 → RPT 呈现 |
+| HYP-19 | 证实 | 代码级无发现(外部依赖风险 → RPT 呈现;Protocol 双层隔离记 RPT-06 优点候选) |
+| HYP-20 | 证实 | D-12 存在级不占发现 ID → RPT 汇总呈现(与 HYP-01 同根互引) |
+| HYP-21 | 证实 | D-12 存在级不占发现 ID → RPT 汇总呈现(明示 MVP 范围外,PRD 口径一致) |
+| HYP-22 | 证实 | → F-TEST-01(LOW) |
+| HYP-23 | 细化 | 显式无发现记录(行为测试补偿充分 9/9;豁免本身 DNF-03,不质疑) |
+| HYP-24 | 证伪 | → F-TEST-02(LOW,证伪后按实态缩窄立条) |
+| HYP-25 | 证实 | → F-TEST-03(MEDIUM) |
+| DNF-01 | 预录入(D-08) | whisper-local 故意桩——DOC 核对闭环:DOC-CLAIMS P-24/T-25 agree(闭环 DNF-01),AG-21/AG-34 命中同闭环;Phase 5 RPT-05 用户裁定 |
+| DNF-02 | 预录入(D-08) | issue-cedential 拼写域名——DOC 核对闭环:DOC-CLAIMS CF-02 核实结论行(五处文档登记逐字符同值,ROADMAP 成功判据 1 点名线索闭环),另 AG-29/AG-38/RF-01/RM-03、CS-08/MA-02/DG-09/DG-16/FD-12 命中均闭环;Phase 5 RPT-05 用户裁定 |
+| DNF-03 | 预录入(D-08) | FC handler.py mypy 豁免——闭环:HYP-23 交叉引用(补偿充分核实,不质疑豁免本身);CHARTER 双语言适配声明同口径;Phase 5 RPT-05 用户裁定 |
+| DNF-04 | 预录入(D-08"等"字延伸) | 小程序接收原始 STS 秘密(by design)——闭环:DOC-CLAIMS T-20 语境引用(credential_response 七字段,仅字段名);归属由 Phase 5 RPT-05 用户最终裁定 |
+
+**Known Bugs 显式无线索行(照录,不计入 29):** "已检查,无已知 bug 线索。" CONCERNS.md 原文:"None detected in application code" — `apps/` 源码无 TODO/FIXME/HACK 标记,三套测试套件显式覆盖崩溃恢复、故障注入与幂等路径。本条为显式负向记录,不设 HYP 编号、不计入 29 条对账,喂 RPT-08 的"已检查,无发现"显式行。
+
+### HANDOFF 6 条销号声明
+
+| # | 移交条目 | 消费位置 |
+|---|----------|----------|
+| DOC 1 | HYP-16 文档一致性半句 | DOC-CLAIMS.md P-29/T-36 结论行(04-03;runbook 侧 04-04 同口径)+ HYP-16 备注补注(04-09) |
+| DOC 2 | HYP-14 ENV 现值与翻转步骤覆盖 | DOC-CLAIMS.md FD-16(文档侧判定)/CF-08(配置侧现值)证据直引 + HYP-14 回填销号(04-09)→ F-DOC-03 |
+| DOC 3 | HYP-14 门控三重兜底实现 | 同上 FD-16/CF-08 证据直引 + HYP-14 回填销号(04-09)→ F-DOC-03 |
+| TEST 1 | HYP-22 fc_live/verify_upload_live 手工 code 依赖 | TEST-AUDIT.md D-11 对照行 5 消费(04-08)+ HYP-22 回填销号(04-09)→ F-TEST-01 |
+| TEST 2 | HYP-25 scripts/ 门禁范围静态证据 | TEST-AUDIT.md D-11 对照行 3 静态列消费(04-08)+ HYP-25 回填销号(04-09)→ F-TEST-03 |
+| TEST 3 | HYP-25 实害样本(6 违例 + 签名 URL 位置) | TEST-AUDIT.md D-11 对照行 3 实害列消费(04-08)+ HYP-25 回填销号(04-09)→ F-TEST-03 |
+
+### 阶段收尾验证(04-09 实跑记录,2026-07-05)
+
+全套机械验收命令与实际输出逐条照录(ROADMAP 成功判据 4 + 里程碑零 diff 硬约束):
+
+**1. 零 diff 验证(里程碑硬约束,CHARTER 写定命令):**
+
+```
+$ git diff --stat 5927f36 -- apps/ scripts/ docs/
+(空输出)
+$ git diff --stat 5927f36 -- apps/ scripts/ docs/ | wc -l
+0
+```
+
+期望空输出——**命中 ✓**(apps/scripts/docs 相对基线零改动,全阶段写入面仅 .planning/)。
+
+**2. worktree 清理确认:**
+
+```
+$ git worktree list | grep -c 'wt-5927f36'
+0
+```
+
+期望无 wt-5927f36 残留——**命中 ✓**(04-02 执行区 worktree 已拆,零残留;`git worktree list` 现存条目均为主仓与执行代理自身,无审计基线执行区残留)。
+
+**3. HYP 全套 grep 复验(总对账机械验证命令逐条实跑):**
+
+```
+$ grep -c '^### HYP-' .planning/audit/HYPOTHESES.md
+25
+$ grep -c '^- \*\*状态:\*\*' .planning/audit/HYPOTHESES.md
+25
+$ grep -c '^- \*\*状态:\*\* 未验证' .planning/audit/HYPOTHESES.md
+0
+$ grep -c '^### DNF-' .planning/audit/DO-NOT-FIX.md
+4
+```
+
+期望 25 / 25 / 0 / 4——**全部命中 ✓**(25 + 4 = 29 对账等式成立)。
+
+**4. 台账存在性复验:**
+
+```
+$ ls .planning/audit/DOC-CLAIMS.md .planning/audit/TEST-AUDIT.md \
+     .planning/audit/scans/coverage-pytest.md .planning/audit/scans/coverage-node.md \
+     .planning/audit/scans/gate-run-worktree.md
+.planning/audit/DOC-CLAIMS.md
+.planning/audit/TEST-AUDIT.md
+.planning/audit/scans/coverage-node.md
+.planning/audit/scans/coverage-pytest.md
+.planning/audit/scans/gate-run-worktree.md
+```
+
+5 文件全部存在——**命中 ✓**。
+
+**5. 发现台账批次复验(含示例 00 照录):**
+
+```
+$ grep -c '^### F-DOC-' .planning/audit/findings/docs-config.md
+9
+$ grep -c '^### F-TEST-' .planning/audit/findings/test.md
+11
+```
+
+实际计数照录:F-DOC 9(示例 00 + 实条 F-DOC-01~08)、F-TEST 11(示例 00 + 实条 F-TEST-01~10)——与 04-05/04-08 收口计数一致 ✓。
+
+**收尾结论:** 五组验收全部通过——ROADMAP 成功判据 4(HYPOTHESES.md 25 条全闭环 + 零 diff)与里程碑零 diff 硬约束双达成,Phase 4 可交 /gsd-verify-work。
+
+---
+
+*未验证假设清单: 2026-07-04(25 条 HYP + 1 条 Known Bugs 显式无线索记录;对账 25 + 4 DNF = 29,Phase 4 AUDIT-05 逐条回填)。回填进度:已回填 14 条(03-03:HYP-10 证实、HYP-16 细化、HYP-19 证实;03-04:HYP-01 证实、HYP-08 细化、HYP-09 证实、HYP-12 证实、HYP-17 证实、HYP-20 证实;03-05:HYP-04 证实、HYP-15 细化;03-06:HYP-07 证实、HYP-18 细化;03-07:HYP-03 细化,2026-07-05)——Phase 3 回填集 14 条(CODE 10:HYP-01/03/08/09/10/12/16/17/19/20 + TOOL 4:HYP-04/07/15/18)累计 14/14 全部闭环 ✓;余 11 条未验证(均属 Phase 4 维度:DOC 6 + TEST 4 + CON 1)。Phase 4 回填集(04-09,2026-07-05):11 条(DOC 6:HYP-02/05/06/11/14/21 + TEST 4:HYP-22/23/24/25 + CON 1:HYP-13)+ HYP-16 备注补注(状态不动,D-13)——**累计 25/25 全部闭环 ✓**(证实 17 / 细化 7 / 证伪 1;总对账章节在档,HANDOFF 6 条销号,29 条溯源闭环)。*
