@@ -71,3 +71,17 @@
 - **关联发现:** 无;关联线索: 无
 - **上线判定:** (Phase 5 填,留空)
 - **状态:** draft
+
+> 03-04 判定产物(fc 12 文件 + miniprogram 21 文件普审 + 深挖):FC 侧共 1 条发现——F-CODE-05(issue-credential 无频控/配额面,深挖 HYP-17 主证)。sts.py/env.py/audit.py/auth.py/app.py 五个深挖点显式无发现(HYP-08/09/12 证据已记 COVERAGE 备注,回填见 HYPOTHESES.md);DNF-03 对照命中(两 handler mypy 豁免)与 DNF-04 对照命中(sts.py 原始 STS 下发)按负面清单排除不立发现;errors.py 错误码真值源证据只记不裁(D14-3,供 03-07)。app.py S104 销号确认项人工核实为 FC 容器必需形态,不立发现。小程序侧判定产物见后续条目前的补充说明。
+
+### F-CODE-05: `issue-credential` 在 allowlist 之外无任何频控/配额面,STS 签发与上游 jscode2session 调用均无上限
+
+- **维度:** 组件代码 (CODE)
+- **严重度:** LOW — 影响:两个成本/可用性面——①被攻陷的白名单客户端可无限刷 STS 签发与 ≤50 MB 对象上传(OSS 存储与 FC 调用成本滥用,单凭证爆炸半径仍受单 key/PutObject/900 s 约束);②匿名攻击者对公网触发器的每个 POST 都会在鉴权拒绝前消耗一次 jscode2session 上游调用(pre-auth 成本面,极端情况下刷占微信 appid 接口配额可波及合法用户登录);无数据丢失或认证绕过面,取最接近锚点 LOW(非关键路径债务);可能性:需攻击者主动针对个人应用端点或白名单客户端被攻陷,现实概率低
+- **证据:** `apps/fc/issue_credential/handler.py:71-81 @ 5927f36`
+  > `issuer = fc_shared.sts.get_issuer()` → `cred = issuer.assume_role(...)` — 鉴权通过后每请求一次 AssumeRole,函数内与 `fc_shared` 全链路无任何计数、窗口或配额判定;鉴权路径 `apps/fc/shared/fc_shared/auth.py:50 @ 5927f36`(`openid = wechat.code_to_openid(...)`)在 allowlist 判定之前执行,任意匿名 POST 均先触发一次微信上游调用。FC 触发器为匿名 HTTP(业务鉴权仅 allowlist 成员判定,`auth.py:33-36 @ 5927f36`)。
+- **修复建议:** 运维层优先:在 FC 控制台为两函数设置实例并发/弹性上限并配置费用告警(零代码);如需应用层配额,因 FC 无状态,可用按 openid_hash 的轻量计数(如 OSS 计数对象或日志侧告警规则)实现每日签发上限,超限返回 429 类稳定错误码。
+- **工作量:** S(平台配置层零代码即可闭环;应用层配额另计)
+- **关联发现:** 无;关联线索: HYP-17、HYP-09
+- **上线判定:** (Phase 5 填,留空)
+- **状态:** draft

@@ -43,18 +43,18 @@
 | `apps/worker/src/soniscope_worker/locks.py` | 64 | CODE | 普审 | 9/9 | 无发现 | flock advisory 排他锁按 fragment 粒度,跨进程互斥(主轮询 vs retranscribe)语义与 §3.7 一致;锁文件 0 字节不参与恢复扫描(docstring 明示 by-design);获取失败路径(LOCK_NB → LockBusyError)与 fd 关闭(finally)完整 |
 | `apps/worker/src/soniscope_worker/__main__.py` | 11 | CODE | 普审 | 9/9 | 无发现 | 纯入口委托 cli.app,无逻辑面 |
 | `apps/worker/src/soniscope_worker/__init__.py` | 7 | CODE | 普审 | 9/9 | 无发现 | 仅 `__version__ = "0.1.0"`;docstring "US-001 仅建立骨架"措辞滞后(face7 轻微),不立发现 |
-| `apps/fc/shared/fc_shared/sts.py` | 176 | CODE | 待审 | 待审 | 待审 | 深挖:HYP-09/17(单键策略核实);DNF-04 对照 |
-| `apps/fc/shared/fc_shared/env.py` | 150 | CODE | 待审 | 待审 | 待审 | 深挖:HYP-08 |
-| `apps/fc/shared/fc_shared/head.py` | 141 | CODE | 待审 | 待审 | 待审 | — |
-| `apps/fc/issue_credential/handler.py` | 110 | CODE | 待审 | 待审 | 待审 | 深挖:HYP-17(无限流);DNF-03 对照(mypy 豁免勿当发现) |
-| `apps/fc/verify_upload/handler.py` | 106 | CODE | 待审 | 待审 | 待审 | DNF-03 对照 |
-| `apps/fc/shared/fc_shared/__init__.py` | 106 | CODE | 待审 | 待审 | 待审 | — |
-| `apps/fc/shared/fc_shared/http.py` | 79 | CODE | 待审 | 待审 | 待审 | — |
-| `apps/fc/shared/fc_shared/audit.py` | 62 | CODE | 待审 | 待审 | 待审 | 深挖:HYP-08(is_sensitive 洗涤核实) |
-| `apps/fc/shared/fc_shared/wechat.py` | 52 | CODE | 待审 | 待审 | 待审 | — |
-| `apps/fc/shared/fc_shared/auth.py` | 52 | CODE | 待审 | 待审 | 待审 | 深挖:HYP-09 |
-| `apps/fc/shared/fc_shared/errors.py` | 51 | CODE | 待审 | 待审 | 待审 | D14 关联(错误码字面量真值源) |
-| `apps/fc/shared/app.py` | 35 | CODE | 待审 | 待审 | 待审 | 深挖:HYP-12(wsgiref;S104 bind-all 探针命中待人工核实) |
+| `apps/fc/shared/fc_shared/sts.py` | 176 | CODE | 深挖 | 9/9 | 无发现 | 深挖 HYP-09/17:`single_key_policy`(`sts.py:62-73 @ 5927f36`)Resource 精确单 object key 无路径通配、仅 `oss:PutObject`,时效由 handler 固定传 `STS_MAX_DURATION_SECONDS = 900`(`sts.py:25 @ 5927f36`)——收窄程度与 docstring 红线(`:9-10`)一致;AssumeRole 失败不在本模块捕获,由 handler 统一收敛 500(见 handler 行)。DNF-04 对照:`credential_response`(`:102-114`)向小程序下发原始 STS 秘密系 by-design,负面清单排除不立发现;策略实现本身未见缺陷 |
+| `apps/fc/shared/fc_shared/env.py` | 150 | CODE | 深挖 | 9/9 | 无发现 | 深挖 HYP-08 采证(回填见 HYPOTHESES.md):三组必填变量仅存名字常量(`env.py:16-38 @ 5927f36`),缺失时 FcConfigError 只列变量名不含值(`:89-91,117-119,140-142`);秘密以普通 `str` 存 frozen dataclass(StsEnv/VerifyEnv/FcEnv,`:44-79`),无 Worker 侧 MaskedSecret 同等类型级掩码,防线在 log_event 字段名洗涤 + 调用纪律(docstring `:46,60-61,74-75` 明示"绝不进日志")——细化点入 HYP-08 回填,不立发现。`_parse_max_upload_bytes` 非法值静默回退默认 50MB(`:98-107`,face1 轻微:回退方向安全,无告警日志,不立发现) |
+| `apps/fc/shared/fc_shared/head.py` | 141 | CODE | 普审 | 9/9 | 无发现 | 错误分支完整性核查通过:404/NoSuchKey → `ObjectHead(exists=False)`(`head.py:127-130 @ 5927f36`),其余异常上抛由 handler 收敛 500;三态映射(`:42-55`)与 docstring 一致(仅校验存在性 + Content-Length,etag 只回传不比对,docstring `:9-10` 明示 HeadObject 无法校验 sha256);`_oss_error_code` 递归 unwrap 有终止条件(`:85-93`);读凭证仅入 SDK 参数不入日志/响应 |
+| `apps/fc/issue_credential/handler.py` | 110 | CODE | 深挖 | 9/9 | F-CODE-05 | 深挖 HYP-17:allowlist 之外无任何频控/配额——每个鉴权通过的 POST 触发一次 AssumeRole 无上限(`handler.py:71-81 @ 5927f36`),且每个匿名 POST 在鉴权前即触发一次 jscode2session 上游调用(pre-auth 成本面,`fc_shared/auth.py:50 @ 5927f36`)→ F-CODE-05。DNF-03 对照:mypy strict 豁免系显式工程取舍(pyproject 注释),负面清单排除不立发现(handler ruff-only)。秘密面:STS 签发失败统一 500,日志仅 reason=异常类名(`:82-93`)✓ |
+| `apps/fc/verify_upload/handler.py` | 106 | CODE | 普审 | 9/9 | 无发现 | DNF-03 对照:mypy 豁免同 issue_credential,负面清单排除不立发现。校验失败错误码路径完整:FcConfigError→500 SERVER_MISCONFIGURED(仅变量名)、FcHttpError→对应 4xx 稳定码、HeadObject 异常→500 HEAD_OBJECT_FAILED(仅异常类名)、业务三态走 200 响应体 reason(`handler.py:53-106 @ 5927f36`);无限流面与 issue-credential 同构,由 F-CODE-05 一并覆盖不重复立 |
+| `apps/fc/shared/fc_shared/__init__.py` | 106 | CODE | 普审 | 9/9 | 无发现 | re-export 门面无逻辑面;`__all__`(`__init__.py:56-106 @ 5927f36`)与实际导入一致,vendoring 部署形态在 docstring 明示 |
+| `apps/fc/shared/fc_shared/http.py` | 79 | CODE | 普审 | 9/9 | 无发现 | 错误路径统一 400 INVALID_REQUEST(空体/非法 JSON/非对象/缺字段,`http.py:54-79 @ 5927f36`),无静默分支;CONTENT_LENGTH 解析异常回退 0 → 按空体 400(`:56-59`);请求体无应用层大小上限,依托 FC 平台请求边界(face4 轻微,不立发现) |
+| `apps/fc/shared/fc_shared/audit.py` | 62 | CODE | 深挖 | 9/9 | 无发现 | 深挖 HYP-08(is_sensitive 洗涤覆盖面):精确名单 13 项(`audit.py:14-29 @ 5927f36`)+ 子串兜底 secret/token/appkey/api_key/session_key/password(`:31`),覆盖全部长期凭证与会话字段;边界:`ak_id`/`openid` 等非命中名不脱敏——现有调用点均只传 openid_hash(auth.py 组装)与安全标量,纪律依赖面作为细化点入 HYP-08 回填,不立发现;`hash_openid` sha256 前 16 位(`:35-37`)✓ |
+| `apps/fc/shared/fc_shared/wechat.py` | 52 | CODE | 普审 | 9/9 | 无发现 | 任意失败(网络/非 dict/无 openid)统一 401 INVALID_CODE,异常链不外传 code/secret(`wechat.py:41-51 @ 5927f36`);secret 经查询串传 jscode2session 系微信开放接口固有形态,URL 不入任何日志;`timeout=10` 显式(`:25`) |
+| `apps/fc/shared/fc_shared/auth.py` | 52 | CODE | 深挖 | 9/9 | 无发现 | 深挖 HYP-09 采证(回填见 HYPOTHESES.md):鉴权 = JSON 校验 → code 换 openid → allowlist 字符串成员判定(`auth.py:33-52 @ 5927f36`),无会话/无频控/无按用户隔离,与假设一致;AuthContext 提供 openid_hash 供日志(`:24-30`),openid 明文不出鉴权层 |
+| `apps/fc/shared/fc_shared/errors.py` | 51 | CODE | 普审 | 9/9 | 无发现 | D14-3 关联证据(D-15 只记不裁,供 03-07 裁定):稳定错误码字面量真值源 `errors.py:13-24 @ 5927f36`(7 个 HTTP 错误码 + 2 个 verify reason),小程序 JS 按同字符串分支、联调工具镜像同集群;FcHttpError payload 仅含稳定码 + 安全文案(`:34-43`),FcConfigError 只列变量名(`:46-51`) |
+| `apps/fc/shared/app.py` | 35 | CODE | 深挖 | 9/9 | 无发现 | 深挖 HYP-12:wsgiref `ThreadingWSGIServer`(daemon threads)为生产运行时(`app.py:17-31 @ 5927f36`),无请求上限/超时/HTTP 加固,健壮性依托 FC 网关边界——MVP 自评经 D-10 裁定成立,回填见 HYPOTHESES.md(RPT-06/DNF 候选)。S104 bind-all 销号确认项人工核实下落:容器内 `0.0.0.0` 监听(`:27`)为 FC 自定义运行时必需形态(平台网关为唯一公网入口,容器无直连面),不立发现,去向已回填 scans/ruff-extended.md #1 |
 | `apps/miniprogram/pages/index/index.js` | 796 | CODE | 待审 | 待审 | 待审 | D14-1(sha256 调用端 :30,640) |
 | `apps/miniprogram/pages/uploads/uploads.js` | 387 | CODE | 待审 | 待审 | 待审 | D14-4(请求组装第二份 :340,365) |
 | `apps/miniprogram/utils/queue_runtime.js` | 324 | CODE | 待审 | 待审 | 待审 | D14-4(请求组装 :94-128) |
