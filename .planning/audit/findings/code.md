@@ -72,7 +72,7 @@
 - **上线判定:** (Phase 5 填,留空)
 - **状态:** draft
 
-> 03-04 判定产物(fc 12 文件 + miniprogram 21 文件普审 + 深挖):FC 侧共 1 条发现——F-CODE-05(issue-credential 无频控/配额面,深挖 HYP-17 主证)。sts.py/env.py/audit.py/auth.py/app.py 五个深挖点显式无发现(HYP-08/09/12 证据已记 COVERAGE 备注,回填见 HYPOTHESES.md);DNF-03 对照命中(两 handler mypy 豁免)与 DNF-04 对照命中(sts.py 原始 STS 下发)按负面清单排除不立发现;errors.py 错误码真值源证据只记不裁(D14-3,供 03-07)。app.py S104 销号确认项人工核实为 FC 容器必需形态,不立发现。小程序侧判定产物见后续条目前的补充说明。
+> 03-04 判定产物(fc 12 文件 + miniprogram 21 文件普审 + 深挖):共 2 条发现——F-CODE-05(FC 侧,issue-credential 无频控/配额面,深挖 HYP-17 主证)、F-CODE-06(小程序侧,uploading 死态,队列状态机普审产出,uploader/queue_runtime/uploads/uploads_view/upload_queue 五文件共证)。FC 侧 sts.py/env.py/audit.py/auth.py/app.py 五个深挖点显式无发现(HYP-08/09/12 证据已记 COVERAGE 备注,回填见 HYPOTHESES.md);小程序侧 sha256.js 深挖为 HYP-03 静态采证(微基准与回填留 03-07),D14-1/2/4/5/6 证据只记不裁(D-15,记 COVERAGE 备注供 03-07)。DNF-02 对照命中(config.js 拼写域名)、DNF-03 对照命中(两 handler mypy 豁免)、DNF-04 对照命中(sts.py 原始 STS 下发)均按负面清单排除不立发现;errors.py 错误码真值源与 audio.js 契约观察只记/只移交不判断;HYP-14 两处顺带证据(config.js ENV、dev.js 门控)已移交 HANDOFF-PHASE4.md DOC 节,HYP-14 状态未动。app.py S104 销号确认项人工核实为 FC 容器必需形态,不立发现(去向已回填 scans/ruff-extended.md #1);eslint.md 销号表零"确认"项,无待回填去向。判定过程未撞见安全类顺带发现。
 
 ### F-CODE-05: `issue-credential` 在 allowlist 之外无任何频控/配额面,STS 签发与上游 jscode2session 调用均无上限
 
@@ -83,5 +83,17 @@
 - **修复建议:** 运维层优先:在 FC 控制台为两函数设置实例并发/弹性上限并配置费用告警(零代码);如需应用层配额,因 FC 无状态,可用按 openid_hash 的轻量计数(如 OSS 计数对象或日志侧告警规则)实现每日签发上限,超限返回 429 类稳定错误码。
 - **工作量:** S(平台配置层零代码即可闭环;应用层配额另计)
 - **关联发现:** 无;关联线索: HYP-17、HYP-09
+- **上线判定:** (Phase 5 填,留空)
+- **状态:** draft
+
+### F-CODE-06: 进程中断残留的 `uploading` 状态项成为死态——自动驱动不拾取、无手动重传入口、不计入积压提示
+
+- **维度:** 组件代码 (CODE)
+- **严重度:** MEDIUM — 影响:上传中被杀进程/闪退的片段永久滞留 uploading 态——下次启动自动驱动只拾取 queued/pending_verify,视图层 uploading 不在任何可操作集合(无手动重传/重新 verify 按钮)也不计入"未上传 N 条"积压提示,UI 长期显示"上传中"蓝点;该片段音频未达 OSS、仅存本地临时文件(微信临时文件可能被系统回收),用户唯一出路是删除记录,录音随之丢失;可能性:需进程恰在 uploading 窗口内终止,而该窗口含最长 5+15+45 秒的三段退避等待与上传本身,录完即杀小程序/切走属现实操作(潜伏类:正常完成流程不触发,中断即爆)
+- **证据:** `apps/miniprogram/utils/uploader.js:72 @ 5927f36`
+  > `setStatus(STATUS_UPLOADING, { progress: 0 })` — 上传编排入口先把 uploading 即时落盘(onStatus→updateQueueItem→setStorageSync),随后经历 STS 请求与最多 4 次 OSS 尝试(退避 5s/15s/45s)。对照:自动驱动仅拾取两态 `apps/miniprogram/utils/queue_runtime.js:198,221 @ 5927f36`(`status !== STATUS_QUEUED` / `!== STATUS_PENDING_VERIFY` 即跳过;`pages/uploads/uploads.js:126,152 @ 5927f36` 同构);视图层 `apps/miniprogram/utils/uploads_view.js:25-39 @ 5927f36` 的 BACKLOG_STATUSES/MANUAL_RETRY_STATUSES/RE_VERIFY_STATUSES 三个集合均不含 uploading——该态无任何自动或用户可见恢复入口。
+- **修复建议:** 启动/onShow 驱动前增加 stale-uploading 复位:把 `status === 'uploading'` 的项重置为 queued(或 manual_retry)再进入正常驱动——与 Worker 侧启动恢复扫描同一思路;或最小改动把 uploading 纳入 MANUAL_RETRY_STATUSES 提供手动出口。两方案任一均可单点闭环。
+- **工作量:** M(同组件多文件:queue_runtime.js/uploads.js/uploads_view.js 及既有 node 测试)
+- **关联发现:** 无;关联线索: 无(队列状态机普审产出)
 - **上线判定:** (Phase 5 填,留空)
 - **状态:** draft
