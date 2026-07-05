@@ -9,7 +9,7 @@
 
 ## DOC 维度移交
 
-(03-03~03-07 追加。)
+- **(移交 Phase 4 DOC,HYP-16 文档一致性半句):** HYP-16 的代码实态半句已由 03-03 核实(单进程轮询 `apps/worker/src/soniscope_worker/poller.py:378-391 @ 5927f36`,Worker 离线即无转写、本地盘无副本),其"容量边界与文档声明的一致性"半句(PRD/tech-spec/runbook 对单机单用户边界的口径核对)属 Phase 4 DOC 维度,本计划未核对文档侧。
 
 ## TEST 维度移交
 
