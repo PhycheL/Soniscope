@@ -100,7 +100,7 @@ MEDIUM 11 条逐条归属(grep 实测):F-CON-02、F-CON-03、F-CODE-02、F-CODE-
 
 ### CAL 调整条目
 
-本节承载全部 `### CAL-NN` 调整条目(五字段:调整类型、原值→终值、理由、锚点依据、批准记录)。本批扫描结果为**零拟调整、零并入**(见上文与下节),故本节无条目;若用户在 D-02 批复中要求改判,改判条目将按同一五字段格式增补于此。
+本节承载全部 `### CAL-NN` 调整条目(五字段:调整类型、原值→终值、理由、锚点依据、批准记录)。本批扫描结果为**零拟调整、零并入**(见上文与下节),故本节无条目。**批准记录(适用于本节整体):** 经 D-02 批量呈报(第 1 批,与 D-12 合并交互),用户于 2026-07-05 批复 `approve-all`(整批通过,无逐条批注意见)——"零拟调整、零并入"的扫描结论与全部原级维持一并获批;40 条发现原级即终级,报告组装无"经校准"标注需求。
 
 ---
 
@@ -307,9 +307,9 @@ F-CON-04(文档化设计取舍)、F-CODE-01(遗留 API 面)、F-CODE-04(搜索�
 | F-TEST-09 | POST-LAUNCH | PL-1 | 缺测试锁定类,当前实现正确(秘密仅参与派生) |
 | F-TEST-10 | POST-LAUNCH | PL-1 | 测试卫生杂项,纯维护成本类 |
 
-**判定分布(草案):** BLOCKER 0 / PRE-LAUNCH 3(F-CODE-02、F-CODE-06、F-DOC-03)/ POST-LAUNCH 37;0 + 3 + 37 = 40 ✓
+**判定分布(终态,经 D-12 批准):** BLOCKER 0 / PRE-LAUNCH 3(F-CODE-02、F-CODE-06、F-DOC-03)/ POST-LAUNCH 37;0 + 3 + 37 = 40 ✓
 
-**总判定推导(D-11,草案):** 无 BLOCKER、有 PRE-LAUNCH → **CONDITIONAL GO**(必做清单 = F-CODE-02、F-CODE-06、F-DOC-03;分别由 WP-03、WP-04、WP-07 承载)。
+**总判定推导(D-11,终态):** 无 BLOCKER、有 PRE-LAUNCH → **CONDITIONAL GO**(必做清单 = F-CODE-02、F-CODE-06、F-DOC-03;分别由 WP-03、WP-04、WP-07 承载)。
 
 **与严重度直觉相厄条目(MEDIUM 却 POST-LAUNCH,D-12 抽样呈报对象):** F-CON-02、F-CON-03、F-TOOL-05、F-TOOL-06、F-TEST-03、F-TEST-04、F-TEST-05、F-TEST-06,共 8 条(理由见各行)。
 
@@ -317,19 +317,58 @@ F-CON-04(文档化设计取舍)、F-CODE-01(遗留 API 面)、F-CODE-04(搜索�
 
 ## 呈报与批准记录
 
-状态: 呈报待批
+状态: 已批准落账
 
 - **呈报批次:** 第 1 批(D-02 校准批量呈报 + D-12 判定准则批准与抽样呈报,合并为一次交互,per RESEARCH Pattern 2)
+- **呈报日期:** 2026-07-05
 - **呈报内容:** ①拟调整清单(本批 0 条,零拟调整记录见跨维度对齐扫描节)②真重复并入判定(本批 0 条)③上线判定准则全文(B-1~B-3/P-1~P-3/PL-1 + D-11 推导规则)④判定抽样(全部 PRE-LAUNCH 3 条 + 相厄条目 8 条;BLOCKER 0 条)⑤确认项:CHARTER schema 字段 8/9 台账回填预期由本文件承载、findings/*.md 不回写(RESEARCH 假设 A3)
-- **批复记录:** (待用户批复后由 Task 3 落账)
+- **批复记录:** 用户于 2026-07-05 批复,批复方式 = 整批通过;批复原文:"approve-all(整批通过 ①~⑤,无逐条批注意见)"。①~⑤ 全部生效:零拟调整/零并入落账;**判定准则 B-1~PL-1 与 D-11 推导规则经用户批准定稿(D-12 批准结论)**;40 条逐条判定与 CONDITIONAL GO 总判定推导获批为终态;A3 确认项通过——CHARTER schema 字段 8/9 由本文件承载,findings/*.md 保持封版不回写。
 
-### 尾部对账等式(草稿,终稿实跑照录)
+### 尾部对账等式(终稿实跑照录,2026-07-05)
 
-- CAL 调整条目数:`grep -c '^### CAL-' .planning/audit/CALIBRATION.md` = 0(零拟调整、零并入,合法结果)
-- CL 簇数:`grep -c '^### CL-' .planning/audit/CALIBRATION.md` = 5(4~7 之内)
-- WP 包数:`grep -c '^### WP-' .planning/audit/CALIBRATION.md` = 9
-- 判定表行数:`grep -c '^| F-' .planning/audit/CALIBRATION.md` = 40(全文件唯一 `| F-` 开行表)
-- 三态判定计数和:0(BLOCKER)+ 3(PRE-LAUNCH)+ 37(POST-LAUNCH)= 40
-- 工作包成员并集:37 = 40 − 3 INFO − 0 副条
-- findings 封版:`git status --porcelain .planning/audit/findings/` 输出为空
-- 零 diff:`git diff --stat 5927f36 -- apps/ scripts/ docs/ | wc -l` = 0
+```
+$ grep -c '^### CAL-' .planning/audit/CALIBRATION.md
+0
+```
+CAL 调整条目数 = **0**(零拟调整、零并入,经批复确认的合法结果;grep 计数 0 时退出码 1 属预期)✓
+
+```
+$ grep -c '^### CL-' .planning/audit/CALIBRATION.md
+5
+```
+CL 簇数 = **5**(4~7 之内)✓
+
+```
+$ grep -c '^### WP-' .planning/audit/CALIBRATION.md
+9
+```
+WP 包数 = **9** ✓
+
+```
+$ grep -c '^| F-' .planning/audit/CALIBRATION.md
+40
+```
+判定表行数 = **40**(全文件唯一 `| F-` 开行表)✓
+
+```
+$ grep '^| F-' .planning/audit/CALIBRATION.md | grep -cE 'BLOCKER|PRE-LAUNCH|POST-LAUNCH'
+40
+```
+三态判定计数和 = 0(BLOCKER)+ 3(PRE-LAUNCH)+ 37(POST-LAUNCH)= **40** ✓
+
+工作包成员并集 = 37 = WP-01(4)+ WP-02(4)+ WP-03(6)+ WP-04(1)+ WP-05(6)+ WP-06(3)+ WP-07(6)+ WP-08(6)+ WP-09(1)= 40 − 3 INFO − 0 副条 ✓
+
+```
+$ git status --porcelain .planning/audit/findings/
+(空输出)
+```
+findings 封版零改动(D-03)✓
+
+```
+$ git diff --stat 5927f36 -- apps/ scripts/ docs/ | wc -l
+0
+```
+零 diff(CHARTER 写定命令,apps/scripts/docs 相对基线零改动)✓
+
+---
+*校准台账: 2026-07-05(40 条真实发现原级即终级;CAL 0 / CL 5 / WP 9;判定 BLOCKER 0 / PRE-LAUNCH 3 / POST-LAUNCH 37 → CONDITIONAL GO;D-02/D-12 双批准 approve-all 落账,findings 封版零回写)*
