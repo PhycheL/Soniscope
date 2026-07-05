@@ -317,15 +317,17 @@ grep -rE 'OSSAccessKeyId=[0-9A-Za-z]{8,}|Signature=[0-9A-Za-z%+/=]{16,}|LTAI[0-9
 
 其余全部关键事实(文件清单、计数、格式、分布)均 [VERIFIED: 直接盘点],无 [ASSUMED] 残留。
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **MEDIUM 11 条的精确逐条归属**
+1. **MEDIUM 11 条的精确逐条归属** — RESOLVED
    - What we know: 总数 11 已 grep 实测;Phase 3 收口自记 CODE/TOOL 侧 4 条(F-CODE-02/06、F-TOOL-05/06)
    - What's unclear: 其余 7 条在 CON/DOC/TEST 的逐条归属本研究未逐条抄录
    - Recommendation: plan 01 校准扫描第一步就是逐条抽取严重度清单(本就是必做工序),自然解决
-2. **聚类预期数量与粒度**(Claude 裁量)
+   - **RESOLVED:** 已由 05-01-PLAN.md Task 1 第一步(逐条抽取工序)消化——以 `^### F-` 为锚逐条抽取严重度清单并现场 grep 复核分布,执行时自然得出精确归属
+2. **聚类预期数量与粒度**(Claude 裁量)— RESOLVED
    - What we know: 4 个已知重叠群 + TEST-AUDIT 反向映射等式给出成员关系
    - Recommendation: 预期 4~7 个 CL-NN;不追求全覆盖——无共同根因的孤条不强行入簇,聚类层允许有未入簇发现(D-06 分析层性质)
+   - **RESOLVED:** 裁量已编码进 05-01-PLAN.md Task 1 第四步与 acceptance_criteria(`### CL-` 簇数 4~7、孤条不强行入簇),CONTEXT 裁量区就此落定
 
 ## Environment Availability
 
