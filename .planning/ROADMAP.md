@@ -85,7 +85,36 @@ Plans:
   3. 台账中不存在原始 linter/工具输出直接充当发现——每条发现均附人工确认的 file:line@SHA 证据片段
   4. 跨组件契约类观察已转交 Phase 2 的漂移矩阵作为线索,未在组件维度内单独下判断
 
-**Plans**: TBD
+**Plans**: 7 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 03-01-PLAN.md — 零 diff 前置、COVERAGE/HANDOFF 骨架、包合法性检查点与全部审计仪器扫描存档
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 03-02-PLAN.md — scans/ 五档全部命中三态销号(确认/误报/移交)+ 对账等式
+
+**Wave 3** *(blocked on Wave 2)*
+
+- [ ] 03-03-PLAN.md — CODE:apps/worker 核心 14 模块普审+深挖,HYP-10/16/19 回填(AUDIT-01)
+
+**Wave 4** *(blocked on Wave 3)*
+
+- [ ] 03-04-PLAN.md — CODE:apps/fc 12 文件 + apps/miniprogram 21 文件普审+深挖,HYP-01/08/09/12/17/20 回填(AUDIT-01)
+
+**Wave 5** *(blocked on Wave 4)*
+
+- [ ] 03-05-PLAN.md — TOOL:Worker 包内验证/运维 12 模块普审+深挖,HYP-04/15 回填(AUDIT-02)
+
+**Wave 6** *(blocked on Wave 5)*
+
+- [ ] 03-06-PLAN.md — TOOL:scripts/ 三文件 + Makefile 静读审计,HYP-07/18 回填含 test_asr.py 点名线索结论(AUDIT-02)
+
+**Wave 7** *(blocked on Wave 6)*
+
+- [ ] 03-07-PLAN.md — D14-1~6 三要素裁定、D-16 微基准与 HYP-03 回填、COVERAGE 完成判定与阶段机械收尾
 
 ### Phase 4: 文档配置与测试审计
 
