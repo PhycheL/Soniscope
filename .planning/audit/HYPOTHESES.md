@@ -100,8 +100,9 @@
 - **来源:** CONCERNS.md §Performance Bottlenecks / Worker processes fragments sequentially in one process
 - **假设:** Worker 轮询循环对每个片段串行执行下载→ffmpeg 转码→同步轮询 NLS(5 s 间隔)后才处理下一片段,单进程单线程构成吞吐上限。
 - **待验证维度:** CODE
-- **状态:** 未验证
-- **备注:** CONCERNS.md 自评为 deliberate MVP choice(单线程保持磁盘状态机简单),待 Phase 3/4 核实该判断是否成立(RESEARCH A4 分流依据)。
+- **状态:** 证实 — 单进程单线程串行处理属实:每轮对 to_download 逐条 for 循环同步执行下载→标准化→同步转写(NLS 5 s 轮询),主循环单线程 while + sleep,无任何并发原语。
+- **证据:** `apps/worker/src/soniscope_worker/pipeline.py:407-441 @ 5927f36`(单轮串行 for 循环,transcribe 同步调用)、`pipeline.py:485-506 @ 5927f36`(单线程主循环)、`apps/worker/src/soniscope_worker/nls.py:327 @ 5927f36`(`sleep(NLS_POLL_INTERVAL_SECONDS)` 同步轮询)、`apps/worker/src/soniscope_worker/poller.py:378-391 @ 5927f36`(poll_loop 单线程)
+- **备注:** CONCERNS.md 自评 deliberate MVP choice 经 D-10 上线语境裁定**成立**:个人单用户场景片段到达率低,串行吞吐上限远未触及,单线程换取磁盘文件状态机免锁简单性是可辩护取舍——记 RPT-06 优点候选兼 DNF 候选,不占发现 ID(D-12)。03-03 回填。
 
 ### HYP-11: FC-direct will pay for NLS poll wait time
 
@@ -149,7 +150,9 @@
 - **来源:** CONCERNS.md §Scaling Limits / Single machine, single user, poll-based
 - **假设:** 单 Mac 单 Worker、单白名单 openid、轮询式架构:Worker 离线即无转写(音频滞留 OSS 待重启补齐),本地盘为权威存储且无副本(盘毁则转写全失,音频可自 OSS 重下),该容量边界与文档声明的一致性待核实。
 - **待验证维度:** CODE
-- **状态:** 未验证
+- **状态:** 细化 — 代码实态半句证实(单机单进程轮询、离线即滞留、本地盘权威且无副本);"与文档声明的一致性"半句属 Phase 4 DOC,已移交(HANDOFF-PHASE4.md DOC 节),本计划未核对文档侧。
+- **证据:** `apps/worker/src/soniscope_worker/poller.py:378-391 @ 5927f36`(单线程轮询循环,Worker 离线即无扫描)、`poller.py:395-407 @ 5927f36`(RealOssSource 单 config 单桶,无多实例协调)、`apps/worker/src/soniscope_worker/pipeline.py:15-18 @ 5927f36`(docstring:对象永不删除,重启按硬盘状态续,音频可自 OSS 重下补全)
+- **备注:** CONCERNS.md 自评可接受经 D-10 上线语境裁定**成立**:音频有 OSS 长期备份、转写产物可经 retranscribe 自 OSS 重建,盘毁仅损失转写成本而非录音数据,个人 MVP 边界可辩护——记 RPT-06 优点候选兼 DNF 候选,不占发现 ID。持久失败对象的无界重试面另立 F-CODE-02(关联本条)。03-03 回填。
 
 ### HYP-17: No FC rate limiting or quota per openid
 
@@ -172,7 +175,9 @@
 - **来源:** CONCERNS.md §Dependencies at Risk / `alibabacloud-nls20180628` / NLS filetrans API (2018 vintage)
 - **假设:** 整条转写路径(现 Worker、未来 FC 直转)依赖 2018-08-17 版 NLS 录音文件识别 API,若 Aliyun 弃用则管线搁浅;`Transcriber` Protocol 对引擎的隔离是否足以支撑替换待核实。
 - **待验证维度:** CODE
-- **状态:** 未验证
+- **状态:** 证实 — 2018 版 API 依赖属实(filetrans 2018-08-17 + legacy aliyunsdkcore AcsClient 承载 oss-url 主路径);Protocol 隔离经核实**充分**:业务流程仅依赖 Transcriber Protocol,引擎替换只需新实现类 + 工厂分支 + config.yaml 改名,不动流水线。
+- **证据:** `apps/worker/src/soniscope_worker/verify_prep.py:87 @ 5927f36`(`NLS_FILETRANS_VERSION = "2018-08-17"`)、`apps/worker/src/soniscope_worker/nls.py:454-455 @ 5927f36`(filetrans 域名 + 版本消费点)、`verify_prep.py:775-776 @ 5927f36`(legacy `aliyunsdkcore` AcsClient/CommonRequest)、`apps/worker/src/soniscope_worker/transcriber.py:81-90,168-183 @ 5927f36`(Transcriber Protocol + 工厂分发,隔离面)
+- **备注:** 弃用风险为外部依赖风险(Aliyun 侧不可控),代码级无发现(COVERAGE nls.py/transcriber.py 行"无发现");Transcriber/NlsBackend 双层 Protocol 分层记 RPT-06 优点候选。direct 降级模式(FlashRecognizer)走独立网关端点(`nls.py:507 @ 5927f36`),filetrans 弃用时可作短期退路。03-03 回填。
 
 ## Missing Critical Features
 
@@ -224,4 +229,4 @@
 
 ---
 
-*未验证假设清单: 2026-07-04(25 条 HYP + 1 条 Known Bugs 显式无线索记录;对账 25 + 4 DNF = 29,Phase 4 AUDIT-05 逐条回填)*
+*未验证假设清单: 2026-07-04(25 条 HYP + 1 条 Known Bugs 显式无线索记录;对账 25 + 4 DNF = 29,Phase 4 AUDIT-05 逐条回填)。回填进度:已回填 3 条(HYP-10 证实、HYP-16 细化、HYP-19 证实,03-03,2026-07-05),余 22 条未验证。*

@@ -29,20 +29,20 @@
 
 | 路径 | 行数 | 维度 | 深度 | 已过面 | 产出 | 备注 |
 |------|------|------|------|--------|------|------|
-| `apps/worker/src/soniscope_worker/pipeline.py` | 875 | CODE | 待审 | 待审 | 待审 | 深挖:HYP-10(串行吞吐) |
-| `apps/worker/src/soniscope_worker/nls.py` | 740 | CODE | 待审 | 待审 | 待审 | 深挖:HYP-19(2018 版 NLS API)、D14-2(重试常量) |
-| `apps/worker/src/soniscope_worker/cli.py` | 601 | CODE | 待审 | 待审 | 待审 | TOOL 子命令入口,实体逻辑见 TOOL 侧对应模块,整体归 CODE 审一次(RESEARCH Open Question 2 裁决) |
-| `apps/worker/src/soniscope_worker/poller.py` | 531 | CODE | 待审 | 待审 | 待审 | 深挖:HYP-10、HYP-16;D14-1(sha256 比对流程) |
-| `apps/worker/src/soniscope_worker/manifest.py` | 473 | CODE | 待审 | 待审 | 待审 | — |
-| `apps/worker/src/soniscope_worker/recovery.py` | 465 | CODE | 待审 | 待审 | 待审 | — |
-| `apps/worker/src/soniscope_worker/audio.py` | 412 | CODE | 待审 | 待审 | 待审 | — |
-| `apps/worker/src/soniscope_worker/oss_admin.py` | 242 | CODE | 待审 | 待审 | 待审 | HYP-13 相关(契约观察→移交,成功判据 4) |
-| `apps/worker/src/soniscope_worker/transcriber.py` | 183 | CODE | 待审 | 待审 | 待审 | 深挖:HYP-19(Protocol 隔离充分性);DNF-01 对照(勿把 whisper 桩当发现) |
-| `apps/worker/src/soniscope_worker/config.py` | 150 | CODE | 待审 | 待审 | 待审 | 深挖:HYP-08(MaskedSecret/600 权限缓解核实) |
-| `apps/worker/src/soniscope_worker/paths.py` | 117 | CODE | 待审 | 待审 | 待审 | — |
-| `apps/worker/src/soniscope_worker/locks.py` | 64 | CODE | 待审 | 待审 | 待审 | — |
-| `apps/worker/src/soniscope_worker/__main__.py` | 11 | CODE | 待审 | 待审 | 待审 | — |
-| `apps/worker/src/soniscope_worker/__init__.py` | 7 | CODE | 待审 | 待审 | 待审 | — |
+| `apps/worker/src/soniscope_worker/pipeline.py` | 875 | CODE | 深挖 | 9/9 | 无发现 | 深挖 HYP-10 证实:串行 for 循环 `pipeline.py:407-441 @ 5927f36` + 单线程主循环 `:485-506`(回填见 HYPOTHESES.md)。`.done` 最后写(`:274`/`:367`)、任一阶段失败不建 `.done`、原子写协议核查通过;F-CODE-02 消费端证据 `:412-422` |
+| `apps/worker/src/soniscope_worker/nls.py` | 740 | CODE | 深挖 | 9/9 | 无发现 | 深挖 HYP-19 证据:filetrans 域名+版本经 `verify_prep.NLS_FILETRANS_VERSION = "2018-08-17"`(`verify_prep.py:87 @ 5927f36`,消费 `nls.py:454-455 @ 5927f36`),legacy `aliyunsdkcore` AcsClient(`verify_prep.py:775-776`)。D14-2 证据(D-15 只记不裁):`RETRY_DELAYS_SECONDS = (5.0, 15.0, 45.0)` 与 `MAX_RETRIES = 3` 均为独立字面量(`nls.py:45-46 @ 5927f36`),MAX 非 `len()` 派生;`_with_retries`(`:268-270`)当前 3 == len 自洽。RESIGN_THRESHOLD 续签逻辑(`:314-326`)无静默失败;秘密仅经 `.get_secret_value()` 入 SDK 参数,错误信息只含类名/错误码(`:428`/`:579`) |
+| `apps/worker/src/soniscope_worker/cli.py` | 601 | CODE | 普审 | 9/9 | 无发现 | TOOL 子命令入口,实体逻辑见 TOOL 侧对应模块,整体归 CODE 审一次(RESEARCH Open Question 2 裁决)。全部子命令统一 `(lines, exit_code)` → `typer.Exit` 转换完整;`oss-delete-obj` 双闸门(--yes/SONISCOPE_ALLOW_OSS_DELETE)测试专用;face7 轻微:模块 docstring(`cli.py:1-5 @ 5927f36`)"主轮询与 retranscribe 等在后续 story 实现"滞后于实态(两者已实现 `:24-29`/`:401-423`),不立发现 |
+| `apps/worker/src/soniscope_worker/poller.py` | 531 | CODE | 深挖 | 9/9 | F-CODE-01、F-CODE-02 | 深挖 HYP-10/16 证实:`poll_loop` 单线程 while 循环 `poller.py:378-391 @ 5927f36`,单机单配置 RealOssSource(`:395-451`)。D14-1 证据(只记不裁):Worker 侧 sha256 比对流程 `poller.py:261,272-284 @ 5927f36`,经 `fixtures.sha256_of`(stdlib hashlib)。契约观察移交:`fragment_id_from_key` 往返校验(`:47-61`)已由 Phase 2 矩阵覆盖(F-CON-02/03 引用行),本维度不判断。OssSource Protocol 结构性无删除能力(`:215-231`)红线核查通过 |
+| `apps/worker/src/soniscope_worker/manifest.py` | 473 | CODE | 普审 | 9/9 | 无发现 | 落盘顺序核查通过:`write_fragment_outputs` 原子写 manifest→transcript.json(经 tmp/)→transcript.txt→`.done` 最后(`manifest.py:226-232 @ 5927f36`);face7 轻微:`UploadInfo` 注释(`:91`)称 original_sha256/original_size_bytes"可显式覆盖"但 dataclass 无该字段,不立发现 |
+| `apps/worker/src/soniscope_worker/recovery.py` | 465 | CODE | 普审 | 9/9 | F-CODE-03 | 三段恢复扫描按后缀清理仅中间态(`.part`/`.wav.tmp`/`.transcript.json.tmp`),误删面核查通过;`.done` 无任何删除路径(simulate 工具除外,显式测试用);缺口:fragment 目录内 mkstemp 孤儿 `*.tmp` 无清理路径 → F-CODE-03;`remove_empty_dirs` 默认 False 安全 |
+| `apps/worker/src/soniscope_worker/audio.py` | 412 | CODE | 普审 | 9/9 | F-CODE-02(增补证据) | 直通/转码均原子 rename(`audio.py:203,238 @ 5927f36`),失败留档 inbox/failed/ 不污染 fragments/(`:185,225`);但留档不阻止下轮重下(`_archive_failed` docstring "不再重试"与实态相悖)→ 并入 F-CODE-02 并升级 MEDIUM;ffmpeg 子进程 S603/S607 已在 scans 销号(误报,固定参数列表) |
+| `apps/worker/src/soniscope_worker/oss_admin.py` | 242 | CODE | 普审 | 9/9 | 无发现 | 契约观察移交:`object_key_for`(`oss_admin.py:37-50 @ 5927f36`)三处重复实现与往返校验已由 Phase 2 矩阵组①行 2/4/5 覆盖(F-CON-01/02/03 引用 `:45-49/:50`),本维度不判断(成功判据 4/D-11)。DeleteObject 仅测试用且双闸门(`delete_allowed :53-55` + cli --yes/env),业务路径 OssSource 结构性无删除——红线核查通过;输出无 AK 明文(`:209/:240` 仅异常类名) |
+| `apps/worker/src/soniscope_worker/transcriber.py` | 183 | CODE | 深挖 | 9/9 | 无发现 | 深挖 HYP-19(Protocol 隔离):`Transcriber` Protocol(`transcriber.py:81-90 @ 5927f36`)+ 工厂分发(`:168-183`),业务流程仅依赖 Protocol,引擎替换只需新实现类 + 工厂分支 + config.yaml 改名——隔离充分(证据供 HYP-19 回填)。DNF-01 对照命中:`WhisperLocalTranscriber.transcribe`(`:156-165`)抛 NotImplementedError 附可操作提示,系故意桩,负面清单排除不立发现 |
+| `apps/worker/src/soniscope_worker/config.py` | 150 | CODE | 深挖 | 9/9 | 无发现 | 深挖 HYP-08 证据(本计划只采证不回填,回填在 03-04):`MaskedSecret._display`(`config.py:31-35 @ 5927f36`)repr/str 前后 4 位脱敏;`masked_summary`(`:85-106`)经 MaskedSecret __str__ 输出,无明文;`config_permission_is_600`(`:148-150`)恰 600 判定,但 CLI 侧仅警告不拒载(`cli.py:48-53 @ 5927f36`);边界细节:`mask_secret`(`:22-28`)对 9-16 字符短秘密暴露 8 字符占比过半(现实 Aliyun AK secret 30 字符/appkey 较长,边界性),供 03-04 合并 FC env.py 侧证据裁定;`yaml.safe_load`(`:137`)非 unsafe load ✓ |
+| `apps/worker/src/soniscope_worker/paths.py` | 117 | CODE | 普审 | 9/9 | F-CODE-04 | `.env` 向上搜索(`paths.py:38-46 @ 5927f36`)自 CWD 无界直至根目录,与错误信息/config.py 注释"仓库根目录 .env"口径不符 → F-CODE-04;`init_runtime_dirs` 幂等、home 不存在显式拒绝(`:103-112`) |
+| `apps/worker/src/soniscope_worker/locks.py` | 64 | CODE | 普审 | 9/9 | 无发现 | flock advisory 排他锁按 fragment 粒度,跨进程互斥(主轮询 vs retranscribe)语义与 §3.7 一致;锁文件 0 字节不参与恢复扫描(docstring 明示 by-design);获取失败路径(LOCK_NB → LockBusyError)与 fd 关闭(finally)完整 |
+| `apps/worker/src/soniscope_worker/__main__.py` | 11 | CODE | 普审 | 9/9 | 无发现 | 纯入口委托 cli.app,无逻辑面 |
+| `apps/worker/src/soniscope_worker/__init__.py` | 7 | CODE | 普审 | 9/9 | 无发现 | 仅 `__version__ = "0.1.0"`;docstring "US-001 仅建立骨架"措辞滞后(face7 轻微),不立发现 |
 | `apps/fc/shared/fc_shared/sts.py` | 176 | CODE | 待审 | 待审 | 待审 | 深挖:HYP-09/17(单键策略核实);DNF-04 对照 |
 | `apps/fc/shared/fc_shared/env.py` | 150 | CODE | 待审 | 待审 | 待审 | 深挖:HYP-08 |
 | `apps/fc/shared/fc_shared/head.py` | 141 | CODE | 待审 | 待审 | 待审 | — |

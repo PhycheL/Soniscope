@@ -827,7 +827,7 @@ No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` opti
 | 52 | apps/worker/src/soniscope_worker/pipeline.py:582 | ARG002(audio_path) | 误报 | 同 #51 |
 | 53 | apps/worker/src/soniscope_worker/pipeline.py:582 | ARG002(oss_key) | 误报 | 同 #51 |
 | 54 | apps/worker/src/soniscope_worker/pipeline.py:625 | ARG002 | 误报 | 假 OssSource 的 head_metadata 须契合 Protocol 签名 |
-| 55 | apps/worker/src/soniscope_worker/poller.py:249 | ARG001 | 确认 | process_plan 关键字形参 fragments_root 在函数体内未使用(.done 判定由调用方 done_check 闭包另行携带,poller.py:333)——疑为遗留 API 面 → 深挖线索(03-03 poller 普审) |
+| 55 | apps/worker/src/soniscope_worker/poller.py:249 | ARG001 | 确认 | process_plan 关键字形参 fragments_root 在函数体内未使用(.done 判定由调用方 done_check 闭包另行携带,poller.py:333)——疑为遗留 API 面 → F-CODE-01(03-03 深挖核实立发现,findings/code.md) |
 | 56 | apps/worker/src/soniscope_worker/recovery.py:315 | ARG001 | 误报 | _stub_transcript 为 make test 确定性占位桩(docstring 明言),形参保留签名形状 |
 | 57 | apps/worker/src/soniscope_worker/retranscribe.py:371 | ARG002(fragment_id) | 误报 | 占位转写器契合 Transcriber Protocol 签名,同 #51 |
 | 58 | apps/worker/src/soniscope_worker/retranscribe.py:371 | ARG002(audio_path) | 误报 | 同 #57 |
