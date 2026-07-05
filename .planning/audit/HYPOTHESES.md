@@ -331,6 +331,73 @@ grep -c '^### DNF-' .planning/audit/DO-NOT-FIX.md               # 期望 4(25 + 
 | TEST 2 | HYP-25 scripts/ 门禁范围静态证据 | TEST-AUDIT.md D-11 对照行 3 静态列消费(04-08)+ HYP-25 回填销号(04-09)→ F-TEST-03 |
 | TEST 3 | HYP-25 实害样本(6 违例 + 签名 URL 位置) | TEST-AUDIT.md D-11 对照行 3 实害列消费(04-08)+ HYP-25 回填销号(04-09)→ F-TEST-03 |
 
+### 阶段收尾验证(04-09 实跑记录,2026-07-05)
+
+全套机械验收命令与实际输出逐条照录(ROADMAP 成功判据 4 + 里程碑零 diff 硬约束):
+
+**1. 零 diff 验证(里程碑硬约束,CHARTER 写定命令):**
+
+```
+$ git diff --stat 5927f36 -- apps/ scripts/ docs/
+(空输出)
+$ git diff --stat 5927f36 -- apps/ scripts/ docs/ | wc -l
+0
+```
+
+期望空输出——**命中 ✓**(apps/scripts/docs 相对基线零改动,全阶段写入面仅 .planning/)。
+
+**2. worktree 清理确认:**
+
+```
+$ git worktree list | grep -c 'wt-5927f36'
+0
+```
+
+期望无 wt-5927f36 残留——**命中 ✓**(04-02 执行区 worktree 已拆,零残留;`git worktree list` 现存条目均为主仓与执行代理自身,无审计基线执行区残留)。
+
+**3. HYP 全套 grep 复验(总对账机械验证命令逐条实跑):**
+
+```
+$ grep -c '^### HYP-' .planning/audit/HYPOTHESES.md
+25
+$ grep -c '^- \*\*状态:\*\*' .planning/audit/HYPOTHESES.md
+25
+$ grep -c '^- \*\*状态:\*\* 未验证' .planning/audit/HYPOTHESES.md
+0
+$ grep -c '^### DNF-' .planning/audit/DO-NOT-FIX.md
+4
+```
+
+期望 25 / 25 / 0 / 4——**全部命中 ✓**(25 + 4 = 29 对账等式成立)。
+
+**4. 台账存在性复验:**
+
+```
+$ ls .planning/audit/DOC-CLAIMS.md .planning/audit/TEST-AUDIT.md \
+     .planning/audit/scans/coverage-pytest.md .planning/audit/scans/coverage-node.md \
+     .planning/audit/scans/gate-run-worktree.md
+.planning/audit/DOC-CLAIMS.md
+.planning/audit/TEST-AUDIT.md
+.planning/audit/scans/coverage-node.md
+.planning/audit/scans/coverage-pytest.md
+.planning/audit/scans/gate-run-worktree.md
+```
+
+5 文件全部存在——**命中 ✓**。
+
+**5. 发现台账批次复验(含示例 00 照录):**
+
+```
+$ grep -c '^### F-DOC-' .planning/audit/findings/docs-config.md
+9
+$ grep -c '^### F-TEST-' .planning/audit/findings/test.md
+11
+```
+
+实际计数照录:F-DOC 9(示例 00 + 实条 F-DOC-01~08)、F-TEST 11(示例 00 + 实条 F-TEST-01~10)——与 04-05/04-08 收口计数一致 ✓。
+
+**收尾结论:** 五组验收全部通过——ROADMAP 成功判据 4(HYPOTHESES.md 25 条全闭环 + 零 diff)与里程碑零 diff 硬约束双达成,Phase 4 可交 /gsd-verify-work。
+
 ---
 
 *未验证假设清单: 2026-07-04(25 条 HYP + 1 条 Known Bugs 显式无线索记录;对账 25 + 4 DNF = 29,Phase 4 AUDIT-05 逐条回填)。回填进度:已回填 14 条(03-03:HYP-10 证实、HYP-16 细化、HYP-19 证实;03-04:HYP-01 证实、HYP-08 细化、HYP-09 证实、HYP-12 证实、HYP-17 证实、HYP-20 证实;03-05:HYP-04 证实、HYP-15 细化;03-06:HYP-07 证实、HYP-18 细化;03-07:HYP-03 细化,2026-07-05)——Phase 3 回填集 14 条(CODE 10:HYP-01/03/08/09/10/12/16/17/19/20 + TOOL 4:HYP-04/07/15/18)累计 14/14 全部闭环 ✓;余 11 条未验证(均属 Phase 4 维度:DOC 6 + TEST 4 + CON 1)。Phase 4 回填集(04-09,2026-07-05):11 条(DOC 6:HYP-02/05/06/11/14/21 + TEST 4:HYP-22/23/24/25 + CON 1:HYP-13)+ HYP-16 备注补注(状态不动,D-13)——**累计 25/25 全部闭环 ✓**(证实 17 / 细化 7 / 证伪 1;总对账章节在档,HANDOFF 6 条销号,29 条溯源闭环)。*
