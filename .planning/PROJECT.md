@@ -27,11 +27,13 @@ SoniScope 是一条个人录音转写流水线:WeChat 小程序录音 → Aliyun
 - ✓ 文档与配置一致性审计:DOC-CLAIMS.md 23 对象四层收口,198 条声明四态销号(146 一致/9 drift/24 死链/19 无法静态核实),F-DOC-01~08 发现(`issue-cedential` 线索闭环 DNF-02,AGENTS.md 死链 AG-01~17 聚合 F-DOC-06)— Validated in Phase 4: 文档配置与测试审计
 - ✓ 测试代码审计:TEST-AUDIT.md 41 测试模块 8 面台账、双语言覆盖率实测(pytest 73% / node 92.73%)、D-11 门禁三方对照,F-TEST-01~10 发现;HYPOTHESES.md 25/25 全闭环(证实 17/细化 7/证伪 1)— Validated in Phase 4: 文档配置与测试审计
 
+- ✓ 产出结构化审计报告:40 条发现单一口径校准(CALIBRATION.md 零调整/零并入经 D-02/D-12 批准)、REPORT.md 主报告(执行摘要 + CONDITIONAL GO 判定 + 40 行汇总表 + WP-01~09 修复工作包 + DNF 表 + 优点盘点 + 置信声明)、附录 A 追溯映射 + 附录 B 聚类明细,8/8 机械门禁实跑照录 — Validated in Phase 5: 汇总校准与报告组装
+
 ### Active
 
 <!-- 本里程碑:审计,仅产出报告,不做修复。 -->
 
-- [ ] 产出结构化审计报告:每个发现带严重度分级、文件/行号证据、修复建议与工作量估计,可直接作为下一个里程碑(修复)的输入
+(无 — 本里程碑全部需求已验证)
 
 ### Out of Scope
 
@@ -49,6 +51,7 @@ SoniScope 是一条个人录音转写流水线:WeChat 小程序录音 → Aliyun
 - Phase 1(审计章程与基线)已完成(2026-07-04):审计基线钉住 5927f36,CHARTER.md(严重度体系/工作量分档/发现 schema/排除清单)与 HYPOTHESES.md(25 条假设)、DO-NOT-FIX.md(4 条预录入)定稿,验证 13/13 通过
 - Phase 2(契约抽取与漂移分析)已完成(2026-07-05):CONTRACT-MATRIX.md 51 行封版,FC↔Worker 主链零漂移;判定分布:潜伏 2(MEDIUM)/覆盖洞 3(LOW)/良性 1(INFO)/活跃失配 0;F-CON-01~06 入台账,CONTRACT-TEST-RECIPE.md 产出,6 条 D14 重复逻辑移交 Phase 3,验证 5/5 通过
 - Phase 3(组件与工具链深潜)已完成(2026-07-05):COVERAGE.md 63 对象(47 CODE + 16 TOOL)全落格封版;新发现 F-CODE-01~08(MEDIUM 2:无界重下载循环、uploading 卡死态)+ F-TOOL-01~08(MEDIUM 2:过期预签名 URL 曾入库、mypy 门禁结构性恒红);258 条扫描命中三态销号(确认 15/误报 243),14 条假设回填(累计 14/25,余 11 条留 Phase 4),D14-1~6 全部裁定,HANDOFF-PHASE4.md 封版(DOC 3 + TEST 3),零 diff 红线全程成立,验证 13/13 通过
+- Phase 5(汇总校准与报告组装)已完成(2026-07-05,里程碑最后一个 phase):CALIBRATION.md 经用户 approve-all 批准落账(严重度/工作量零调整、真重复零并入、聚类 CL-01~05、工作包 WP-01~09、判定准则 B/P/PL 定稿,40 条判定 BLOCKER 0 / PRE-LAUNCH 3 / POST-LAUNCH 37 → 总判定 CONDITIONAL GO,必做 F-CODE-02/F-CODE-06/F-DOC-03);REPORT.md + 附录 A/B 零新判断组装,8/8 机械门禁实跑照录,零 diff 红线全程成立,验证 14/14 通过
 
 ## Constraints
 
@@ -83,4 +86,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-05 after Phase 4 completion*
+*Last updated: 2026-07-05 after Phase 5 completion (milestone complete)*
