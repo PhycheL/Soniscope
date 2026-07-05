@@ -39,7 +39,7 @@ Requirements for this milestone's audit report. Each maps to roadmap phases.
 - [x] **RPT-05**: "Do NOT fix" 登记表:核实过的故意设计(`issue-cedential` 在用域名、`whisper-local` 桩、handler mypy 豁免等),标注 `⚠ intentional — do not "fix"`
 - [x] **RPT-06**: 优点盘点章节:刻意为之且正确的设计(MaskedSecret、单键 STS、`.done` 状态机等),防止修复里程碑误"优化"
 - [x] **RPT-07**: 分维度置信声明:每个维度审到多深、哪些区域仅轻度覆盖
-- [ ] **RPT-08**: 可追溯映射表:发现 ↔ CONCERNS.md 线索 ↔ 本里程碑需求,含各维度"已检查,无发现"显式记录
+- [x] **RPT-08**: 可追溯映射表:发现 ↔ CONCERNS.md 线索 ↔ 本里程碑需求,含各维度"已检查,无发现"显式记录
 - [x] **RPT-09**: 报告语言为中文正文 + 英文 ID/严重度术语(与仓库中文注释习惯一致)
 
 ## v2 Requirements
@@ -90,7 +90,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RPT-05 | Phase 5 | Complete |
 | RPT-06 | Phase 5 | Complete |
 | RPT-07 | Phase 5 | Complete |
-| RPT-08 | Phase 5 | Pending |
+| RPT-08 | Phase 5 | Complete |
 | RPT-09 | Phase 5 | Complete |
 
 **Coverage:**
