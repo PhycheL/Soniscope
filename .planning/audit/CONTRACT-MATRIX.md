@@ -73,7 +73,81 @@
 
 ## 组② 小程序↔FC HTTP 契约
 
-*(02-02 填)*
+> D-01 组②:issue-credential 与 verify-upload 的请求/响应 JSON 字段、7 个错误码字符串、2 个 verify reason。本组契约仅存在于小程序↔FC 之间,**Worker 列全部 n/a**(Worker 业务流水线只消费 OSS 数据面,不调用 FC HTTP 接口——结构性理由代替行号,per D-03/D-04;Worker 侧联调工具 fc_live.py / verify_upload_live.py 中的契约常量镜像属普查命中,见普查节行 44-46,不占本组 Worker 列)。小程序侧请求组装取 utils 层 `queue_runtime.js`(D-04 列限定 utils);pages 层存在同构第二份组装(`apps/miniprogram/pages/uploads/uploads.js:340,365 @ 5927f36`),作为行下注与普查移交线索记录,不占列。全部行号已经 `git show 5927f36:<path>` 逐一复核。
+
+### 组②-a issue-credential 请求字段(行 16-18)
+
+| 契约要素 | FC (fc_shared) | Worker | 小程序 (utils) | 判定 |
+|----------|----------------|--------|----------------|------|
+| 16. 请求字段 `code` | agree `apps/fc/shared/fc_shared/auth.py:48-50 @ 5927f36`(`require_fields(("code", *extra_fields))` :48、`str(body["code"])` :49 → jscode2session 换 openid :50) | n/a — Worker 不调用小程序↔FC HTTP 接口,无微信登录态 | agree `apps/miniprogram/utils/queue_runtime.js:103 @ 5927f36`(请求体键 `code`,值来自 wxLogin `queue_runtime.js:85-90 @ 5927f36`) | 待判定 |
+| 17. 请求字段 `fragment_id` | agree `apps/fc/issue_credential/handler.py:45 @ 5927f36`(extra_fields 必填)+ `handler.py:50 @ 5927f36`(`str(ctx.body["fragment_id"])` → `object_key_for`) | n/a — 同上 | agree `queue_runtime.js:103 @ 5927f36`(键 `fragment_id`;经 `apps/miniprogram/utils/uploader.js:86 @ 5927f36` deps.requestSts 透传) | 待判定 |
+| 18. 请求字段 `size` | agree `handler.py:48-49 @ 5927f36`(parse_size + check_size)+ `apps/fc/shared/fc_shared/sts.py:76-88 @ 5927f36`(`parse_size`:接受 int 或纯数字字符串、显式拒 bool、≤0 抛 400 INVALID_REQUEST) | n/a — 同上 | agree `queue_runtime.js:103 @ 5927f36`(键 `size`)+ `uploader.js:63 @ 5927f36`(值 = `manifest.audio.size_bytes`,缺失回退 `0`) | 待判定 |
+
+**行 18 边界注记(size=0):** 小程序 manifest 缺失时发 `size=0`(`uploader.js:63 @ 5927f36` 的 `|| 0` 回退),FC `parse_size` 判 `size <= 0` 抛 400 INVALID_REQUEST(`sts.py:86-87 @ 5927f36`)——生产者可产出消费者必拒的值;宽严归类留 02-04 Postel 分析(D-12)。
+
+### 组②-b issue-credential 响应字段(行 19-25)
+
+FC 侧 7 字段全部出自 `credential_response`(`sts.py:102-114 @ 5927f36`,docstring 自证"含 7 个字段,AC#6");小程序侧字段名清单与必备性校验统一在 `uploader.js:17-25 @ 5927f36`(`CREDENTIAL_FIELDS` 7 字段名与 FC 逐字符同名)+ `uploader.js:34-44 @ 5927f36`(200 且 7 字段全非空才判凭证有效,任一缺失判 `INCOMPLETE_CREDENTIAL` :45)。下表小程序格的"消费"指字段值的实际下游用途;**未消费的字段如实标注**。
+
+| 契约要素 | FC (fc_shared) | Worker | 小程序 (utils) | 判定 |
+|----------|----------------|--------|----------------|------|
+| 19. 响应字段 `access_key_id` | agree `sts.py:107 @ 5927f36` | n/a — Worker 不消费 FC HTTP 响应 | agree `uploader.js:18 @ 5927f36`(必备)+ `apps/miniprogram/utils/oss_sign.js:63,71-72 @ 5927f36`(拼 x-oss-credential;formData :100) | 待判定 |
+| 20. 响应字段 `access_key_secret` | agree `sts.py:108 @ 5927f36` | n/a — 同上 | agree `uploader.js:19 @ 5927f36` + `oss_sign.js:64,93 @ 5927f36`(仅入 V4 派生签名链,不落日志——`uploader.js:7 @ 5927f36` 注释红线) | 待判定 |
+| 21. 响应字段 `security_token` | agree `sts.py:109 @ 5927f36` | n/a — 同上 | agree `uploader.js:20 @ 5927f36` + `oss_sign.js:65,81,102 @ 5927f36`(policy 条件 + formData) | 待判定 |
+| 22. 响应字段 `expiration` | agree `sts.py:110 @ 5927f36` | n/a — 同上 | agree(键名与必备性)`uploader.js:21,35-37 @ 5927f36`(非空校验)——**值无任何下游消费**:`oss_sign.js` 不读该字段,表单 policy 过期用本地 `now + 900s` 独立推导(`oss_sign.js:16,91 @ 5927f36`);STS 过期实际由 OSS 服务端强制。消费缺席如实标注,归类留 02-04 | 待判定 |
+| 23. 响应字段 `bucket` | agree `sts.py:111 @ 5927f36`(值来自 FC env OSS_BUCKET,`handler.py:108 @ 5927f36`) | n/a — 同上 | agree `uploader.js:22 @ 5927f36` + `oss_sign.js:67,76 @ 5927f36`(policy bucket 条件) | 待判定 |
+| 24. 响应字段 `endpoint` | agree `sts.py:112 @ 5927f36`(值来自 FC env OSS_ENDPOINT,`handler.py:108 @ 5927f36`) | n/a — 同上 | agree(键名与必备性)`uploader.js:23,35-37 @ 5927f36`(非空校验)——**值无下游消费**:上传 URL 用 `config.OSS_UPLOAD_URL`(`queue_runtime.js:154 @ 5927f36` → `oss_sign.js:60,110 @ 5927f36`),credential.endpoint 被忽略。如实标注,归类留 02-04 | 待判定 |
+| 25. 响应字段 `object_key` | agree `sts.py:113 @ 5927f36`(值由 `handler.py:50 @ 5927f36` 服务端从 fragment_id 解析,模板见组① 行 3) | n/a — 同上 | agree `uploader.js:24 @ 5927f36` + `oss_sign.js:66,77,97 @ 5927f36`(policy `eq $key` 精确条件 + formData key)+ `uploader.js:102,112 @ 5927f36`(AC#4 注释与日志) | 待判定 |
+
+**行 25 AC#4 语义注记:** 小程序 object_key **用 FC 返回值,不由前端拼接覆盖**(`uploader.js:102 @ 5927f36` 注释、`oss_sign.js:50-52 @ 5927f36` docstring 双重声明)——这是往返链关键环:FC `object_key_for` 签发 → 小程序原样使用 → Worker `fragment_id_from_key` 反推。02-03 将对此链做执行佐证。小程序 `buildObjectKeyPreview`(组① 行 3/4)仅用于本地预览/去重键,不参与上传 key。
+
+### 组②-c verify-upload 请求字段(行 26-28)
+
+字段全集依据(RESEARCH Open Question 2 裁决):`apps/fc/verify_upload/handler.py:46-48 @ 5927f36`(`authorize_request(..., extra_fields=("fragment_id", "expected_size"))`)+ `handler.py:51-52 @ 5927f36`——请求字段全集 = `code` + `fragment_id` + `expected_size`,共 3 字段,无其他读取。
+
+| 契约要素 | FC (fc_shared) | Worker | 小程序 (utils) | 判定 |
+|----------|----------------|--------|----------------|------|
+| 26. 请求字段 `code`(verify) | agree `auth.py:48-50 @ 5927f36`(与 issue-credential 同一共享鉴权路径;入口 `verify_upload/handler.py:46-48 @ 5927f36`) | n/a — Worker 不调用 FC HTTP 接口 | agree `queue_runtime.js:123 @ 5927f36`(键 `code`)+ `apps/miniprogram/utils/verify.js:68,71 @ 5927f36`(code 一次性,每轮重试重新 login) | 待判定 |
+| 27. 请求字段 `fragment_id`(verify) | agree `verify_upload/handler.py:47 @ 5927f36`(必填)+ `handler.py:52 @ 5927f36`(`object_key_for`) | n/a — 同上 | agree `queue_runtime.js:123 @ 5927f36` + `verify.js:87 @ 5927f36`(透传) | 待判定 |
+| 28. 请求字段 `expected_size` | agree `verify_upload/handler.py:51 @ 5927f36`(`parse_size(ctx.body.get("expected_size"))`,复用 `sts.py:76-88 @ 5927f36` 同一解析) | n/a — 同上 | agree `queue_runtime.js:123 @ 5927f36`(键 `expected_size`)+ `verify.js:59-60 @ 5927f36`(值 = `manifest.audio.size_bytes` 回退 `0`——同行 18 的 size=0 边界) | 待判定 |
+
+### 组②-d verify-upload 响应字段(行 29-34)
+
+字段全集依据(Open Question 2):FC 侧全部出自 `verify_upload_result`(`apps/fc/shared/fc_shared/head.py:34-55 @ 5927f36`,三态映射:不存在 / 大小不符 / 一致)——响应字段全集 = `verified` + `reason` + `actual_size` + `etag` + `size` + `last_modified`,共 6 字段。小程序侧分类在 `classifyVerifyResponse`(`verify.js:28-51 @ 5927f36`)。
+
+| 契约要素 | FC (fc_shared) | Worker | 小程序 (utils) | 判定 |
+|----------|----------------|--------|----------------|------|
+| 29. 响应字段 `verified` | agree `head.py:43,45,51 @ 5927f36`(false 两分支 + true 分支均携带) | n/a — Worker 不消费 FC HTTP 响应 | agree `verify.js:32 @ 5927f36`(`data.verified === true` 严格布尔判定;非 true 一律走 unverified 分支 :40-44) | 待判定 |
+| 30. 响应字段 `reason` | agree `head.py:43,47 @ 5927f36`(OBJECT_NOT_FOUND / SIZE_MISMATCH 两分支) | n/a — 同上 | agree `verify.js:42 @ 5927f36`(`String(data.reason)`,缺失回退 `'UNKNOWN'`)+ `verify.js:103 @ 5927f36`(随状态补丁落存;pages 展示端 `uploads.wxml:23 @ 5927f36` 渲染,不占列括注) | 待判定 |
+| 31. 响应字段 `actual_size` | agree `head.py:48 @ 5927f36`(仅 SIZE_MISMATCH 分支携带) | n/a — 同上 | agree(提取)`verify.js:43 @ 5927f36`(actualSize)——**提取后未落存**:`verifyFragment` 状态补丁仅含 reason(`verify.js:101-105 @ 5927f36`)。如实标注 | 待判定 |
+| 32. 响应字段 `etag` | agree `head.py:52 @ 5927f36` | n/a — 同上 | agree(提取)`verify.js:35 @ 5927f36`——verified 分支仅落存 verifiedAt(`verify.js:94-99 @ 5927f36`),etag 提取后丢弃。如实标注 | 待判定 |
+| 33. 响应字段 `size` | agree `head.py:53 @ 5927f36`(Content-Length 回显) | n/a — 同上 | agree(提取)`verify.js:36 @ 5927f36`——同行 32,未落存 | 待判定 |
+| 34. 响应字段 `last_modified` | agree `head.py:54 @ 5927f36` | n/a — 同上 | agree(提取)`verify.js:37 @ 5927f36`(lastModified)——同行 32,未落存 | 待判定 |
+
+### 组②-e 错误码字符串(行 35-41)
+
+**小程序侧裁决(RESEARCH Open Question 1,以 classifyFcResponse 全文为证):** 对照 `classifyFcResponse` 全文(`uploader.js:32-50 @ 5927f36`)与 `classifyVerifyResponse` 全文(`verify.js:28-51 @ 5927f36`)——**小程序不按错误码字符串分支**:uploader 按 `statusCode === 200` 与否二分(`uploader.js:34 @ 5927f36`);verify 按 200 / ≥500 / 其余 4xx 三段(`verify.js:31,46,49 @ 5927f36`);`data.error` 仅作通用透传(`uploader.js:48 @ 5927f36`、`verify.js:49 @ 5927f36` 的 `String(data.error)`)记录与展示,行为不依赖具体码值。7 个错误码字面量在小程序**实现代码**中零出现(`uploader.js:47 @ 5927f36` 提及 3 码但为注释非代码)。故 7 行小程序格统一判 **absent**(字面量未实现;通用透传使每码行为等同——是覆盖洞还是良性设计留 02-04 归类)。
+
+| 契约要素 | FC (fc_shared) | Worker | 小程序 (utils) | 判定 |
+|----------|----------------|--------|----------------|------|
+| 35. 错误码 `INVALID_CODE`(401) | agree `apps/fc/shared/fc_shared/errors.py:13 @ 5927f36`(定义)+ `wechat.py:45,47,51 @ 5927f36`(raise) | n/a — Worker 不参与 HTTP 错误码契约(联调工具镜像见普查行 44) | absent — 字面量零出现,经 `uploader.js:48 @ 5927f36` 通用透传(测试锁定:`test/uploader.test.js` 含码字符串断言) | 待判定 |
+| 36. 错误码 `OPENID_NOT_ALLOWED`(403) | agree `errors.py:14 @ 5927f36` + `auth.py:36 @ 5927f36`(raise) | n/a — 同上 | absent — 同行 35 裁决 | 待判定 |
+| 37. 错误码 `INVALID_REQUEST`(400) | agree `errors.py:15 @ 5927f36` + `http.py:63,67,69,78 @ 5927f36` + `sts.py:53,58,79,85,87 @ 5927f36`(raise) | n/a — 同上 | absent — 同行 35 裁决 | 待判定 |
+| 38. 错误码 `SIZE_EXCEEDED`(400) | agree `errors.py:16 @ 5927f36` + `sts.py:93-99 @ 5927f36`(raise,附 limit_bytes / actual_bytes) | n/a — 同上 | absent — 同行 35 裁决(`uploader.js:47 @ 5927f36` 注释提及但非代码分支) | 待判定 |
+| 39. 错误码 `SERVER_MISCONFIGURED`(500) | agree `errors.py:17 @ 5927f36` + `issue_credential/handler.py:61 @ 5927f36`、`verify_upload/handler.py:63 @ 5927f36`(附 missing 变量名列表) | n/a — 同上 | absent — 同行 35 裁决 | 待判定 |
+| 40. 错误码 `STS_ISSUE_FAILED`(500) | agree `errors.py:18 @ 5927f36` + `issue_credential/handler.py:92 @ 5927f36` | n/a — 同上 | absent — 同行 35 裁决 | 待判定 |
+| 41. 错误码 `HEAD_OBJECT_FAILED`(500) | agree `errors.py:19 @ 5927f36` + `verify_upload/handler.py:93 @ 5927f36` | n/a — 同上 | absent — 同行 35 裁决 | 待判定 |
+
+**行 35-41 移交线索(Phase 4 DOC 维度):** CLAUDE.md("Naming Patterns"节)声明错误码字符串 "shared verbatim between Python FC handlers and miniprogram JS (`uploader.js` branches on the same strings)" 与实态不符——uploader.js 实为 statusCode 段分支 + `error` 字段通用透传,错误码字面量不在小程序实现代码中(上表逐行为证)。本矩阵不立 DOC 判断,仅记移交。
+
+**行 35-41 错误响应包络注记:** FC 错误响应体固定含 `error` 字段(`errors.py:38 @ 5927f36` payload 组装),可选 `message` 与 extra 字段(如行 38 的 limit_bytes、行 39 的 missing);小程序仅读 `error` 一个键,extra 字段全部无消费——静态层面无键名冲突。
+
+### 组②-f verify reason(行 42-43)
+
+| 契约要素 | FC (fc_shared) | Worker | 小程序 (utils) | 判定 |
+|----------|----------------|--------|----------------|------|
+| 42. reason `OBJECT_NOT_FOUND` | agree `errors.py:23 @ 5927f36`(定义)+ `head.py:43 @ 5927f36`(响应组装) | n/a — Worker 不消费 verify 响应(联调工具镜像见普查行 46) | agree `verify.js:20 @ 5927f36`(`REASON_OBJECT_NOT_FOUND` 字面量逐字符一致)——分支仍为通用透传(`verify.js:42 @ 5927f36`),常量当前仅模块导出(`verify.js:134 @ 5927f36`)供测试/故障注入消费(测试锁定:`test/verify.test.js`;故障注入 mock 字面量 `queue_runtime.js:116 @ 5927f36`) | 待判定 |
+| 43. reason `SIZE_MISMATCH` | agree `errors.py:24 @ 5927f36` + `head.py:47 @ 5927f36` | n/a — 同上 | agree `verify.js:21 @ 5927f36`(`REASON_SIZE_MISMATCH`)——同行 42(导出 `verify.js:135 @ 5927f36`) | 待判定 |
 
 ## 组③ 两侧镜像常量
 
