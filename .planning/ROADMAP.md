@@ -54,7 +54,7 @@ Plans:
   4. 已知三处之外的契约相关跨语言重复实现(sha256、日期格式、配置解析等)普查完成,结果(含"已检查,无新发现")记录在案
   5. 若矩阵发现真实分歧,共享黄金样本跨语言契约测试(pytest + node:test 共用样本)的设计配方成文——仅设计不实现;若无真实分歧,显式记录"无需配方"
 
-**Plans**: 1/4 plans executed
+**Plans**: 2/4 plans executed
 
 Plans:
 **Wave 1**
@@ -63,7 +63,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 02-02-PLAN.md — 组② HTTP 契约、组③ 镜像常量抽取与重复逻辑普查(CONTRACT-01/03)
+- [x] 02-02-PLAN.md — 组② HTTP 契约、组③ 镜像常量抽取与重复逻辑普查(CONTRACT-01/03)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -124,7 +124,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5(Phase 2 与 Phase 3 �
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. 审计章程与基线 | 2/2 | Complete    | 2026-07-04 |
-| 2. 契约抽取与漂移分析 | 1/4 | In Progress|  |
+| 2. 契约抽取与漂移分析 | 2/4 | In Progress|  |
 | 3. 组件与工具链深潜 | 0/? | Not started | - |
 | 4. 文档配置与测试审计 | 0/? | Not started | - |
 | 5. 汇总校准与报告组装 | 0/? | Not started | - |
