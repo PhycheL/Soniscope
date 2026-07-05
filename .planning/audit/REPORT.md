@@ -276,3 +276,114 @@ MEDIUM 11 / LOW 26 / INFO 3(CRITICAL 0 / HIGH 0)
 
 - **附录 A — RPT-08 可追溯映射表:** [REPORT-APPENDIX-A-traceability.md](REPORT-APPENDIX-A-traceability.md) — 29 条溯源闭环主表(25 HYP + 4 DNF,含报告落点与需求映射两列)、Known Bugs 显式无线索行照录、五维度"已检查,无发现"代表性记录、发现↔发现补边表(findings `关联发现` 字段规整转写 46 行)。
 - **附录 B — CL-NN 根因聚类明细:** [REPORT-APPENDIX-B-clusters.md](REPORT-APPENDIX-B-clusters.md) — 5 簇根因明细照搬 CALIBRATION.md 零改判(根因陈述/成员/关联工作包互指/证据锚),未入簇孤条 11 条显式清单,成员全覆盖对账等式 29 + 11 = 40 ✓。
+
+## 收尾验证
+
+> 全套机械门禁逐条实跑照录(命令 + 实际输出 + 期望值命中 ✓,仿 HYPOTHESES.md 阶段收尾验证范式),2026-07-05 实跑。任何等式不中只修组装侧(报告/附录),封版台账与 CALIBRATION.md 已批准记录不动——本次实跑 **8/8 全部命中**,无需修正。
+
+**1. 零 diff 验证(里程碑硬约束,ROADMAP 成功判据 5,CHARTER 写定命令):**
+
+```
+$ git diff --stat 5927f36 -- apps/ scripts/ docs/
+(空输出)
+$ git diff --stat 5927f36 -- apps/ scripts/ docs/ | wc -l
+0
+```
+
+期望空输出——**命中 ✓**(apps/、scripts/、docs/ 相对基线 `5927f36` 零改动,全里程碑审计过程未触碰被审计代码)。
+
+**2. 发现底数等式(findings 五文件):**
+
+```
+$ grep -hc '^### F-' .planning/audit/findings/*.md | paste -sd+ - | bc
+45
+$ grep -h '^### F-' .planning/audit/findings/*.md | grep -vc '\-00:'
+40
+```
+
+期望 45(含 5 条 `F-*-00` schema 示例)与 40(剔除示例后真实发现)——**双命中 ✓**。
+
+**3. 报告主表等式:**
+
+```
+$ grep -c '^| F-' .planning/audit/REPORT.md
+40
+$ grep '^| F-' .planning/audit/REPORT.md | grep -cE 'BLOCKER|PRE-LAUNCH|POST-LAUNCH'
+40
+```
+
+发现汇总表 40 行(本文件唯一 `| F-` 开行表)且逐行携带三态判定;三态分解 = BLOCKER 0 + PRE-LAUNCH 3 + POST-LAUNCH 37 = 40——**命中 ✓**(与 CALIBRATION.md 逐条上线判定表终态一致)。
+
+**4. 溯源等式(RPT-08 闭环):**
+
+```
+$ grep -c '^### HYP-' .planning/audit/HYPOTHESES.md
+25
+$ grep -c '^### DNF-' .planning/audit/DO-NOT-FIX.md
+4
+$ grep -c '^| HYP-' .planning/audit/REPORT-APPENDIX-A-traceability.md
+25
+$ grep -c '^| DNF-' .planning/audit/REPORT-APPENDIX-A-traceability.md
+4
+```
+
+附录 A 主表 25 + 4 = **29** = HYPOTHESES 25 HYP + DO-NOT-FIX 4 DNF——**命中 ✓**(29 条溯源在报告侧全部有落点,断链自查见附录 A)。
+
+**5. 校准等式:**
+
+```
+$ grep -c '^### CAL-' .planning/audit/CALIBRATION.md
+0
+$ grep -c '^### CL-' .planning/audit/CALIBRATION.md
+5
+$ grep -c '^### WP-' .planning/audit/CALIBRATION.md
+9
+$ grep -c '^### WP-' .planning/audit/REPORT.md
+9
+$ grep -c '^### CL-' .planning/audit/REPORT-APPENDIX-B-clusters.md
+5
+```
+
+CAL 0(零拟调整、零并入,经批复确认;grep 计数 0 时退出码 1 属预期)/ CL 5 / WP 9 与 CALIBRATION.md 尾部对账逐项一致;报告 WP 小节数 9 = CALIBRATION WP 数;附录 B CL 数 5 = CALIBRATION CL 数——**全部命中 ✓**。
+
+**6. 严重度分布复算(findings 现场 grep,叠加校准后对照执行摘要):**
+
+```
+$ for lvl in CRITICAL HIGH MEDIUM LOW INFO; do
+    echo "$lvl $(grep -hc "^- \*\*严重度:\*\* $lvl" .planning/audit/findings/*.md | paste -sd+ - | bc)"
+  done
+CRITICAL 0
+HIGH 0
+MEDIUM 11
+LOW 26
+INFO 3
+```
+
+现场复算原级分布 CRITICAL 0 / HIGH 0 / MEDIUM 11 / LOW 26 / INFO 3(合计 40;`-00` 示例严重度槽为"(五级之一)"占位不计入);叠加 CALIBRATION.md 已批准校准(调整 0 条、并入 0 条)后终级分布不变,与执行摘要计数逐级相符——**命中 ✓**。
+
+**7. 秘密反扫(COVERAGE 完成判定第 9 条同款,范围 `.planning/audit/` 全目录,含本阶段全部新文件 REPORT.md 与两附录):**
+
+```
+$ grep -rE 'OSSAccessKeyId=[0-9A-Za-z]{8,}|Signature=[0-9A-Za-z%+/=]{16,}|LTAI[0-9A-Za-z]{10,}' .planning/audit/
+(零命中,exit=1)
+```
+
+期望零命中(exit 1)——**命中 ✓**(报告与附录全程只引位置+模式名,无任何秘密值本体二次入库,CHARTER 秘密红线守住)。
+
+**8. 写入面复核(Pitfall 7:零 diff 命令不保护 apps/scripts/docs 之外的根文件):**
+
+```
+$ git status --porcelain
+(空输出——本阶段全部改动已随任务提交)
+$ git diff --name-only <阶段起点>..HEAD | grep -v '^\.planning/' | wc -l
+0
+```
+
+工作树干净且本阶段全部提交涉及路径仅 `.planning/audit/` 三文件(REPORT.md + 两附录),无任何 `.planning/` 之外的写入——**命中 ✓**。
+
+### 里程碑交付声明
+
+全套机械门禁 **8/8 命中**。本审计里程碑最终交付物四件套:**`REPORT.md`(主报告)+ `REPORT-APPENDIX-A-traceability.md`(RPT-08 追溯映射)+ `REPORT-APPENDIX-B-clusters.md`(聚类明细)+ `CALIBRATION.md`(已批准校准台账,判断类字段唯一来源)**;修复里程碑移交物为 `CONTRACT-TEST-RECIPE.md`(FUTURE-02,见上文修复里程碑移交物章节)。总判定 **CONDITIONAL GO**,必做清单 `F-CODE-02`/`F-CODE-06`/`F-DOC-03` 三条先行,其余 37 条按发现汇总表进修复里程碑排期。
+
+---
+*SoniScope 上线前代码审计报告: 2026-07-05(40 条发现 = MEDIUM 11 / LOW 26 / INFO 3,总判定 CONDITIONAL GO,必做 3 条;附录 A 追溯映射 29 条闭环 + 附录 B 聚类 5 簇;收尾验证 8/8 门禁命中,零 diff 达成)*
