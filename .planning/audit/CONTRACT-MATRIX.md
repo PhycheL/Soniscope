@@ -35,10 +35,10 @@
 | 契约要素 | FC (fc_shared) | Worker | 小程序 (utils) | 判定 |
 |----------|----------------|--------|----------------|------|
 | 1. fragment_id 格式正则 | agree `apps/fc/shared/fc_shared/sts.py:30-33 @ 5927f36`(`_FRAGMENT_ID_RE`,含命名捕获组) | agree `apps/worker/src/soniscope_worker/oss_admin.py:24-27 @ 5927f36`(`_FRAGMENT_ID_RE`,与 FC 逐字符相同) | agree `apps/miniprogram/utils/audio.js:95-96 @ 5927f36`(`FRAGMENT_ID_RE`,无命名捕获组但匹配语义等价) | 待判定 |
-| 2. fragment_id 日期合法性校验 | agree `apps/fc/shared/fc_shared/sts.py:54-58 @ 5927f36`(正则命中后 `datetime()` 构造校验,非法抛 400 INVALID_REQUEST) | agree `apps/worker/src/soniscope_worker/oss_admin.py:45-49 @ 5927f36`(同样 `datetime.datetime()` 构造校验,非法抛 `OssAdminError`) | absent `apps/miniprogram/utils/audio.js:95-96 @ 5927f36`(正则仅 `\d{4}\d{2}\d{2}` 形状校验,匹配路径上无任何日期合法性检查;如 `20260231` 可通过) | 待判定 |
+| 2. fragment_id 日期合法性校验 | agree `apps/fc/shared/fc_shared/sts.py:54-58 @ 5927f36`(正则命中后 `datetime()` 构造校验,非法抛 400 INVALID_REQUEST) | agree `apps/worker/src/soniscope_worker/oss_admin.py:45-49 @ 5927f36`(同样 `datetime.datetime()` 构造校验,非法抛 `OssAdminError`) | absent `apps/miniprogram/utils/audio.js:95-96 @ 5927f36`(正则仅 `\d{4}\d{2}\d{2}` 形状校验,匹配路径上无任何日期合法性检查;如 `20260231` 可通过)(02-03 执行佐证:S-02/S-04 非法日期 `FRAGMENT_ID_RE.test → true` 双 TZ 实证,佐证不改静态判据,见往返校验结论对照点 a) | 待判定 |
 | 3. object key 模板 `recordings/<YYYY-MM-DD>/<id>.wav` | agree `apps/fc/shared/fc_shared/sts.py:46-59 @ 5927f36`(`object_key_for`,f-string 模板 :59) | agree `apps/worker/src/soniscope_worker/oss_admin.py:37-50 @ 5927f36`(`object_key_for`,f-string 模板 :50) | agree `apps/miniprogram/utils/audio.js:104-106 @ 5927f36`(`buildObjectKeyPreview`,字符串拼接 :105,`.wav` 来自 `OSS_OBJECT_KEY_EXT`) | 待判定 |
-| 4. key 目录日期来源 | agree `apps/fc/shared/fc_shared/sts.py:54,59 @ 5927f36`(year/month/day 取自 fragment_id 正则捕获组前缀) | agree `apps/worker/src/soniscope_worker/oss_admin.py:45,50 @ 5927f36`(同 FC:取自 fragment_id 前缀) | diverge `apps/miniprogram/utils/audio.js:104-105,63-67 @ 5927f36`(`buildObjectKeyPreview(fragmentId, recordedAt)` 两个独立入参,日期取自 `objectKeyDate(recordedAt)` 本地时区,与 fragment_id 前缀无绑定) | 待判定 |
-| 5. key → fragment_id 反推 | n/a — FC 只正向签发 object key(`object_key_for`),两个 handler 均无从 key 反推 fragment_id 的代码路径,结构上不承担反推角色 | agree `apps/worker/src/soniscope_worker/poller.py:47-61 @ 5927f36`(`fragment_id_from_key`,以 `object_key_for(fragment_id) == key` 往返校验 :57,连带保证格式、日期合法、目录日期与前缀一致) | diverge `apps/miniprogram/utils/upload_queue.js:38-44 @ 5927f36`(`fragmentIdFromObjectKey`,纯字符串切割:取最后一个 `/` 后、最后一个 `.` 前,无格式/日期/往返校验——普查发现的第四处实现) | 待判定 |
+| 4. key 目录日期来源 | agree `apps/fc/shared/fc_shared/sts.py:54,59 @ 5927f36`(year/month/day 取自 fragment_id 正则捕获组前缀) | agree `apps/worker/src/soniscope_worker/oss_admin.py:45,50 @ 5927f36`(同 FC:取自 fragment_id 前缀) | diverge `apps/miniprogram/utils/audio.js:104-105,63-67 @ 5927f36`(`buildObjectKeyPreview(fragmentId, recordedAt)` 两个独立入参,日期取自 `objectKeyDate(recordedAt)` 本地时区,与 fragment_id 前缀无绑定)(02-03 执行佐证:S-06 同一 UTC 瞬间双 TZ 产出不同目录日期,S-07 双入参错位实产目录≠前缀 key——见往返校验结论对照点 c/d) | 待判定 |
+| 5. key → fragment_id 反推 | n/a — FC 只正向签发 object key(`object_key_for`),两个 handler 均无从 key 反推 fragment_id 的代码路径,结构上不承担反推角色 | agree `apps/worker/src/soniscope_worker/poller.py:47-61 @ 5927f36`(`fragment_id_from_key`,以 `object_key_for(fragment_id) == key` 往返校验 :57,连带保证格式、日期合法、目录日期与前缀一致) | diverge `apps/miniprogram/utils/upload_queue.js:38-44 @ 5927f36`(`fragmentIdFromObjectKey`,纯字符串切割:取最后一个 `/` 后、最后一个 `.` 前,无格式/日期/往返校验——普查发现的第四处实现)(02-03 执行佐证:S-14 `.m4a` key、S-18 日期错位 key 均照单全收返回前缀 id,Worker 同输入均返回 `None`——见往返校验结论对照点 b/c) | 待判定 |
 | 6. `.wav` 固定扩展名 | agree `apps/fc/shared/fc_shared/sts.py:59 @ 5927f36`(f-string 尾部硬编码 `.wav`) | agree `apps/worker/src/soniscope_worker/poller.py:53 @ 5927f36`(`key.endswith(".wav")` 过滤)+ `apps/worker/src/soniscope_worker/oss_admin.py:50 @ 5927f36`(f-string 尾部) | agree `apps/miniprogram/config.js:26 @ 5927f36`(`OSS_OBJECT_KEY_EXT = '.wav'` 常量,经 `apps/miniprogram/utils/audio.js:10 @ 5927f36` require,:105 拼接使用) | 待判定 |
 | 7. `x-oss-meta-session-id` | n/a — FC 职责限于 STS 签发与 HeadObject 大小校验,无任何 meta 读写路径(见下方 FC 触点核实) | agree `apps/worker/src/soniscope_worker/poller.py:34 @ 5927f36`(`META_SESSION_ID` 常量)+ `poller.py:139 @ 5927f36`(`metadata_to_draft` 映射 `session_id`) | agree `apps/miniprogram/utils/audio.js:162 @ 5927f36`(`buildOssMetadata` 写入,`String(manifest.session_id \|\| '')`)(键名被测试锁定:`test/ids.test.js:128`) | 待判定 |
 | 8. `x-oss-meta-chunk-seq` | n/a — 同上,FC 无 meta 读写路径 | agree `apps/worker/src/soniscope_worker/poller.py:35 @ 5927f36`(`META_CHUNK_SEQ`)+ `poller.py:140 @ 5927f36`(`_as_int` 映射 `chunk_seq`) | agree `apps/miniprogram/utils/audio.js:163 @ 5927f36`(写入 `String(manifest.chunk_seq)`)(测试锁定:`test/ids.test.js:129`) | 待判定 |
@@ -293,30 +293,65 @@ harness 首部来源断言通过:`soniscope_worker.poller.__file__` 与 `fc_shar
 
 **python 侧结论:** FC `object_key_for` 与 Worker `oss_admin.object_key_for` 在全部 15 个 python 侧样本上行为逐样本一致(同收同拒,拒绝类别一致:格式/日期两类);FC 签发出的每一个 key 都能被 Worker `fragment_id_from_key` 解析且往返等式成立——**FC↔Worker 主链在样本域内无漂移**(与组① 行 1-6 静态判定一致,佐证不改判据)。
 
+### JS 侧小结(小程序声部,双 TZ)
+
+全部 JS 样本以 `TZ=Asia/Shanghai node <harness>` 与 `TZ=America/New_York node <harness>` 双跑;非时区敏感样本双 TZ 结果逐条相同。`FRAGMENT_ID_RE.test` 与 FC/Worker 正则在**格式维度**逐样本同判(S-01/03/05/13/15 通过,S-08~S-12/S-16/S-17 拒),分叉仅出现在日期合法性与 key 反推两处(见对照点)。`buildObjectKeyPreview` 在同 recordedAt 下产出与 FC 签发 key 逐字符相等(S-01 正向对照,双 TZ 同果)。
+
+### 高价值对照点实测记录(a)-(d)
+
+- **(a) 非法日期:FC/Worker datetime 拒 vs JS 正则放行(组① 行 2 absent 的行为化)** — S-02(13 月 32 日)与 S-04(非闰年 2/29):FC `FcHttpError: 400 INVALID_REQUEST: invalid fragment_id date`、Worker `OssAdminError: 非法 fragment_id 日期`;JS `FRAGMENT_ID_RE.test → true`(TZ=Asia/Shanghai 与 TZ=America/New_York 双跑均 true)。**生产者可产出消费者必拒的 fragment_id**(若前端日期构造异常,FC 侧 400 是唯一拦截点)。
+- **(b) 非 .wav key:Worker endswith 拒 vs 第四处照单全收(组① 行 5 diverge 的行为化)** — S-14(`….m4a`):Worker `fragment_id_from_key → None`(`poller.py:53 @ 5927f36`);JS `fragmentIdFromObjectKey → '20260704T101500_dev01a_01HZX3K8MN5PQR9TFB7AYWVCDE'`(双 TZ 同,照单全收)。
+- **(c) 目录日期≠前缀日期 key:Worker 往返等式拒 vs 第四处放行** — S-18(目录 `2026-07-05`/前缀 `20260704`):Worker → `None`(`poller.py:57 @ 5927f36` 往返等式不成立);JS `fragmentIdFromObjectKey` → 返回前缀 id(双 TZ 同)。且 S-07 实证**小程序自身就能产出这种错位 key**:`buildFragmentId` 于 23:59:59 构造、`buildObjectKeyPreview` 传入次日 00:00:01 的 recordedAt,产出 `recordings/2026-07-05/20260704T235959_….wav`(`dir-date != prefix-date → true`,双 TZ 同)——组① 行 4 双独立入参 diverge 的行为级证据。此类对象上传后 Worker 轮询将**静默跳过**(`fragment_id_from_key` 返回 None 即不入处理队列)。
+- **(d) 跨时区日期错位:同一 UTC 瞬间双 TZ 产出不同 fragment_id/key** — S-06(UTC 2026-07-04T16:30:00Z):TZ=Asia/Shanghai → fid `20260705T003000_…`、key `recordings/2026-07-05/…`;TZ=America/New_York → fid `20260704T123000_…`、key `recordings/2026-07-04/…`。单 TZ 进程内前缀与目录日期自洽(`prefix==dirdate → true` 双 TZ 均真);错位风险在**双入参跨时刻/跨时区混用**时显化(见 c 的 S-07)。
+
+### 总结论(CONTRACT-02 成功判据 2 的回答)
+
+**FC 签发的 object key 在"正则格式合法 + 日期合法"的全部样本域内均可被 Worker `fragment_id_from_key` 解析且往返等式成立**(S-01/S-03/S-05/S-13/S-15 五样本实证,含闰日、跨年、宽字符集边界);FC 与 Worker 的签发/解析双侧在 15 个 python 样本上同收同拒、产出逐字符相等——主链(FC→OSS→Worker)无行为分叉。分叉全部位于**小程序声部**且与静态判定一致:① 日期合法性校验缺失(对照点 a,组① 行 2 absent);② 本地时区双入参日期推导可产出目录≠前缀的 key(对照点 c/d,组① 行 4 diverge)——此类 key 一旦真实上传,Worker 将静默跳过(数据滞留 OSS,无告警);③ 第四处反推 `fragmentIdFromObjectKey` 无任何校验(对照点 b/c,组① 行 5 diverge)。执行结果与静态判定**零矛盾**;四类归类(良性/潜伏/活跃/覆盖洞)与 Postel 宽严分析按 D-12 留给 02-04。
+
+### harness 复跑说明(02-VALIDATION.md 可重放要求)
+
+```bash
+# 1. 基线导出(D-06;SCRATCH 为会话 scratchpad 下 phase2-baseline 目录,严禁指向仓库内)
+mkdir -p "$SCRATCH"
+git archive 5927f36 apps/worker/src apps/fc/shared apps/miniprogram/utils apps/miniprogram/config.js \
+  | tar -x -C "$SCRATCH"
+
+# 2. python 侧(解释器必须用仓库 .venv:poller import 链需 pydantic/yaml)
+#    harness.py 首部含来源断言:poller/fc_sts/oss_admin 的 __file__ 均须以 $SCRATCH 开头
+PYTHONPATH="$SCRATCH/apps/worker/src:$SCRATCH/apps/fc/shared" \
+  /Volumes/Data/ProjectCode/my_soniscope/.venv/bin/python "$SCRATCH/harness.py"
+
+# 3. node 侧(node v22.18.0 实测;require 导出树内 utils,audio.js 对 ../config 的相对 require 已保真)
+TZ=Asia/Shanghai   node "$SCRATCH/harness.js"
+TZ=America/New_York node "$SCRATCH/harness.js"
+```
+
+harness 只调用纯函数(`object_key_for` / `fragment_id_from_key` / `FRAGMENT_ID_RE` / `buildFragmentId` / `buildObjectKeyPreview` / `fragmentIdFromObjectKey` / `addChunk` / `resolveChunkTotal` / `ulid`),零云 IO(T-02-03 缓解);harness 与导出树仅存在于 scratchpad,不入仓库(T-02-04 缓解);样本全为合成数据(T-02-01 缓解)。
+
 ## 附录:往返校验样本清单
 
-> D-07 样本清单(先预期后实测:预期三格从矩阵组① 行 1/2/4/5/6 静态结论推导写死,再执行验证)。样本**全部为合成数据**(合成 ULID 常量 `01HZX3K8MN5PQR9TFB7AYWVCDE`,合成 deviceShortId `dev01a`,不含任何真实 openid/凭证)。执行结果为佐证,判据以静态行号对照为准(D-05)。chunk 后缀样本值以 `chunking.js` 实际产出为准:经 `git show 5927f36:apps/miniprogram/utils/chunking.js` 核实(`chunking.js:5 @ 5927f36` 注释"每个分片独立 fragment_id,chunk_seq 从 1 递增"+ `:27-31` `addChunk` 只写 `chunk_seq` 字段),**分片不改变 fragment_id 形态**——chunk 场景 fragment_id 与典型值同形,分片信息仅入 `x-oss-meta-chunk-seq/total`(组① 行 8/9)。
+> D-07 样本清单(先预期后实测:预期三格从矩阵组① 行 1/2/4/5/6 静态结论推导写死,再执行验证)。样本**全部为合成数据**(合成 ULID 常量 `01HZX3K8MN5PQR9TFB7AYWVCDE`,合成 deviceShortId `dev01a`,不含任何真实 openid/凭证)。执行结果为佐证,判据以静态行号对照为准(D-05)。chunk 后缀样本值以 `chunking.js` 实际产出为准:经 `git show 5927f36:apps/miniprogram/utils/chunking.js` 核实(`chunking.js:5 @ 5927f36` 注释"每个分片独立 fragment_id,chunk_seq 从 1 递增"+ `:27-31` `addChunk` 只写 `chunk_seq` 字段),**分片不改变 fragment_id 形态**——chunk 场景 fragment_id 与典型值同形,分片信息仅入 `x-oss-meta-chunk-seq/total`(组① 行 8/9)。**TZ 声明:JS 执行佐证反映指定 TZ 下的行为**——全部 JS 样本以 `TZ=Asia/Shanghai node <harness>` 与 `TZ=America/New_York node <harness>` 双跑(Pitfall 2),时区敏感样本(S-06/S-07 及跨年 S-05)逐条记 TZ 于『实测』列。
 
 | ID | 样本值 | 类别 | 预期(FC) | 预期(Worker) | 预期(小程序) | 实测 | 销号 |
 |----|--------|------|----------|--------------|--------------|------|------|
-| S-01 | `20260704T101500_dev01a_01HZX3K8MN5PQR9TFB7AYWVCDE` | 典型值 | 签发 `recordings/2026-07-04/<id>.wav`(`sts.py:46-59`) | `object_key_for` 同 FC;`fragment_id_from_key(FC key)` 往返成立(`poller.py:47-61`) | 正则通过(`audio.js:95-96`);同 recordedAt 下 `buildObjectKeyPreview` 产出同 key(`audio.js:104-106`) | py:FC/WK 签发 key 逐字符相等;往返等式 True。JS:待 node 佐证 | ◐ py 已销 |
-| S-02 | `20261332T101500_dev01a_…`(13 月 32 日) | 非法日期但正则可过 | 拒:400 INVALID_REQUEST(`sts.py:56-58` datetime 校验) | 拒:`OssAdminError`(`oss_admin.py:47-49`) | **正则通过**——无日期合法性校验(组① 行 2 absent) | py:FC `FcHttpError: 400 INVALID_REQUEST: invalid fragment_id date`;WK `OssAdminError: 非法 fragment_id 日期`。JS:待 node 佐证 | ◐ py 已销 |
-| S-03 | `20240229T120000_dev01a_…`(合法闰日) | 闰日 | 签发 `recordings/2024-02-29/…` | 同 FC;往返成立 | 正则通过 | py:FC/WK 签发一致;往返 True。JS:待 node 佐证 | ◐ py 已销 |
-| S-04 | `20250229T120000_dev01a_…`(非闰年 2/29) | 闰日(非法变体) | 拒:400 INVALID_REQUEST(datetime 校验) | 拒:`OssAdminError` | **正则通过**(同 S-02,行 2 absent) | py:FC 400 invalid fragment_id date;WK `OssAdminError: 非法 fragment_id 日期`。JS:待 node 佐证 | ◐ py 已销 |
-| S-05 | `20251231T235959_dev01a_…` | 跨年边界 | 签发 `recordings/2025-12-31/…` | 同 FC;往返成立 | 正则通过 | py:FC/WK 签发一致;往返 True。JS:待 node 佐证 | ◐ py 已销 |
-| S-06 | 同一 recordedAt(UTC 2026-07-04T16:30:00Z)在两个 TZ 下构造 | 跨时区 | 对 JS 产出 fragment_id 施 `object_key_for`(前缀合法即签发——FC 对时区零感知,`sts.py:46-59` 只看字符串) | 对 JS 产出 key 施往返等式(前缀日期=目录日期则成立) | `fragmentTimestamp`/`objectKeyDate` 走本地时区(`audio.js:63-73`):两 TZ 下前缀与目录日期**均随 TZ 变**(组① 行 4 diverge) | 待 node 双 TZ 佐证 | ☐ |
-| S-07 | fragmentId 于 23:59:59 构造,`buildObjectKeyPreview` 传入次日 00:00:01 的 recordedAt | 近午夜 | n/a — FC 无此双入参路径(单一来源,组① 行 4) | 对错位 key 施往返等式:预期拒(等价 S-18) | `buildObjectKeyPreview(fragmentId, recordedAt)` 两独立入参(`audio.js:104-106`):预期产出**目录日期≠前缀日期**的 key(组① 行 4 diverge 的行为化) | 待 node 佐证(python 侧等价样本 S-18 已证拒) | ◐ py 等价已销 |
-| S-08 | `20260704T101500_abc_…`(deviceShortId 3 字符) | deviceShortId 过短 | 拒:400 格式(`[A-Za-z0-9]{4,8}` 不匹配) | 拒:`OssAdminError` 格式 | 正则拒(同一字符类,组① 行 1) | py:FC 400 invalid fragment_id format;WK `OssAdminError: 非法 fragment_id 格式`。JS:待 node 佐证 | ◐ py 已销 |
-| S-09 | `20260704T101500_abcdefghi_…`(9 字符) | deviceShortId 过长 | 拒:400 格式 | 拒:格式 | 正则拒 | py:FC 400 format;WK 格式拒。JS:待 node 佐证 | ◐ py 已销 |
-| S-10 | `20260704T101500_dev-1a_…`(含 `-`) | deviceShortId 非法字符 | 拒:400 格式 | 拒:格式 | 正则拒 | py:FC 400 format;WK 格式拒。JS:待 node 佐证 | ◐ py 已销 |
-| S-11 | ULID 截为 25 字符 | ULID 过短 | 拒:400 格式(`{26}` 定长) | 拒:格式 | 正则拒 | py:FC 400 format;WK 格式拒。JS:待 node 佐证 | ◐ py 已销 |
-| S-12 | ULID 加至 27 字符 | ULID 过长 | 拒:400 格式 | 拒:格式 | 正则拒 | py:FC 400 format;WK 格式拒。JS:待 node 佐证 | ◐ py 已销 |
-| S-13 | `…_dev01a_01HZX3K8MNILOUabcdefghijkl`(含 Crockford 排除字符 I/L/O/U + 小写) | ULID 字符集宽严 | **接受并签发**(正则 `[0-9A-Za-z]{26}` 宽于 Crockford;`ulid.js` 实际生成集为 Crockford 大写子集) | 接受;往返成立 | 正则通过(同一宽字符类) | py:FC/WK 签发一致;往返 True——三处正则均宽于生成端字符集,行为一致故非漂移(组① 行 1 agree 佐证)。JS:待 node 佐证 | ◐ py 已销 |
-| S-14 | `recordings/2026-07-04/<典型 id>.m4a` | 非 .wav key | n/a — FC 只正向签发(组① 行 5) | 拒:`fragment_id_from_key` 返回 None(`poller.py:53` endswith) | `fragmentIdFromObjectKey` **照单全收**(`upload_queue.js:38-44` 无校验切割,组① 行 5 diverge) | py:WK 返回 `None`。JS:待 node 佐证 | ◐ py 已销 |
-| S-15 | chunk 场景 fragment_id(经 `chunking.js` 核实与典型值同形,见节首注) | chunk 后缀 | 同 S-01(分片对 FC 只显现为独立 fragment_id 的多次签发,组③ 行 47) | 同 S-01(分片信息仅在 meta,组① 行 8/9) | 正则通过;`addChunk` 不改 fragment_id | py:FC/WK 签发一致;往返 True(与 S-01 同值同果)。JS:待 node 佐证(含 chunking 实际产出核验) | ◐ py 已销 |
-| S-16 | ``(空串) | 空/畸形 | 拒:400 格式 | 拒:格式 | 正则拒 | py:FC 400 format;WK 格式拒。JS:待 node 佐证 | ◐ py 已销 |
-| S-17 | `20260704T101500dev01a01HZX…`(无 `_` 分隔) | 空/畸形 | 拒:400 格式 | 拒:格式 | 正则拒 | py:FC 400 format;WK 格式拒。JS:待 node 佐证 | ◐ py 已销 |
-| S-18 | `recordings/2026-07-05/20260704T101500_dev01a_….wav`(目录日期≠前缀) | 空/畸形(日期错位 key) | n/a — FC 只正向签发 | 拒:往返等式不成立返回 None(`poller.py:57`) | `fragmentIdFromObjectKey` 照单全收(无往返校验) | py:WK 返回 `None`。JS:待 node 佐证 | ◐ py 已销 |
+| S-01 | `20260704T101500_dev01a_01HZX3K8MN5PQR9TFB7AYWVCDE` | 典型值 | 签发 `recordings/2026-07-04/<id>.wav`(`sts.py:46-59`) | `object_key_for` 同 FC;`fragment_id_from_key(FC key)` 往返成立(`poller.py:47-61`) | 正则通过(`audio.js:95-96`);同 recordedAt 下 `buildObjectKeyPreview` 产出同 key(`audio.js:104-106`) | py:FC/WK 签发 key 逐字符相等;往返等式 True。JS:正则通过;`buildObjectKeyPreview`(同 recordedAt)产出与 FC 签发 key 逐字符相等(TZ=Asia/Shanghai 与 TZ=America/New_York 双跑同果) | ✅ |
+| S-02 | `20261332T101500_dev01a_…`(13 月 32 日) | 非法日期但正则可过 | 拒:400 INVALID_REQUEST(`sts.py:56-58` datetime 校验) | 拒:`OssAdminError`(`oss_admin.py:47-49`) | **正则通过**——无日期合法性校验(组① 行 2 absent) | py:FC `FcHttpError: 400 INVALID_REQUEST: invalid fragment_id date`;WK `OssAdminError: 非法 fragment_id 日期`。JS:**正则通过**(`FRAGMENT_ID_RE.test → true`,双 TZ 同)——非法日期放行实证(对照点 a) | ✅ |
+| S-03 | `20240229T120000_dev01a_…`(合法闰日) | 闰日 | 签发 `recordings/2024-02-29/…` | 同 FC;往返成立 | 正则通过 | py:FC/WK 签发一致;往返 True。JS:正则通过(双 TZ 同) | ✅ |
+| S-04 | `20250229T120000_dev01a_…`(非闰年 2/29) | 闰日(非法变体) | 拒:400 INVALID_REQUEST(datetime 校验) | 拒:`OssAdminError` | **正则通过**(同 S-02,行 2 absent) | py:FC 400 invalid fragment_id date;WK `OssAdminError: 非法 fragment_id 日期`。JS:**正则通过**(true,双 TZ 同)——非闰年 2/29 放行实证(对照点 a) | ✅ |
+| S-05 | `20251231T235959_dev01a_…` | 跨年边界 | 签发 `recordings/2025-12-31/…` | 同 FC;往返成立 | 正则通过 | py:FC/WK 签发一致;往返 True。JS:正则通过(双 TZ 同) | ✅ |
+| S-06 | 同一 recordedAt(UTC 2026-07-04T16:30:00Z)在两个 TZ 下构造 | 跨时区 | 对 JS 产出 fragment_id 施 `object_key_for`(前缀合法即签发——FC 对时区零感知,`sts.py:46-59` 只看字符串) | 对 JS 产出 key 施往返等式(前缀日期=目录日期则成立) | `fragmentTimestamp`/`objectKeyDate` 走本地时区(`audio.js:63-73`):两 TZ 下前缀与目录日期**均随 TZ 变**(组① 行 4 diverge) | TZ=Asia/Shanghai:fid `20260705T003000_…`、key `recordings/2026-07-05/…`;TZ=America/New_York:fid `20260704T123000_…`、key `recordings/2026-07-04/…`——同一 UTC 瞬间双 TZ 产出**不同 fragment_id 与目录日期**(对照点 d);单 TZ 内前缀=目录日期自洽(`prefix==dirdate → true` 双 TZ 均真) | ✅ |
+| S-07 | fragmentId 于 23:59:59 构造,`buildObjectKeyPreview` 传入次日 00:00:01 的 recordedAt | 近午夜 | n/a — FC 无此双入参路径(单一来源,组① 行 4) | 对错位 key 施往返等式:预期拒(等价 S-18) | `buildObjectKeyPreview(fragmentId, recordedAt)` 两独立入参(`audio.js:104-106`):预期产出**目录日期≠前缀日期**的 key(组① 行 4 diverge 的行为化) | TZ=Asia/Shanghai 与 TZ=America/New_York 双跑同果:产出 `recordings/2026-07-05/20260704T235959_….wav`(**目录日期≠前缀日期**,`dir-date != prefix-date → true`);`fragmentIdFromObjectKey` 照单全收返回前缀 id;Worker 对等价错位 key 已证拒(S-18 → `None`,对照点 c) | ✅ |
+| S-08 | `20260704T101500_abc_…`(deviceShortId 3 字符) | deviceShortId 过短 | 拒:400 格式(`[A-Za-z0-9]{4,8}` 不匹配) | 拒:`OssAdminError` 格式 | 正则拒(同一字符类,组① 行 1) | py:FC 400 invalid fragment_id format;WK `OssAdminError: 非法 fragment_id 格式`。JS:正则拒(false,双 TZ 同) | ✅ |
+| S-09 | `20260704T101500_abcdefghi_…`(9 字符) | deviceShortId 过长 | 拒:400 格式 | 拒:格式 | 正则拒 | py:FC 400 format;WK 格式拒。JS:正则拒(false,双 TZ 同) | ✅ |
+| S-10 | `20260704T101500_dev-1a_…`(含 `-`) | deviceShortId 非法字符 | 拒:400 格式 | 拒:格式 | 正则拒 | py:FC 400 format;WK 格式拒。JS:正则拒(false,双 TZ 同) | ✅ |
+| S-11 | ULID 截为 25 字符 | ULID 过短 | 拒:400 格式(`{26}` 定长) | 拒:格式 | 正则拒 | py:FC 400 format;WK 格式拒。JS:正则拒(false,双 TZ 同) | ✅ |
+| S-12 | ULID 加至 27 字符 | ULID 过长 | 拒:400 格式 | 拒:格式 | 正则拒 | py:FC 400 format;WK 格式拒。JS:正则拒(false,双 TZ 同) | ✅ |
+| S-13 | `…_dev01a_01HZX3K8MNILOUabcdefghijkl`(含 Crockford 排除字符 I/L/O/U + 小写) | ULID 字符集宽严 | **接受并签发**(正则 `[0-9A-Za-z]{26}` 宽于 Crockford;`ulid.js` 实际生成集为 Crockford 大写子集) | 接受;往返成立 | 正则通过(同一宽字符类) | py:FC/WK 签发一致;往返 True——三处正则均宽于生成端字符集,行为一致故非漂移(组① 行 1 agree 佐证)。JS:正则通过(双 TZ 同);`ulid(seed)` 实测产出 26 字符纯 Crockford 集(`crockford-only=true`)——正则宽、生成端窄,三处放行行为一致 | ✅ |
+| S-14 | `recordings/2026-07-04/<典型 id>.m4a` | 非 .wav key | n/a — FC 只正向签发(组① 行 5) | 拒:`fragment_id_from_key` 返回 None(`poller.py:53` endswith) | `fragmentIdFromObjectKey` **照单全收**(`upload_queue.js:38-44` 无校验切割,组① 行 5 diverge) | py:WK 返回 `None`。JS:`fragmentIdFromObjectKey` 照单全收返回前缀 id(双 TZ 同,对照点 b/c) | ✅ |
+| S-15 | chunk 场景 fragment_id(经 `chunking.js` 核实与典型值同形,见节首注) | chunk 后缀 | 同 S-01(分片对 FC 只显现为独立 fragment_id 的多次签发,组③ 行 47) | 同 S-01(分片信息仅在 meta,组① 行 8/9) | 正则通过;`addChunk` 不改 fragment_id | py:FC/WK 签发一致;往返 True(与 S-01 同值同果)。JS:`addChunk` 实测 chunk_seq=1,2 且 fragment_id 原样不变、正则通过;`resolveChunkTotal(1)=null / (2)=2`(组① 行 14 约定佐证) | ✅ |
+| S-16 | ``(空串) | 空/畸形 | 拒:400 格式 | 拒:格式 | 正则拒 | py:FC 400 format;WK 格式拒。JS:正则拒(false,双 TZ 同) | ✅ |
+| S-17 | `20260704T101500dev01a01HZX…`(无 `_` 分隔) | 空/畸形 | 拒:400 格式 | 拒:格式 | 正则拒 | py:FC 400 format;WK 格式拒。JS:正则拒(false,双 TZ 同) | ✅ |
+| S-18 | `recordings/2026-07-05/20260704T101500_dev01a_….wav`(目录日期≠前缀) | 空/畸形(日期错位 key) | n/a — FC 只正向签发 | 拒:往返等式不成立返回 None(`poller.py:57`) | `fragmentIdFromObjectKey` 照单全收(无往返校验) | py:WK 返回 `None`。JS:`fragmentIdFromObjectKey` 照单全收返回前缀 id(双 TZ 同,对照点 b/c) | ✅ |
 
 **类别覆盖对账(D-07 全 11 类):** 典型值(S-01)/ 非法日期(S-02)/ 闰日(S-03,S-04)/ 跨年(S-05)/ 跨时区(S-06)/ 近午夜(S-07)/ deviceShortId 边界(S-08~S-10)/ ULID 边界(S-11~S-13)/ 非 .wav key(S-14)/ chunk 后缀(S-15)/ 空/畸形(S-16~S-18)——18 样本 ≥ 11 类下限。
 
@@ -325,4 +360,4 @@ harness 首部来源断言通过:`soniscope_worker.poller.__file__` 与 `fc_shar
 *(02-04 填)*
 
 ---
-*契约漂移矩阵: 2026-07-05(组① 15 行 + 组② 28 行 + 组③ 5 行 + 普查新行 3 行 = 51 行落格;普查 5 命令存档、9 候选核实、D14-1~6 移交;判定列待 02-04 回填,往返校验待 02-03)*
+*契约漂移矩阵: 2026-07-05(组① 15 行 + 组② 28 行 + 组③ 5 行 + 普查新行 3 行 = 51 行落格;普查 5 命令存档、9 候选核实、D14-1~6 移交;往返校验 18 样本全销号 + 结论成文(02-03);判定列与零 diff 收尾待 02-04)*
