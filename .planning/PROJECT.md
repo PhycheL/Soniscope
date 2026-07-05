@@ -21,12 +21,12 @@ SoniScope 是一条个人录音转写流水线:WeChat 小程序录音 → Aliyun
 - ✓ 启动恢复扫描、manifest/transcript 组装、Typer CLI(Makefile 全目标映射)— existing
 - ✓ FC 部署工具链(打包/备份/部署/回滚/日志)与真云 E2E 验证脚本 — existing
 - ✓ pytest + node:test 统一 `make test` 门禁;纯逻辑+注入 IO 模式贯穿双语言 — existing
+- ✓ 契约一致性审计:51 行漂移矩阵(FC/Worker/小程序三列,236 处 `@ 5927f36` 行号证据)、18 样本往返校验佐证、12 个分歧格四类判定(F-CON-01~06)、重复逻辑普查与跨语言契约测试配方 — Validated in Phase 2: 契约抽取与漂移分析
 
 ### Active
 
 <!-- 本里程碑:审计,仅产出报告,不做修复。 -->
 
-- [ ] 契约一致性审计:fragment_id / object key / `x-oss-meta-*` 元数据契约在小程序、FC、Worker 三处实现的现状一致性(以现状为基准,不对照 FC 直转设计)
 - [ ] 代码质量与技术债审计:三层主体代码(apps/miniprogram、apps/fc、apps/worker)的债务、脆弱区域盘点
 - [ ] 脚本与工具链审计:scripts/、Makefile、fc_deploy 等部署工具链
 - [ ] 文档与配置一致性审计:docs/、config.js、AGENTS.md 等与代码实态的一致性(含已知的 `issue-cedential` 拼写域名、AGENTS.md 引用已删除文档等线索)
@@ -47,6 +47,7 @@ SoniScope 是一条个人录音转写流水线:WeChat 小程序录音 → Aliyun
 - 架构特点:无数据库、无消息队列,OSS 对象是唯一数据契约,Worker 以本地磁盘文件状态机为权威状态 — 契约审计需覆盖对象键、元数据、状态机三类约定
 - 项目处于部署阶段(2026-07),FC 直转已定为未来主转写路径,但本审计以现状为基准
 - Phase 1(审计章程与基线)已完成(2026-07-04):审计基线钉住 5927f36,CHARTER.md(严重度体系/工作量分档/发现 schema/排除清单)与 HYPOTHESES.md(25 条假设)、DO-NOT-FIX.md(4 条预录入)定稿,验证 13/13 通过
+- Phase 2(契约抽取与漂移分析)已完成(2026-07-05):CONTRACT-MATRIX.md 51 行封版,FC↔Worker 主链零漂移;判定分布:潜伏 2(MEDIUM)/覆盖洞 3(LOW)/良性 1(INFO)/活跃失配 0;F-CON-01~06 入台账,CONTRACT-TEST-RECIPE.md 产出,6 条 D14 重复逻辑移交 Phase 3,验证 5/5 通过
 
 ## Constraints
 
@@ -81,4 +82,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-04 after Phase 1 completion*
+*Last updated: 2026-07-05 after Phase 2 completion*
