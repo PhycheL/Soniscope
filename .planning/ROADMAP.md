@@ -85,7 +85,7 @@ Plans:
   3. 台账中不存在原始 linter/工具输出直接充当发现——每条发现均附人工确认的 file:line@SHA 证据片段
   4. 跨组件契约类观察已转交 Phase 2 的漂移矩阵作为线索,未在组件维度内单独下判断
 
-**Plans**: 1/7 plans executed
+**Plans**: 2/7 plans executed
 
 Plans:
 **Wave 1**
@@ -94,7 +94,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1)*
 
-- [ ] 03-02-PLAN.md — scans/ 五档全部命中三态销号(确认/误报/移交)+ 对账等式
+- [x] 03-02-PLAN.md — scans/ 五档全部命中三态销号(确认/误报/移交)+ 对账等式
 
 **Wave 3** *(blocked on Wave 2)*
 
@@ -154,6 +154,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5(Phase 2 与 Phase 3 �
 |-------|----------------|--------|-----------|
 | 1. 审计章程与基线 | 2/2 | Complete    | 2026-07-04 |
 | 2. 契约抽取与漂移分析 | 4/4 | Complete    | 2026-07-05 |
-| 3. 组件与工具链深潜 | 1/7 | In Progress|  |
+| 3. 组件与工具链深潜 | 2/7 | In Progress|  |
 | 4. 文档配置与测试审计 | 0/? | Not started | - |
 | 5. 汇总校准与报告组装 | 0/? | Not started | - |
