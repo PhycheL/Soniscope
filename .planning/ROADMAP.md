@@ -14,7 +14,7 @@
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: 审计章程与基线** - 钉住审计 SHA,定稿严重度体系、工作量分档、发现 schema 与范围声明 (completed 2026-07-04)
-- [ ] **Phase 2: 契约抽取与漂移分析** - 三处实现的契约漂移矩阵、往返校验、分歧分类与重复逻辑普查
+- [x] **Phase 2: 契约抽取与漂移分析** - 三处实现的契约漂移矩阵、往返校验、分歧分类与重复逻辑普查 (completed 2026-07-05)
 - [ ] **Phase 3: 组件与工具链深潜** - 三层主体代码与部署工具链的债务/脆弱区盘点,人工核实进台账
 - [ ] **Phase 4: 文档配置与测试审计** - 以代码实态为基准审 docs/config/AGENTS.md 与双语言测试,关闭 CONCERNS.md 假设清单
 - [ ] **Phase 5: 汇总校准与报告组装** - 去重、根因聚类、单一口径校准,产出最终审计报告
@@ -54,7 +54,7 @@ Plans:
   4. 已知三处之外的契约相关跨语言重复实现(sha256、日期格式、配置解析等)普查完成,结果(含"已检查,无新发现")记录在案
   5. 若矩阵发现真实分歧,共享黄金样本跨语言契约测试(pytest + node:test 共用样本)的设计配方成文——仅设计不实现;若无真实分歧,显式记录"无需配方"
 
-**Plans**: 3/4 plans executed
+**Plans**: 4/4 plans complete
 
 Plans:
 **Wave 1**
@@ -71,7 +71,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 02-04-PLAN.md — 四类分歧判定、F-CON 发现、条件配方与零 diff 收尾(CONTRACT-02/04)
+- [x] 02-04-PLAN.md — 四类分歧判定、F-CON 发现、条件配方与零 diff 收尾(CONTRACT-02/04)
 
 ### Phase 3: 组件与工具链深潜
 
@@ -124,7 +124,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5(Phase 2 与 Phase 3 �
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. 审计章程与基线 | 2/2 | Complete    | 2026-07-04 |
-| 2. 契约抽取与漂移分析 | 3/4 | In Progress|  |
+| 2. 契约抽取与漂移分析 | 4/4 | Complete   | 2026-07-05 |
 | 3. 组件与工具链深潜 | 0/? | Not started | - |
 | 4. 文档配置与测试审计 | 0/? | Not started | - |
 | 5. 汇总校准与报告组装 | 0/? | Not started | - |
