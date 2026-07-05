@@ -27,8 +27,8 @@ Requirements for this milestone's audit report. Each maps to roadmap phases.
 - [x] **AUDIT-01**: 三层主体代码(apps/miniprogram、apps/fc、apps/worker)技术债与脆弱区域盘点;工具输出仅作线索,每条发现均经人工核实(原始 linter 输出不直接进报告)
 - [x] **AUDIT-02**: scripts/、Makefile、fc_deploy 等部署与验证工具链审计
 - [x] **AUDIT-03**: docs/、`apps/miniprogram/config.js`、AGENTS.md 等文档配置与代码实态一致性审计
-- [ ] **AUDIT-04**: 测试质量与覆盖缺口盘点(pytest 与 node:test 双侧,含 `make test` 门禁完整性)
-- [ ] **AUDIT-05**: `.planning/codebase/CONCERNS.md` 每条已知线索被证实/证伪/细化,并附新鲜 file:line 证据(线索是假设,不是答案)
+- [x] **AUDIT-04**: 测试质量与覆盖缺口盘点(pytest 与 node:test 双侧,含 `make test` 门禁完整性)
+- [x] **AUDIT-05**: `.planning/codebase/CONCERNS.md` 每条已知线索被证实/证伪/细化,并附新鲜 file:line 证据(线索是假设,不是答案)
 
 ### 报告组装 (RPT)
 
@@ -81,8 +81,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AUDIT-01 | Phase 3 | Complete |
 | AUDIT-02 | Phase 3 | Complete |
 | AUDIT-03 | Phase 4 | Complete |
-| AUDIT-04 | Phase 4 | Pending |
-| AUDIT-05 | Phase 4 | Pending |
+| AUDIT-04 | Phase 4 | Complete |
+| AUDIT-05 | Phase 4 | Complete |
 | RPT-01 | Phase 5 | Pending |
 | RPT-02 | Phase 5 | Pending |
 | RPT-03 | Phase 5 | Pending |
