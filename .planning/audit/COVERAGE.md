@@ -106,27 +106,53 @@
 
 | 线索 | 维度 | 命中模块路径 | 下落 |
 |------|------|--------------|------|
-| HYP-01 | CODE | apps/fc/ 目录结构(transcribe_audio/ 缺席,基线仅 issue_credential/ 与 verify_upload/) | 待审 |
-| HYP-03 | CODE | apps/miniprogram/utils/sha256.js(D-16 微基准对象) | 待审 |
-| HYP-08 | CODE | apps/worker/src/soniscope_worker/config.py、apps/fc/shared/fc_shared/env.py、apps/fc/shared/fc_shared/audit.py | 待审 |
-| HYP-09 | CODE | apps/fc/shared/fc_shared/sts.py、apps/fc/shared/fc_shared/auth.py | 待审 |
-| HYP-10 | CODE | apps/worker/src/soniscope_worker/pipeline.py、apps/worker/src/soniscope_worker/poller.py | 待审 |
-| HYP-12 | CODE | apps/fc/shared/app.py | 待审 |
-| HYP-16 | CODE | apps/worker/src/soniscope_worker/poller.py | 待审 |
-| HYP-17 | CODE | apps/fc/shared/fc_shared/sts.py、apps/fc/issue_credential/handler.py | 待审 |
-| HYP-19 | CODE | apps/worker/src/soniscope_worker/nls.py、apps/worker/src/soniscope_worker/transcriber.py | 待审 |
-| HYP-20 | CODE | apps/fc/ 目录结构(transcribe-audio 已决策未建) | 待审 |
+| HYP-01 | CODE | apps/fc/ 目录结构(transcribe_audio/ 缺席,基线仅 issue_credential/ 与 verify_upload/) | 已回填(证实,03-04):transcribe_audio 零代码,现役转写全在 Worker 侧;存在级不占发现 ID(D-12);见 HYPOTHESES.md |
+| HYP-03 | CODE | apps/miniprogram/utils/sha256.js(D-16 微基准对象) | 已回填(细化,03-07):静态主判据(`sha256.js:9-18,66-135` + 调用链 `index.js:30,640` @ 5927f36)+ D-16 微基准辅助(scans/microbench-sha256.md,Mac 非真机量级参考);性能面系 docstring 自述取舍不立发现(D-12);见 HYPOTHESES.md |
+| HYP-08 | CODE | apps/worker/src/soniscope_worker/config.py、apps/fc/shared/fc_shared/env.py、apps/fc/shared/fc_shared/audit.py | 已回填(细化,03-04):"Strong" 缓解评价成立,两处细化边界(600 仅警告/FC 无类型级掩码)不构成发现;见 HYPOTHESES.md |
+| HYP-09 | CODE | apps/fc/shared/fc_shared/sts.py、apps/fc/shared/fc_shared/auth.py | 已回填(证实,03-04):allowlist 单点鉴权 + single_key_policy 约束逐行核实属实;RPT-06/DNF 候选不占发现 ID;见 HYPOTHESES.md |
+| HYP-10 | CODE | apps/worker/src/soniscope_worker/pipeline.py、apps/worker/src/soniscope_worker/poller.py | 已回填(证实,03-03):单进程单线程串行属实;deliberate MVP choice 经 D-10 裁定成立,不占发现 ID;见 HYPOTHESES.md |
+| HYP-12 | CODE | apps/fc/shared/app.py | 已回填(证实,03-04):wsgiref ThreadingWSGIServer 生产运行时属实,健壮性依托 FC 网关;DNF 候选不占发现 ID;见 HYPOTHESES.md |
+| HYP-16 | CODE | apps/worker/src/soniscope_worker/poller.py | 已回填(细化,03-03):代码实态半句证实;文档一致性半句移交 Phase 4 DOC(HANDOFF-PHASE4.md);无界重试面另立 F-CODE-02;见 HYPOTHESES.md |
+| HYP-17 | CODE | apps/fc/shared/fc_shared/sts.py、apps/fc/issue_credential/handler.py | 已回填(证实,03-04):全链路无频控/配额面 → F-CODE-05;见 HYPOTHESES.md |
+| HYP-19 | CODE | apps/worker/src/soniscope_worker/nls.py、apps/worker/src/soniscope_worker/transcriber.py | 已回填(证实,03-03):2018 版 API 依赖属实,Transcriber Protocol 隔离充分;外部依赖风险代码级无发现;见 HYPOTHESES.md |
+| HYP-20 | CODE | apps/fc/ 目录结构(transcribe-audio 已决策未建) | 已回填(证实,03-04):零代码属实,与 HYP-01 同根互引;存在级不占发现 ID(D-12);见 HYPOTHESES.md |
 | HYP-04 | TOOL | apps/worker/src/soniscope_worker/fc_deploy.py | 已回填(证实,03-05):能力面仅备份/打包/代码更新/回滚/日志诊断,无 create/触发器/env 面(`fc_deploy.py:13,106-119,667-672 @ 5927f36`);见 HYPOTHESES.md |
 | HYP-07 | TOOL | scripts/test_asr.py(DEFAULT_FILE_LINK 约 :80;与五类秘密扫描同批,D-06) | 已回填(证实,03-06):DEFAULT_FILE_LINK 确为已提交预签名 STS URL,过期可由 `Expires=` 参数静态判定(`scripts/test_asr.py:78-81 @ 5927f36`,双模式命中,值本体略)→ F-TOOL-05;见 HYPOTHESES.md |
 | HYP-15 | TOOL | apps/worker/src/soniscope_worker/miniprogram_lint.py | 已回填(细化,03-05):规则五族零语义检查(`miniprogram_lint.py:42-46,65-128 @ 5927f36`)+ ESLint 量化底数 0 error/29 warning → F-TOOL-04;见 HYPOTHESES.md |
 | HYP-18 | TOOL | scripts/test_asr.py(legacy AcsClient SDK) | 已回填(细化,03-06):两代 SDK 并存证实(`scripts/test_asr.py:22-23,159,174 @ 5927f36`);"仅脚本级、不随 Worker/FC 打包"半句在 Worker 侧证伪(`apps/worker/pyproject.toml:13`、`nls.py:441-448 @ 5927f36`),FC 侧属实;见 HYPOTHESES.md |
-| D14-1 | CODE | apps/miniprogram/utils/sha256.js、apps/miniprogram/pages/index/index.js(:30,640)、apps/worker/src/soniscope_worker/fixtures.py(:21,118)、apps/worker/src/soniscope_worker/poller.py(比对流程) | 待审 |
-| D14-2 | CODE | apps/worker/src/soniscope_worker/nls.py(:45)、apps/miniprogram/utils/uploader.js(:28)、apps/miniprogram/utils/verify.js(:16) | 待审 |
-| D14-3 | TOOL | apps/worker/src/soniscope_worker/fc_live.py(:42-59,256)、apps/worker/src/soniscope_worker/verify_upload_live.py(:34-35,201)、apps/worker/src/soniscope_worker/e2e_scenarios.py(导入消费端) | 证据齐备(03-05,未下裁定,裁定留 03-07):fc_live 四点(错误码 :42-44 含 fc_shared 锚点、7 字段 :47-55、50MB 假设 :57-59、合成 ID :254-258)、verify_upload_live 两点(reason :34-35、合成 ID :199-203)、e2e_scenarios 确为导入消费(:31-40 非第四份副本);另 sts_escape.py 顺带两点(key 模板 :127-129、key→id 切割 :256-258);详见各模块行备注 |
-| D14-4 | CODE | apps/miniprogram/utils/queue_runtime.js(:94-128)、apps/miniprogram/pages/uploads/uploads.js(:340,365) | 待审 |
-| D14-5 | CODE | apps/miniprogram/config.js(:10-15,唯一代码内硬编码真实云值) | 待审 |
-| D14-6 | CODE | apps/miniprogram/utils/upload_queue.js(:38-44,`fragmentIdFromObjectKey` 无校验切割,关联 F-CON-03) | 待审 |
+| D14-1 | CODE | apps/miniprogram/utils/sha256.js、apps/miniprogram/pages/index/index.js(:30,640)、apps/worker/src/soniscope_worker/fixtures.py(:21,118)、apps/worker/src/soniscope_worker/poller.py(比对流程) | 裁定(03-07):**不构成债务**,不占 F-ID。三要素:① 结构必要性成立——小程序 JS 运行时与 Worker Python 跨部署单元跨语言,哈希实现无法共享 = 故意重复;小程序侧手写算法系"零外部依赖"约束下的自述取舍(`sha256.js:4-5 @ 5927f36`)。② 兜底机制有——JS 侧已知向量 + node crypto 随机字节对照测试锁定(`apps/miniprogram/test/ids.test.js:139-163 @ 5927f36`),Worker 侧用 stdlib hashlib(`fixtures.py:21,118 @ 5927f36`)无实现漂移面;契约值语义(hex digest)已由 Phase 2 矩阵组① 行 13 对照覆盖。③ 漂移后果受控——SHA-256 系固定标准算法无"约定漂移"面,仅存实现错误风险且已被测试封死;比对失配的下游后果(重下循环)已由 F-CODE-02 承载。关联:HYP-03(性能疑点分立判断,细化)、F-CON-04 关联字段、D14-1 销号 |
+| D14-2 | CODE | apps/worker/src/soniscope_worker/nls.py(:45)、apps/miniprogram/utils/uploader.js(:28)、apps/miniprogram/utils/verify.js(:16) | 裁定(03-07):→ **F-CODE-07**(LOW,findings/code.md)。三要素理由与行号证据见条目证据字段(跨语言镜像故意 / JS 同包双份可疑 + 兜底覆盖不对称(JS 字面锁定、Worker 仅结构锁定)/ 漂移后果仅节奏失准) |
+| D14-3 | TOOL | apps/worker/src/soniscope_worker/fc_live.py(:42-59,256)、apps/worker/src/soniscope_worker/verify_upload_live.py(:34-35,201)、apps/worker/src/soniscope_worker/e2e_scenarios.py(导入消费端) | 裁定(03-07):→ **F-TOOL-08**(LOW,findings/toolchain.md,D-03 落点)。三要素理由与行号证据见条目证据字段(运行时隔离故意但测试层可绑定 / 注释锚点覆盖不全 + 零测试兜底 / 漂移后果工具失准两向);证据由 03-05 采集(fc_live 四点、verify_upload_live 两点、e2e_scenarios 导入消费、sts_escape 顺带两点,详见各模块行备注) |
+| D14-4 | CODE | apps/miniprogram/utils/queue_runtime.js(:94-128)、apps/miniprogram/pages/uploads/uploads.js(:340,365) | 裁定(03-07):→ **F-CODE-08**(LOW,findings/code.md)。三要素理由与行号证据见条目证据字段(同端同包重复非结构必然 / 仅注释锚点无同步测试 / 漂移后果显式 400 非静默) |
+| D14-5 | CODE | apps/miniprogram/config.js(:10-15,唯一代码内硬编码真实云值) | 裁定(03-07):**不构成债务**,不占 F-ID。三要素:① 结构必要性成立——三运行时三机制(Worker pydantic+yaml / FC env / 小程序代码内常量模块)系部署形态结构必然:小程序平台无环境变量/外部配置注入机制,代码内常量模块是唯一可用形态,`config.js:10-15 @ 5927f36` 作为声明的单一真值源系平台约束下的合理落点(DNF-02 对照点,拼写域名系真实云值)。② 兜底机制有——miniprogram_lint 三合法域名 + issue-cedential 拼写守卫(`miniprogram_lint.py:107-118 @ 5927f36`)对最危险漂移(域名错写)有工具级锁定,`config.js:8 @ 5927f36` 注释明示勿"修正"。③ 漂移后果不在代码层——同族值(region/bucket/endpoint/URL)Worker/FC 侧存于运行时配置(yaml/env)不在基线代码内,静态层面无可对照的代码内重复(Phase 2 普查扫描 8 已判"已检查,无新发现");跨机制运行时值失配属部署配置核对面而非重复实现债务。**边界(与 HYP-14 移交的分工):** 本条只裁重复实现债务;`ENV = 'development'` 现值与发布清单/文档口径属配置漂移核对,已由 HYP-14 移交 Phase 4 DOC(HANDOFF-PHASE4.md),两判断不混。关联:D14-5 销号、HYP-14(移交,状态未动) |
+| D14-6 | CODE | apps/miniprogram/utils/upload_queue.js(:38-44,`fragmentIdFromObjectKey` 无校验切割,关联 F-CON-03) | 裁定(03-07):**不构成新债务发现**(不重复立,债务实体已由 Phase 2 **F-CON-03**(MEDIUM)完整承载),不占新 F-ID。三要素:① 结构必要性不成立——同端同包内第四处 key↔id 逻辑:队列项已持久化 fragmentId 字段,反推仅作 manifest 缺失回退(`upload_queue.js:53-54 @ 5927f36`),且 `:37 @ 5927f36` 注释自认"US-015 落地正式 fragment_id 后替换"(声明的临时物)。② 兜底机制弱——仅该注释锚点,无往返校验(对照 Worker `poller.py:47-61 @ 5927f36` 双重校验)。③ 漂移后果触及主链路数据可见性——异常 key 进入队列数据时,小程序对 Worker 视角不存在的片段维持"正常"展示、掩盖数据滞留(MEDIUM 潜伏,严重度参照 CHARTER 主链锚已由 F-CON-03 定级)。CODE 维度复核确认 F-CON-03 定性与定级,避免同一事实双立;销号落点 = F-CON-03(其关联字段已反向引 D14-6)。关联:F-CON-03、D14-6 销号 |
 
 ## 完成判定
 
-(占位——03-07 收口时填:覆盖对象总数对账、深挖点逐点下落、已过面 9/9 全模块核对、可复算命令 + 数字 + ✓,格式仿 CONTRACT-MATRIX ④完成判定。)
+(03-07 收口填写,格式仿 CONTRACT-MATRIX ④完成判定——逐条可复算命令 + 数字 + ✓;命令均自仓库根执行。)
+
+1. **覆盖对象总数 63** — `grep -cE '^\| \`' .planning/audit/COVERAGE.md` → **63**(CODE 47 + TOOL 16 = 63,对照 03-RESEARCH.md 审计对象全量清单)✓
+2. **"待审"残留 0** — `awk '/## CODE 维[度]/,/## 完成判[定]/' .planning/audit/COVERAGE.md | grep -c '待审'` → **0**(覆盖 CODE/TOOL 两表与深挖点登记节全部台账行;标记用字符类写法避免本句自匹配,与朴素标记写法计数结果一致)✓
+3. **已过面全 9/9** — `grep -c '| 9/9 |' .planning/audit/COVERAGE.md` → **63** = 对象总数(每模块 D-04 九面全过)✓
+4. **深挖点 20 处全有下落** — 深挖点登记节 20 行(14 HYP + 6 D14):14 条 HYP 全部"已回填(证实/细化,03-0N)";6 条 D14 全部"裁定(03-07)"——D14-2 → F-CODE-07、D14-3 → F-TOOL-08、D14-4 → F-CODE-08 立发现,D14-1/D14-5/D14-6 "不构成债务"结论(三要素理由与行号证据在各行,D14-6 销号落点 = 既有 F-CON-03)✓
+5. **发现计数** — `grep -c '^### F-CODE-' .planning/audit/findings/code.md` → 9,扣 F-CODE-00 示例 = **8 条**(F-CODE-01~08);`grep -c '^### F-TOOL-' .planning/audit/findings/toolchain.md` → 9,扣 F-TOOL-00 示例 = **8 条**(F-TOOL-01~08);Phase 3 合计 **16 条**,严重度分布 MEDIUM 4(F-CODE-02/06、F-TOOL-05/06)/ LOW 12 ✓
+6. **HYP 回填 14/14** — Phase 3 回填集(RESEARCH Pitfall 4 写死):CODE 10 条 HYP-01(证实)/03(细化)/08(细化)/09(证实)/10(证实)/12(证实)/16(细化)/17(证实)/19(证实)/20(证实)+ TOOL 4 条 HYP-04(证实)/07(证实)/15(细化)/18(细化)——14 个指定 ID 状态全部 ≠ "未验证" ✓;全清单行首锚定统计 `grep -c '^- \*\*状态:\*\* 未验证' .planning/audit/HYPOTHESES.md` → **11**(25 − 14 = 11,余量均属 Phase 4 维度:DOC 6 + TEST 4 + CON 1)✓
+7. **scans/ 五档对账等式复核** — gates-baseline 90 + ruff-extended 69 + vulture 1 + eslint 29 + secrets 69 = **258** 命中全部销号(确认 15 / 误报 243 / 移交 0,见 scans/secrets.md 尾部封版行);15 条确认项去向列**零未决占位**——gates #1 → F-TOOL-06、#2-7 → HYP-25 移交(HANDOFF TEST 节)、ruff #1 → HYP-12 回填、#41/#45/#49 → 降级理由(不立发现)、#55 → F-CODE-01、vulture #1 → 降级理由、secrets #14/#15 → F-TOOL-05,逐条含"03-0N 核实"最终下落 ✓;本计划新增 scans/microbench-sha256.md(D-16 档案,非销号类,不入 258 等式)
+8. **HANDOFF-PHASE4.md 移交条目计数** — `grep -c '^- \*\*(移交' .planning/audit/HANDOFF-PHASE4.md` → **6**(DOC 3:HYP-16 半句 / HYP-14 ×2;TEST 3:HYP-22 / HYP-25 ×2),每条含去向 + 一句观察 + `@ 5927f36` 行号证据,被移交 HYP 状态均未动(D-11)✓
+9. **秘密反扫零命中(T-03-01 门禁)** — `grep -rE 'OSSAccessKeyId=[0-9A-Za-z]{8,}|Signature=[0-9A-Za-z%+/=]{16,}|LTAI[0-9A-Za-z]{10,}' .planning/audit/` → 零命中(exit=1),`.planning/audit/` 全目录(scans/findings/COVERAGE/HANDOFF/HYPOTHESES/CHARTER 等)无任何秘密模式二次入库 ✓
+10. **零 diff(T-03-02/D-08)** — 见下节"零 diff 验证记录":`git diff --stat 5927f36 -- apps/ scripts/ docs/` 输出为空 ✓
+
+**Phase 3 四条成功判据机械核验:** ①三层发现进台账(判据 1/2:F-CODE 8 + F-TOOL 8,九字段 schema 合规,HYP-07 有结论 → F-TOOL-05)✓ ②点名线索有结论(判据 2:14 HYP 回填 + 6 D14 裁定 = 20 深挖点全下落)✓ ③无原始输出充当发现(判据 3:scans/ 与 findings/ 分离,每条发现证据字段含 `@ 5927f36` 引用片段)✓ ④契约观察全移交不判断(判据 4:oss_admin.py/audio.js/errors.py 等契约观察均记"移交/不判断",findings/code.md 无 CON 维度发现)✓
+
+### 零 diff 验证记录(CHARTER D-03,阶段收尾必跑必记)
+
+```bash
+git diff --stat 5927f36 -- apps/ scripts/ docs/
+# 实际输出:(空)——apps/、scripts/、docs/ 相对基线零改动;D-16 微基准全程在会话 scratchpad
+# 执行(基线导出副本 + 仓外 bench_sha256.js),零仓库写入
+```
+
+`git status --porcelain` 检查结论:输出仅含 `.planning/` 路径条目(审计台账文档),无任何 apps/、scripts/、docs/ 或 scratchpad 工件路径——Phase 3 全部改动落 `.planning/audit/` 与 `.planning/phases/`,审计基线未被污染。
+
+---
+*覆盖台账: 2026-07-05(63 对象全落格 47 CODE + 16 TOOL、已过面 63×9/9、深挖点 20/20 下落(14 HYP 回填 + 6 D14 裁定)、发现 F-CODE 8 + F-TOOL 8、秘密反扫零命中、零 diff 为空——03-07 收口,Phase 3 产物封版)*

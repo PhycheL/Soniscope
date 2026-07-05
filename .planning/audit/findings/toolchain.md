@@ -107,3 +107,19 @@
 - **关联发现:** 无;关联线索: HYP-15(miniprogram_lint 规则面同模块,TOOL 已回填)
 - **上线判定:**
 - **状态:** draft
+
+> 03-07 判定产物(D14-3 三要素裁定,D-15 独立下落;证据由 03-05 采集,见 COVERAGE fc_live/verify_upload_live/e2e_scenarios/sts_escape 行备注):立发现 F-TOOL-08(LOW,工具失准类,D-14 口径)。三要素(①结构必要性 ②兜底机制 ③漂移后果)写入证据字段裁定段。
+
+### F-TOOL-08: 联调工具契约镜像集群(错误码/凭证字段清单/大小假设/合成 fragment_id)靠注释约定同步,零测试兜底
+
+- **维度:** 部署与验证工具链 (TOOL)
+- **严重度:** LOW — 影响:工具失准类——fc_shared 契约变更(错误码更名、凭证字段增删、MAX_UPLOAD_BYTES 调整、fragment_id 语法变更)时无任何测试提醒同步工具侧镜像:漂移后果大多为联调工具可见 FAIL(误导操作者向线上排查而实为工具过时),少数为静默欠验证(FC 新增凭证字段不会进入 CREDENTIAL_FIELDS 完整性断言与拒绝响应泄漏反查清单,检查面滞后);纯工具级影响无生产数据面,对照 CHARTER LOW"lint/typecheck 覆盖缺口"同族锚(验证工具检查面缺口);可能性:仅在契约变更时触发,基线镜像值与 fc_shared 逐项一致(03-05 已逐处核实)
+- **证据:** `apps/worker/src/soniscope_worker/fc_live.py:41-59,254-258 @ 5927f36`、`apps/worker/src/soniscope_worker/verify_upload_live.py:33-35,199-203 @ 5927f36`
+  > `# FC issue-credential 响应 / 错误码(与 fc_shared 保持一致,避免跨包导入)。` → `ERR_INVALID_CODE = "INVALID_CODE"` 等 3 码第二份字面定义(:42-44);`CREDENTIAL_FIELDS` 7 字段清单锚 tech-spec §4.1 非 fc_shared(:46-55);`SIZE_OK_BYTES = 10_000_000` / `SIZE_EXCEEDED_BYTES = 60_000_000` 以注释字面编码"50MB 上限"假设、未引用 env.py `MAX_UPLOAD_BYTES` 常量(:57-59);`make_fragment_id` 合成 ID 注释自证正则子集(:254-258)。verify_upload_live 同构:`REASON_OBJECT_NOT_FOUND`/`REASON_SIZE_MISMATCH` 第三份字面定义锚 tech-spec §4.2(:33-35)+ 合成 ID 第六处(:199-203)。集群消费端:`e2e_scenarios.py:31-40 @ 5927f36` 确为导入消费非第四份副本;顺带同族:`sts_escape.py:127-129,256-258 @ 5927f36`(key 模板手拼 + key→id 切割,自产自洽)。
+  >
+  > **三要素裁定(D-13):** ① 结构必要性:部分成立——worker 包运行时不依赖 fc_shared(部署单元分离),fc_live 注释自述"避免跨包导入"系故意的运行时隔离;但同仓同语言且 pytest 已配 `pythonpath = ["apps/fc/shared"]`(`pyproject.toml:58 @ 5927f36`),**测试层**完全可绑定两侧常量而不引入运行时耦合——"无法共享"在测试层不成立,镜像无绑定 = 可疑。② 兜底机制:注释锚点覆盖不全——仅 3 错误码有"与 fc_shared 保持一致"锚(fc_live.py:41),7 字段清单/2 reason 锚 tech-spec 文档而非代码真值源,50MB 假设与合成 ID 仅自证注释;**全集群零测试断言**。③ 漂移后果:工具失准两向——契约收紧/更名时工具误 FAIL(可见,但把操作者导向线上排查);契约扩展时工具静默欠验证(新增凭证字段不入完整性断言 fc_live.py:47-55 与泄漏反查 :152-156,泄漏检查面滞后于契约)。无生产链路污染面(合成 key 反例安全性已在 COVERAGE fc_live 行核实)。
+- **修复建议:** 增加一个契约镜像一致性测试(落 apps/fc/tests 或 apps/worker/tests,pythonpath 使 fc_shared 与 soniscope_worker 可同时导入):断言 fc_live `ERR_*` == fc_shared.errors 对应常量、verify_upload_live `REASON_*` 同构、`CREDENTIAL_FIELDS` 与 `credential_response` 输出字段集一致、`SIZE_OK_BYTES < DEFAULT_MAX_UPLOAD_BYTES < SIZE_EXCEEDED_BYTES`、`make_fragment_id()` 产物通过 `fc_shared.sts` 与 `oss_admin` 双侧校验——单测试文件即可绑定全集群,运行时零耦合,契约漂移即测试变红。
+- **工作量:** S(单测试文件新增)
+- **关联发现:** F-CON-05(其关联字段已挂 D14-3,错误码镜像同源);关联线索: D14-3(CONTRACT-MATRIX ③移交记录第 3 条销号)、HYP-22(联调工具活体路径依赖,TEST 维度移交);矩阵普查表行 50-51、组③ 行 46 辅助线索
+- **上线判定:**
+- **状态:** draft
