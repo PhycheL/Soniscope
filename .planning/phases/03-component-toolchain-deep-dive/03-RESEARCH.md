@@ -447,16 +447,16 @@ git diff --stat 5927f36 -- apps/ scripts/ docs/                 # 期望空
 
 其余全部关键论断([VERIFIED] 标注项:仪器版本、命令配方、命中计数、文件行数、零 diff、模块归属 docstring)均在本会话内以工具实测确认。
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **COVERAGE.md 并行写入的具体机制(骨架分节 vs 分片合并)**
+1. **COVERAGE.md 并行写入的具体机制(骨架分节 vs 分片合并)** — RESOLVED:计划集采用全串行波次(03-01→03-07 逐波依赖),不存在并行写入,问题失效(mooted)。
    - What we know: D-02 只约束粒度与可复核性;Phase 2 用分文件避免冲突。
    - What's unclear: planner 打算 Wave B 出几个并行计划。
    - Recommendation: 若 CODE/TOOL 并行,则预建分节骨架(Wave A 末尾任务建好),两计划各写各节;串行则无此问题。
-2. **`cli.py`(601 行)的 TOOL 子命令部分如何计覆盖**
+2. **`cli.py`(601 行)的 TOOL 子命令部分如何计覆盖** — RESOLVED:03-01 Task 1 与 03-03 Task 1 采纳本建议(cli.py 整体归 CODE 审一次,COVERAGE 备注"TOOL 子命令入口")。
    - What we know: cli.py 混载主链与 ~30 个验证子命令的入口;实体逻辑都在被分类的模块里。
    - Recommendation: cli.py 整体归 CODE 普审一次,COVERAGE.md 备注"TOOL 子命令入口,实体逻辑见 TOOL 侧对应模块",避免双计双审。
-3. **Makefile 审计粒度(45 目标逐个 vs 分组)**
+3. **Makefile 审计粒度(45 目标逐个 vs 分组)** — RESOLVED:03-06 Task 2 采纳本建议(按功能组过关注面 + 危险目标逐个细读)。
    - What we know: 171 行、45 目标;D-08 禁执行,只能静读。
    - Recommendation: 按功能组(install/质量门禁/worker 运行/deploy/live 验证)过关注面,危险目标(deploy-fc/rollback/oss-delete-obj 类)逐个细读;COVERAGE.md 记 Makefile 一行 + 分组备注。
 
