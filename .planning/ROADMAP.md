@@ -57,10 +57,20 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
+**Wave 1**
 
 - [ ] 02-01-PLAN.md — 矩阵骨架与组① OSS 数据面逐字段静态抽取(CONTRACT-01)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 02-02-PLAN.md — 组② HTTP 契约、组③ 镜像常量抽取与重复逻辑普查(CONTRACT-01/03)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 02-03-PLAN.md — 往返校验执行佐证:基线导出 harness + 样本清单销号(CONTRACT-02)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 02-04-PLAN.md — 四类分歧判定、F-CON 发现、条件配方与零 diff 收尾(CONTRACT-02/04)
 
 ### Phase 3: 组件与工具链深潜
