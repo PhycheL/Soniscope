@@ -73,7 +73,7 @@
 
 ## 组② 小程序↔FC HTTP 契约
 
-> D-01 组②:issue-credential 与 verify-upload 的请求/响应 JSON 字段、7 个错误码字符串、2 个 verify reason。本组契约仅存在于小程序↔FC 之间,**Worker 列全部 n/a**(Worker 业务流水线只消费 OSS 数据面,不调用 FC HTTP 接口——结构性理由代替行号,per D-03/D-04;Worker 侧联调工具 fc_live.py / verify_upload_live.py 中的契约常量镜像属普查命中,见普查节行 44-46,不占本组 Worker 列)。小程序侧请求组装取 utils 层 `queue_runtime.js`(D-04 列限定 utils);pages 层存在同构第二份组装(`apps/miniprogram/pages/uploads/uploads.js:340,365 @ 5927f36`),作为行下注与普查移交线索记录,不占列。全部行号已经 `git show 5927f36:<path>` 逐一复核。
+> D-01 组②:issue-credential 与 verify-upload 的请求/响应 JSON 字段、7 个错误码字符串、2 个 verify reason。本组契约仅存在于小程序↔FC 之间,**Worker 列全部 n/a**(Worker 业务流水线只消费 OSS 数据面,不调用 FC HTTP 接口——结构性理由代替行号,per D-03/D-04;Worker 侧联调工具 fc_live.py / verify_upload_live.py 中的契约常量镜像属普查命中,见普查节行 49-51,不占本组 Worker 列)。小程序侧请求组装取 utils 层 `queue_runtime.js`(D-04 列限定 utils);pages 层存在同构第二份组装(`apps/miniprogram/pages/uploads/uploads.js:340,365 @ 5927f36`),作为行下注与普查移交线索记录,不占列。全部行号已经 `git show 5927f36:<path>` 逐一复核。
 
 ### 组②-a issue-credential 请求字段(行 16-18)
 
@@ -130,7 +130,7 @@ FC 侧 7 字段全部出自 `credential_response`(`sts.py:102-114 @ 5927f36`,doc
 
 | 契约要素 | FC (fc_shared) | Worker | 小程序 (utils) | 判定 |
 |----------|----------------|--------|----------------|------|
-| 35. 错误码 `INVALID_CODE`(401) | agree `apps/fc/shared/fc_shared/errors.py:13 @ 5927f36`(定义)+ `wechat.py:45,47,51 @ 5927f36`(raise) | n/a — Worker 不参与 HTTP 错误码契约(联调工具镜像见普查行 44) | absent — 字面量零出现,经 `uploader.js:48 @ 5927f36` 通用透传(测试锁定:`test/uploader.test.js` 含码字符串断言) | 待判定 |
+| 35. 错误码 `INVALID_CODE`(401) | agree `apps/fc/shared/fc_shared/errors.py:13 @ 5927f36`(定义)+ `wechat.py:45,47,51 @ 5927f36`(raise) | n/a — Worker 不参与 HTTP 错误码契约(联调工具镜像见普查行 50) | absent — 字面量零出现,经 `uploader.js:48 @ 5927f36` 通用透传(测试锁定:`test/uploader.test.js` 含码字符串断言) | 待判定 |
 | 36. 错误码 `OPENID_NOT_ALLOWED`(403) | agree `errors.py:14 @ 5927f36` + `auth.py:36 @ 5927f36`(raise) | n/a — 同上 | absent — 同行 35 裁决 | 待判定 |
 | 37. 错误码 `INVALID_REQUEST`(400) | agree `errors.py:15 @ 5927f36` + `http.py:63,67,69,78 @ 5927f36` + `sts.py:53,58,79,85,87 @ 5927f36`(raise) | n/a — 同上 | absent — 同行 35 裁决 | 待判定 |
 | 38. 错误码 `SIZE_EXCEEDED`(400) | agree `errors.py:16 @ 5927f36` + `sts.py:93-99 @ 5927f36`(raise,附 limit_bytes / actual_bytes) | n/a — 同上 | absent — 同行 35 裁决(`uploader.js:47 @ 5927f36` 注释提及但非代码分支) | 待判定 |
@@ -146,12 +146,40 @@ FC 侧 7 字段全部出自 `credential_response`(`sts.py:102-114 @ 5927f36`,doc
 
 | 契约要素 | FC (fc_shared) | Worker | 小程序 (utils) | 判定 |
 |----------|----------------|--------|----------------|------|
-| 42. reason `OBJECT_NOT_FOUND` | agree `errors.py:23 @ 5927f36`(定义)+ `head.py:43 @ 5927f36`(响应组装) | n/a — Worker 不消费 verify 响应(联调工具镜像见普查行 46) | agree `verify.js:20 @ 5927f36`(`REASON_OBJECT_NOT_FOUND` 字面量逐字符一致)——分支仍为通用透传(`verify.js:42 @ 5927f36`),常量当前仅模块导出(`verify.js:134 @ 5927f36`)供测试/故障注入消费(测试锁定:`test/verify.test.js`;故障注入 mock 字面量 `queue_runtime.js:116 @ 5927f36`) | 待判定 |
+| 42. reason `OBJECT_NOT_FOUND` | agree `errors.py:23 @ 5927f36`(定义)+ `head.py:43 @ 5927f36`(响应组装) | n/a — Worker 不消费 verify 响应(联调工具镜像见普查行 51) | agree `verify.js:20 @ 5927f36`(`REASON_OBJECT_NOT_FOUND` 字面量逐字符一致)——分支仍为通用透传(`verify.js:42 @ 5927f36`),常量当前仅模块导出(`verify.js:134 @ 5927f36`)供测试/故障注入消费(测试锁定:`test/verify.test.js`;故障注入 mock 字面量 `queue_runtime.js:116 @ 5927f36`) | 待判定 |
 | 43. reason `SIZE_MISMATCH` | agree `errors.py:24 @ 5927f36` + `head.py:47 @ 5927f36` | n/a — 同上 | agree `verify.js:21 @ 5927f36`(`REASON_SIZE_MISMATCH`)——同行 42(导出 `verify.js:135 @ 5927f36`) | 待判定 |
 
 ## 组③ 两侧镜像常量
 
-*(02-02 填)*
+> D-01 组③:跨语言镜像约定值(重试节奏、重试上限、大小上限、分片阈值、STS 时长)。本组是"两侧镜像"对照,列式仍用三列;不参与的列标 n/a + 结构性理由。全部行号已经 `git show 5927f36:<path>` 复核;grep 核实命令写入行下注(为普查节存档预铺)。
+
+| 契约要素 | FC (fc_shared) | Worker | 小程序 (utils) | 判定 |
+|----------|----------------|--------|----------------|------|
+| 44. 重试节奏 5s→15s→45s | n/a — FC 是被重试的服务端,自身无重试表(两 handler 均单次调用云 API,失败即收敛 500) | agree `apps/worker/src/soniscope_worker/nls.py:45 @ 5927f36`(`RETRY_DELAYS_SECONDS = (5.0, 15.0, 45.0)`,秒,NLS 提交/查询重试)(测试锁定:`apps/worker/tests/test_nls.py:401,449-450`) | agree `apps/miniprogram/utils/uploader.js:28 @ 5927f36`(`RETRY_DELAYS_MS = [5000, 15000, 45000]`,毫秒,OSS 直传重试)+ `apps/miniprogram/utils/verify.js:16 @ 5927f36`(`VERIFY_RETRY_DELAYS_MS = [5000, 15000, 45000]`,毫秒,verify 重试——**JS 侧两份独立常量,两处行号均列**)(测试锁定:`test/uploader.test.js:55`、`test/verify.test.js:54`) | 待判定 |
+| 45. 最多 3 次重试 | n/a — 同行 44 | agree `nls.py:46 @ 5927f36`(`MAX_RETRIES = 3`,**独立字面量**,与延时表长度无结构绑定) | agree `uploader.js:29 @ 5927f36`(`MAX_UPLOAD_RETRIES = RETRY_DELAYS_MS.length`,派生)+ `verify.js:17 @ 5927f36`(`MAX_VERIFY_RETRIES = VERIFY_RETRY_DELAYS_MS.length`,派生)(测试锁定:`test/uploader.test.js:56`、`test/verify.test.js:55`) | 待判定 |
+| 46. 上传大小上限 50 MB | agree `apps/fc/shared/fc_shared/env.py:41 @ 5927f36`(`DEFAULT_MAX_UPLOAD_BYTES = 52428800`,可被 env `MAX_UPLOAD_BYTES` 覆盖;执行点 `sts.py:91-99 @ 5927f36` check_size)(测试锁定:`apps/fc/tests/test_issue_credential.py:142,151`) | n/a — Worker 只下载已入桶对象,不参与上传大小约束 | absent — 无镜像常量、无上传前预检:上限语义仅经 SIZE_EXCEEDED 错误码事后感知(组② 行 38)。覆盖洞候选,归类留 02-04 | 待判定 |
+| 47. 分片阈值 600 s | n/a — FC 对分片阈值零感知(grep 裁决见行下注);分片对 FC 只显现为独立 fragment_id 的多次签发 | n/a — Worker 对分片阈值零感知(grep 裁决见行下注);分片对 Worker 只显现为 chunk-seq / chunk-total 元数据(组① 行 8/9) | agree `apps/miniprogram/config.js:22-23 @ 5927f36`(`CHUNK_MAX_DURATION_SECONDS = 600`,注释自证 tech-spec §3.1"本期作为前端常量管理") | 待判定 |
+| 48. STS 时长 ≤900 s | agree `apps/fc/shared/fc_shared/sts.py:24-25 @ 5927f36`(`STS_MAX_DURATION_SECONDS = 900`;使用点 `issue_credential/handler.py:79 @ 5927f36`) | n/a — Worker 不使用 STS(用 config.yaml 长期 AK 走 OSS 只读) | agree `apps/miniprogram/utils/oss_sign.js:16 @ 5927f36`(`DEFAULT_POLICY_EXPIRE_SECONDS = 900`,表单 policy 过期镜像常量,注释自证"与 STS 有效期同量级即可,签名本身受 STS 过期约束";使用点 `oss_sign.js:61,91 @ 5927f36`)——注意小程序对响应字段 `expiration` 本体无消费(组② 行 22),900 镜像为独立本地常量 | 待判定 |
+
+**行 46 grep 裁决依据(absent):**
+
+```bash
+git grep -nE '52428800|MAX_UPLOAD' 5927f36 -- apps/miniprogram/   # 小程序侧大小上限镜像核实
+# 命中 5 行,全部为重试次数常量 MAX_UPLOAD_RETRIES(uploader.js:29,116,139,160)及其测试断言
+# (test/uploader.test.js:56)——与大小上限语义无关;无 52428800、无任何大小预检常量 → 判 absent
+```
+
+**行 47 grep 裁决依据(FC/Worker 双 n/a):**
+
+```bash
+git grep -n '600' 5927f36 -- apps/fc/ apps/worker/src/   # FC/Worker 侧 600s 分片阈值感知核实
+# 命中 30 行,逐条人工筛选全部为无关值:chmod 600 权限(config.py:148-150、cli.py:40-51、
+# verify_prep.py:249-257)、3600 秒签名 URL 时长(nls.py:49,54,108)、16000 采样率
+# (audio.py:82、nls.py:502)、500<=status<600 段判(verify_prep.py:301)、样本 fragment_id
+# 内数字(e2e_scenarios.py:67、pipeline.py:558)——零分片阈值感知 → FC/Worker 双 n/a
+```
+
+**行 44/45 语义注记:** 三份重试表(nls.py / uploader.js / verify.js)作用于**不同操作**(NLS 转写调用 / OSS 直传 / FC verify 调用),镜像的是 AGENTS 错误处理节奏约定(三处注释均自证引用该约定);单位不同(秒 vs 毫秒)属字面差异语义一致(Pitfall 5)。JS 两份独立常量 + Worker 独立字面量 MAX_RETRIES 的重复实现债务线索移交 Phase 3(见普查节)。
 
 ## 重复逻辑普查
 
