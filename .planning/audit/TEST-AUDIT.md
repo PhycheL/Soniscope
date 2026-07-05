@@ -28,30 +28,30 @@
 
 | 路径 | 行数 | 侧 | 深度 | 已过面 | 产出 | 备注 |
 |------|------|-----|------|--------|------|------|
-| `apps/worker/tests/test_audio.py` | 321 | pytest-worker | - | 0/8 | - | 面⑦线索:转码/探测失败留档路径 :215(F-CODE-02 单轮证据) |
-| `apps/worker/tests/test_config.py` | 208 | pytest-worker | - | 0/8 | - | 面⑤先例:test_secret_not_leaked_in_repr_and_summary |
-| `apps/worker/tests/test_e2e.py` | 266 | pytest-worker | - | 0/8 | - | 真云编排逻辑的离线单测 |
-| `apps/worker/tests/test_e2e_scenarios.py` | 209 | pytest-worker | - | 0/8 | - | — |
-| `apps/worker/tests/test_fc_deploy.py` | 485 | pytest-worker | - | 0/8 | - | 面⑦线索::331 首次部署跳过备份分支(F-TOOL-02) |
-| `apps/worker/tests/test_fc_live.py` | 381 | pytest-worker | - | 0/8 | - | 面④线索:镜像常量自证,零跨侧绑定(F-TOOL-08) |
-| `apps/worker/tests/test_fixtures.py` | 244 | pytest-worker | - | 0/8 | - | 二进制夹具 manifest 校验 |
-| `apps/worker/tests/test_latency.py` | 64 | pytest-worker | - | 0/8 | - | — |
-| `apps/worker/tests/test_locks.py` | 64 | pytest-worker | - | 0/8 | - | — |
-| `apps/worker/tests/test_manifest.py` | 303 | pytest-worker | - | 0/8 | - | 面⑦关注:落盘顺序/.done 时序 |
-| `apps/worker/tests/test_miniprogram_js.py` | 36 | pytest-worker | - | 0/8 | - | JS 桥;面⑥已知线索 :24 skipif(node 缺失静默跳过) |
-| `apps/worker/tests/test_miniprogram_lint.py` | 205 | pytest-worker | - | 0/8 | - | 现有五族规则锁定(F-TOOL-04 参照) |
-| `apps/worker/tests/test_nls.py` | 544 | pytest-worker | - | 0/8 | - | 面④线索::401,449-450 重试常量结构锁定、数值字面无断言(F-CODE-07) |
-| `apps/worker/tests/test_ops.py` | 330 | pytest-worker | - | 0/8 | - | :74 非法日期拒绝断言(F-CON-01 消费端) |
-| `apps/worker/tests/test_oss_admin.py` | 200 | pytest-worker | - | 0/8 | - | :75 非法日期拒绝断言(F-CON-01 消费端) |
-| `apps/worker/tests/test_pipeline.py` | 411 | pytest-worker | - | 0/8 | - | 面⑦线索::293 sha 失配无 .done(F-CODE-02 单轮证据) |
-| `apps/worker/tests/test_poller.py` | 428 | pytest-worker | - | 0/8 | - | 面⑦线索::182-191 sha 失配删 .part(F-CODE-02);:171-172 process_plan 调用形态(F-CODE-01) |
-| `apps/worker/tests/test_recovery.py` | 282 | pytest-worker | - | 0/8 | - | 面⑦线索::47-53 正常路径无 tmp 残留(F-CODE-03 参照) |
-| `apps/worker/tests/test_retranscribe.py` | 303 | pytest-worker | - | 0/8 | - | — |
-| `apps/worker/tests/test_skeleton.py` | 64 | pytest-worker | - | 0/8 | - | :52-58 .env 正向解析(F-CODE-04 参照);:39-49 直改 os.environ(面③线索) |
-| `apps/worker/tests/test_sts_escape.py` | 130 | pytest-worker | - | 0/8 | - | 面⑤:报告不泄漏 AK Secret 断言(docstring 自述) |
-| `apps/worker/tests/test_transcriber.py` | 158 | pytest-worker | - | 0/8 | - | — |
-| `apps/worker/tests/test_verify_prep.py` | 438 | pytest-worker | - | 0/8 | - | 面⑦线索::234-251 check_sts_escape 二分行为锁定(F-TOOL-01) |
-| `apps/worker/tests/test_verify_upload_live.py` | 276 | pytest-worker | - | 0/8 | - | 面⑤泄漏反查先例;:202-223 清理成功路径(F-TOOL-03 参照) |
+| `apps/worker/tests/test_audio.py` | 321 | pytest-worker | 普审 | 8/8 | 面①/⑦线索:全文件零 pytest.raises,失败分支均以留档位置断言表达(断言面窄)→ 04-08 候选面 | 面⑦ :215 转码/探测失败留档(F-CODE-02 单轮证据→反向映射);面③ tmp_path×16 全注入;面②⑤⑥⑧ grep 零命中 @ 5927f36 |
+| `apps/worker/tests/test_config.py` | 208 | pytest-worker | 普审 | 8/8 | 无缺口线索 | 面⑤先例 :94-99 raw_secret not in repr/summary;面⑦ pytest.raises×3(收集式报错);面③ tmp_path×31/monkeypatch×5;面①强(38 断言零弱) @ 5927f36 |
+| `apps/worker/tests/test_e2e.py` | 266 | pytest-worker | 普审 | 8/8 | 面①线索:编排结果多以 `assert code == 0` 表达(:149,173,217,250),报告内容值断言偏薄 → 04-08 候选面 | 真云编排逻辑离线单测;面③ tmp_path×29;面⑥ 无 skip;面④ 无契约常量绑定(编排层,可接受) @ 5927f36 |
+| `apps/worker/tests/test_e2e_scenarios.py` | 209 | pytest-worker | 普审 | 8/8 | 无缺口线索 | 面② FakeFcProbes/FakeStsProbes :47,72;面④ :34 ALLOWED_KEY key 格式字面 + 错误码字面 :63,132-133;面⑤ :181-188 report 无秘密断言 @ 5927f36 |
+| `apps/worker/tests/test_fc_deploy.py` | 485 | pytest-worker | 普审 | 8/8 | 无新增线索(F-TOOL-02 已入反向映射) | 面⑦ :331 首次部署跳过备份分支(F-TOOL-02)+ raises×5;面② FakeFcApi :42;面⑤ :157 secret not in summary;面③ monkeypatch×8/tmp_path×67 @ 5927f36 |
+| `apps/worker/tests/test_fc_live.py` | 381 | pytest-worker | 普审 | 8/8 | 无新增线索(F-TOOL-08 已入反向映射) | 面④ :51,105-126 错误码/key 镜像常量自证、零跨侧绑定(F-TOOL-08);面⑤ :124-126 STS 字段泄漏检出 + :325 报告无秘密;面② FakeProbes :55 @ 5927f36 |
+| `apps/worker/tests/test_fixtures.py` | 244 | pytest-worker | 普审 | 8/8 | 无缺口线索 | 二进制夹具 manifest 校验;面⑦ raises×3;面③ tmp_path×26/monkeypatch×2;面①强(27 断言零弱) @ 5927f36 |
+| `apps/worker/tests/test_latency.py` | 64 | pytest-worker | 普审 | 8/8 | 无缺口线索 | 面①强:pytest.approx 数值断言(:20-24 线性插值);面⑦ 空样本/超阈值失败分支 :47-56 全覆盖;纯函数无 IO @ 5927f36 |
+| `apps/worker/tests/test_locks.py` | 64 | pytest-worker | 普审 | 8/8 | 无缺口线索 | 面⑦ LockBusyError 非阻塞互斥负例(fcntl 双 fd 实锁验证);面③ tmp_path×16 全注入;不同 fragment 独立性有断言 @ 5927f36 |
+| `apps/worker/tests/test_manifest.py` | 303 | pytest-worker | 普审 | 8/8 | 面⑧线索:monkeypatch 直引私有 `_fixture_path`(:288,298)→ 04-08 候选面(轻) | 面⑦ 落盘顺序/.done 时序核:5 产物齐全断言 :272-275(.done 0 字节)+ raises×2;面③ monkeypatch×2/tmp_path×3 @ 5927f36 |
+| `apps/worker/tests/test_miniprogram_js.py` | 36 | pytest-worker | 普审 | 8/8 | 面⑥线索::24 skipif node 缺失→静默跳过全部 10 个 JS 测试(单点闸门)→ D-11(04-08 三方对照) | JS 桥;面① 仅 returncode==0 断言(:36,桥接性质透传 node 输出);面⑥ 为全 grep 唯一 skipif 命中 @ 5927f36 |
+| `apps/worker/tests/test_miniprogram_lint.py` | 205 | pytest-worker | 普审 | 8/8 | 无新增线索(F-TOOL-04 已入反向映射) | 现有五族规则锁定 :53-180(F-TOOL-04);面⑤ :172-174 AK 模式(LTAI)检出正例;面③ tmp_path×32 @ 5927f36 |
+| `apps/worker/tests/test_nls.py` | 544 | pytest-worker | 普审 | 8/8 | 面④线索:重试常量结构锁定 :401,449-450(sleeps==list(RETRY_DELAYS_SECONDS)),数值字面 5/15/45 无断言(F-CODE-07 已入反向映射) | 面④ RESIGN_THRESHOLD_SECONDS :307 结构消费;面② _FakeBackend :58/_Clock :105 时钟注入;面⑦ raises×4 + 服务端/客户端异常分类 :455,466;面③ monkeypatch×4 @ 5927f36 |
+| `apps/worker/tests/test_ops.py` | 330 | pytest-worker | 普审 | 8/8 | 无新增线索(F-CON-01 消费端已入反向映射) | :74 非法日期拒绝断言(F-CON-01);面④ :37-38,79 key 格式字面(`recordings/<date>/`);面② FakeSource :41;面③ tmp_path×37;面⑦ raises×2 @ 5927f36 |
+| `apps/worker/tests/test_oss_admin.py` | 200 | pytest-worker | 普审 | 8/8 | 无新增线索(F-CON-01 消费端已入反向映射) | :75 非法日期拒绝断言(F-CON-01);面② FakeStore :21;面⑦ raises×2;面④ object_key_for 派生断言(生产端锁定) @ 5927f36 |
+| `apps/worker/tests/test_pipeline.py` | 411 | pytest-worker | 普审 | 8/8 | 无新增线索(F-CODE-02 已入反向映射) | 面⑦ :293 sha 失配无 .done(F-CODE-02 单轮证据)+ :217-235 失败路径不建 .done(AC#2)+ :275 幂等跳过;零 pytest.raises 但失败经 .done 缺失断言表达(可接受);面③ tmp_path×24 @ 5927f36 |
+| `apps/worker/tests/test_poller.py` | 428 | pytest-worker | 普审 | 8/8 | 面②线索:FakeSource(:52-76)与 RealOssSource 仅经 Protocol 结构对齐(mypy strict),行为面(网络错误语义/覆盖写语义)无对齐锁定 → 04-08 候选面 | 面⑦ :182-191 sha 失配删 .part(F-CODE-02);:171-172 process_plan 调用形态(F-CODE-01);面④ key 反推拒绝负例(:80-89 非 .wav/错前缀);面③ tmp_path×30 @ 5927f36 |
+| `apps/worker/tests/test_recovery.py` | 282 | pytest-worker | 普审 | 8/8 | 无新增线索(F-CODE-03 已入反向映射) | 面⑦ :47-53 正常路径无 tmp 残留(F-CODE-03 参照,孤儿清理路径无测试系功能缺失);面③ tmp_path×47 全注入;面①强(59 断言) @ 5927f36 |
+| `apps/worker/tests/test_retranscribe.py` | 303 | pytest-worker | 普审 | 8/8 | 无缺口线索 | 面⑦ 幂等 skip 行为 :285-286 有锁定;面③ tmp_path×20/monkeypatch×1;面①强(52 断言) @ 5927f36 |
+| `apps/worker/tests/test_skeleton.py` | 64 | pytest-worker | 普审 | 8/8 | 面③线索::39-49 直改 os.environ(try/finally 手工清理,与同文件 monkeypatch 惯例混用)→ 04-08 候选面(轻) | :52-58 .env 正向解析(F-CODE-04 参照,无界搜索面无测试);面⑦ raises×1 @ 5927f36 |
+| `apps/worker/tests/test_sts_escape.py` | 130 | pytest-worker | 普审 | 8/8 | 无缺口线索 | 面⑤ :110-114 report 无 `super-secret-do-not-log` 断言;面② FakeProbes :34;越权反例逻辑离线锁定 @ 5927f36 |
+| `apps/worker/tests/test_transcriber.py` | 158 | pytest-worker | 普审 | 8/8 | 无缺口线索 | 面⑦ raises×2::68 未知 name→TranscriberError、:81 whisper-local→NotImplementedError(placeholder 行为锁定);面③ monkeypatch×1 @ 5927f36 |
+| `apps/worker/tests/test_verify_prep.py` | 438 | pytest-worker | 普审 | 8/8 | 无新增线索(F-TOOL-01 已入反向映射) | 面⑦ :234-251 check_sts_escape 二分行为锁定(F-TOOL-01)+ raises×3;面⑤ :227 check_config_security 不泄密断言;面② FakeProbes :96;面③ monkeypatch×5/tmp_path×24 @ 5927f36 |
+| `apps/worker/tests/test_verify_upload_live.py` | 276 | pytest-worker | 普审 | 8/8 | 无新增线索(F-TOOL-03 已入反向映射) | 面⑤ :51,58 泄漏检出断言(object info/verified true);:202-223 清理成功路径(F-TOOL-03,失败吞并分支无测试);面② FakeProbes :126 @ 5927f36 |
 | `apps/fc/tests/test_custom_runtime_app.py` | 57 | pytest-fc | - | 0/8 | - | — |
 | `apps/fc/tests/test_fc_handlers.py` | 133 | pytest-fc | - | 0/8 | - | — |
 | `apps/fc/tests/test_fc_shared.py` | 270 | pytest-fc | - | 0/8 | - | :196 is_sensitive 白名单断言(面⑤) |
