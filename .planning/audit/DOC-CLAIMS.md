@@ -242,3 +242,15 @@
 | FD-16 | 【HYP-14 专项】发布文档是否覆盖"发布前把 `apps/miniprogram/config.js:29` 的 ENV 常量由 development 翻转为 production"步骤——全文档检索判定:`git grep -n 'ENV' 5927f36 -- docs/ AGENTS.md` 与 `git grep -ni 'production' 5927f36 -- docs/ AGENTS.md`(排除 vendored docs/example/)命中全集:architecture-review-2026-07-02.md:58,70,193、tech-spec.md:529、mvp-acceptance.md:138——**四份 runbook(cloud-setup/deployment-guide/fc-deploy/mvp-acceptance)与 AGENTS.md 零命中翻转步骤**;deployment-guide §6.3-6.4(小程序发布流程:DevTools 上传→体验版→审核→发布,:357-365)与附录 A 小程序清单(:479-482)均无 ENV 项,§6.3 仅要求核对"FC/OSS URL 与 §6.2 一致"(:358);唯一记载该风险的是普审对象 architecture-review(:70"发版忘改会把开发者菜单与故障注入带上线"、:193 建议"构建期注入或发布 checklist 强制项"),但其建议未落入任何 runbook | `docs/runbook/deployment-guide.md:357-365,479-482 @ 5927f36`(发布流程未命中主证)、`docs/architecture/architecture-review-2026-07-02.md:70,193 @ 5927f36`(风险已知未落实)、`docs/v1.0.0 prd/tech-spec.md:529 @ 5927f36`、`docs/runbook/mvp-acceptance.md:138 @ 5927f36`(仅描述门控假设 production 已生效) | ENV 基线现值即 `'development'`,生产门控三重兜底全系 ENV 取值——带 development 上线即向最终用户暴露开发者菜单与故障注入开关(证据直引 HANDOFF DOC 第 2、3 条:`apps/miniprogram/config.js:29 @ 5927f36`、`pages/dev/dev.js:18,28,52 @ 5927f36`、`utils/fault_injection.js:38-40,82-107 @ 5927f36`,03-04 采证) | 判定:**发布文档未覆盖 ENV 翻转步骤**(自称"从零到全链路上线"的 deployment-guide 发布节缺该必要步骤) | drift → F-DOC-03 → HYP-14(04-09 回填锚点);销号引 HANDOFF-PHASE4.md DOC 节第 2、3 条 |
 
 **fc-deploy 节机械对账:** 清单条目总数 **16**(FD-01 ~ FD-16);四态计数:agree **13**(内含闭环 DNF-02 ×1、→ HYP-04 结论行 ×1)+ drift **1**(FD-16 → F-DOC-03,HYP-14 专项)+ dead-ref **0** + 无法静态核实 **2**(FD-02、FD-04);复算:13 + 1 + 0 + 2 = 16 ✓。
+
+## 04-04 批次机械对账(runbook 4 节)
+
+| 节 | 条目数 | agree | drift | dead-ref | 无法静态核实 | 等式 |
+|----|--------|-------|-------|----------|--------------|------|
+| §cloud-setup.md | 19 | 9 | 0 | 2 | 8 | 9+0+2+8=19 ✓ |
+| §mvp-acceptance.md | 12 | 10 | 0 | 1 | 1 | 10+0+1+1=12 ✓ |
+| §deployment-guide.md | 19 | 15 | 0 | 1 | 3 | 15+0+1+3=19 ✓ |
+| §fc-deploy.md | 16 | 13 | 1 | 0 | 2 | 13+1+0+2=16 ✓ |
+| **合计** | **66** | **47** | **1** | **4** | **14** | 47+1+4+14=66 ✓ |
+
+批次要点:drift 发现级 **1** 条(FD-16 → F-DOC-03,HYP-14 专项——发布文档未覆盖 ENV 生产翻转步骤);dead-ref **4** 处登记 → HYP-02(CS-09、CS-15、MA-01、DG-01,04-05 聚合立条);DNF-02 命中 ×5(CS-08/MA-02/DG-09/DG-16/FD-12)全部核实闭环;HYP 结论锚点 ×2(FD-09 → HYP-04 runbook 保真度闭环、FD-16 → HYP-14,均待 04-09 回填引用);阶段累计销号 66(04-03)+ 66(04-04)= **132** 条。

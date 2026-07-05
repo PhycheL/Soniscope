@@ -45,3 +45,17 @@
 - **关联发现:** 无;关联线索: HYP-18(细化:两代 SDK 并存、legacy 承载生产主路径证实)
 - **上线判定:** (Phase 5 填,留空)
 - **状态:** draft
+
+> 04-04 判定产物(runbook 4 份深核:cloud-setup 19 条 + mvp-acceptance 12 条 + deployment-guide 19 条 + fc-deploy 16 条,共 66 条销号):共 **1 条发现**——F-DOC-03(HYP-14 专项:发布文档未覆盖 config.js ENV 常量的生产翻转步骤,MEDIUM);runbook 步骤 ↔ fc_deploy.py 能力面对照零 drift(FD-09,HYP-04 runbook 保真度口径闭环,文档未声称工具不具备的能力);纯控制台/云端/机器侧事实 **14 条**如实标『无法静态核实』无猜测(CS ×8 / MA ×1 / DG ×3 / FD ×2);dead-ref **4 处**登记移交 04-05 聚合(CS-09、CS-15、MA-01、DG-01,→ HYP-02——其中 CS-15 系脚本旧路径 `./test/test_asr.py`,余三处为权威文档旧路径 `docs/PRD_v1.md`/`docs/tech-spec.md`);DNF-02(issue-cedential 拼写)命中 5 行(CS-08/MA-02/DG-09/DG-16/FD-12)全部核实闭环不立发现。销号底稿见 `.planning/audit/DOC-CLAIMS.md` §cloud-setup.md / §mvp-acceptance.md / §deployment-guide.md / §fc-deploy.md 四节。
+
+### F-DOC-03: 发布文档未覆盖小程序 `config.js` ENV 常量的生产翻转步骤,照 deployment-guide 发布流程执行会把 development 门控带上线
+
+- **维度:** 文档配置一致性 (DOC)
+- **严重度:** MEDIUM — 影响:deployment-guide 自称"从零到全链路上线的可逐步执行操作手册",其小程序发布节(§6.3-6.4:DevTools 上传 → 体验版 → 审核 → 发布)与附录 A 检查清单均无"把 `config.js:29` 的 `ENV = 'development'` 翻转为 `production`"步骤,§6.3 仅要求核对 FC/OSS URL——照文档逐步执行即把 development 原样发布,最终用户(含体验成员)可见开发者菜单并可开启故障注入开关(`mock-fc-url-broken`/`mock-verify-fail` 会直接使上传/verify 链路失败),开发者菜单与故障注入的三重 production 门控(代码侧已核实完备)全部落空;可能性:每次发布必经该流程且四份 runbook 与 AGENTS.md 零命中翻转步骤,翻转完全依赖记忆而非清单——架构评审文档已点名该单点风险并建议"构建期注入或发布 checklist 强制项",但建议未落入任何 runbook(对应 CHARTER MEDIUM 锚点『可诱发高危误操作的误导性文档(如 runbook 步骤与实态不符)』:发布 runbook 步骤不完备,照做即误发 development 构建)
+- **证据:** `docs/runbook/deployment-guide.md:357-365,479-482 @ 5927f36`
+  > §6.3-6.4 发布流程:「1. DevTools 点「上传」→ 微信管理后台「版本管理」设为体验版。…真机微信打开体验版验证全链路 verified 后，提交审核 → 发布正式版。」——全流程无 ENV 翻转项;§6.3 第 2 步仅「确认 `apps/miniprogram/config.js` 中的 FC / OSS URL 与 §6.2 一致」(:358)。全文档检索(`git grep -n 'ENV' 5927f36 -- docs/ AGENTS.md`、`git grep -ni 'production' 5927f36 -- docs/ AGENTS.md`,排除 vendored docs/example/)命中全集仅:`docs/architecture/architecture-review-2026-07-02.md:58,70,193`(:70「发版忘改会把开发者菜单与故障注入带上线」、:193 建议清单强制项——风险已知未落实)、`docs/v1.0.0 prd/tech-spec.md:529`、`docs/runbook/mvp-acceptance.md:138`(两处仅描述门控存在,均假设 production 已生效)。ENV 基线现值与门控实现证据(HANDOFF-PHASE4.md DOC 节第 2、3 条移交,03-04 采证):`apps/miniprogram/config.js:29 @ 5927f36`(`ENV = 'development'` 硬编码现值)、`apps/miniprogram/pages/dev/dev.js:18,28,52 @ 5927f36`(dev 页三重门控)、`apps/miniprogram/utils/fault_injection.js:38-40,82-107 @ 5927f36`(production 读全关写忽略——门控实效完全取决于 ENV 发布取值)
+- **修复建议:** 在发布文档补齐 ENV 翻转为强制清单项(双落点):deployment-guide §6.4 发布步骤首条增加「发布前把 `apps/miniprogram/config.js` 的 `ENV` 由 `development` 改为 `production`,并在 DevTools 真机预览确认开发者菜单入口不可见」,附录 A"小程序"清单同步加一行勾选项;可选同步在 mvp-acceptance §0 验收前提补一条 ENV=production 断言。根治向(architecture-review :193 已建议):构建期注入 ENV 或 `miniprogram_lint.py` 增加发布态检查——属代码/工具改动,超出本发现文档修复范围,留待修复里程碑决策。
+- **工作量:** S(deployment-guide 单文件两处清单行;可选 mvp-acceptance 一行)
+- **关联发现:** 无;关联线索: HYP-14(证实方向:发布文档未覆盖翻转步骤;结论行 DOC-CLAIMS.md FD-16,04-09 回填锚点);销号引 HANDOFF-PHASE4.md DOC 节第 2、3 条
+- **上线判定:** (Phase 5 填,留空)
+- **状态:** draft
