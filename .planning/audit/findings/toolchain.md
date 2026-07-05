@@ -69,3 +69,17 @@
 - **关联发现:** 无;关联线索: HYP-15、HYP-24(页面胶水层无测试,TEST 维度)
 - **上线判定:**
 - **状态:** draft
+
+> 03-06 判定产物(AUDIT-02 收尾:scripts/ 缩窄清单三文件 847 行 + Makefile 171 行 45 目标):普审 fetch_test_fixtures.py / gen_worker_config.sh / Makefile,深挖 test_asr.py(HYP-07 核实结论 + HYP-18 采证)。严重度按工具级影响定级(D-03);D-08 零执行——三个脚本与全部 make 目标均未运行,取证仅 `git show 5927f36:<path>`;HYP-07 证据全程遵守 CHARTER 秘密值本体红线(只写位置+模式名,不含任何值本体,含已过期值)。
+
+### F-TOOL-05: test_asr.py 内置样例 URL 为已提交的带签名 OSS 预签名 URL(已过期),签名 URL 入库先例成立
+
+- **维度:** 部署与验证工具链 (TOOL)
+- **严重度:** MEDIUM — 影响:符合签名 URL 模式的完整预签名 GET URL(含 STS 临时 AccessKeyId 与签名参数)随脚本入库,git 历史不可撤回,构成"签名 URL 可以进 git"的先例惯性(对照 CHARTER MEDIUM 锚点"已过期凭证曾入库(泄露习惯风险)",逐字命中);URL 已过期且为 STS 临时凭证 + 单对象 GET 范围,无现行可利用价值,不触 CRITICAL"有效长期凭证泄露"锚;可能性:入库已是基线既成事实,风险面在惯性复发——:78 行内注释明示"过期后请用 --file-link 传新链接",下次更新若再以字面量内置新 URL 即重演,且 scripts/ 无任何静态门禁可拦截(HYP-25)
+- **证据:** `scripts/test_asr.py:79-81 @ 5927f36`(`OSSAccessKeyId=` 签名 URL 模式 + `Signature=` 签名参数模式同行双命中,值本体略,per CHARTER 秘密红线)
+  > `DEFAULT_FILE_LINK = (` — 常量赋值即完整预签名 URL 字面量(此处仅引变量名与赋值号,不截值本体)。过期状态可静态判定:URL 内 `Expires=` 参数为 unix 时间戳,对应 2026-05-29,早于审计日 2026-07-05;AccessKeyId 为 `TMP.` 前缀(STS 临时凭证形态,非 LTAI 长期 AK)。佐证::78 行内注释自认"OSS 签名 URL 会过期,过期后请用 --file-link 传新链接";:112-115 `--file-link` 缺省链回落至该常量(NLS_FILE_LINK 环境变量可覆盖)。
+- **修复建议:** 移除 `DEFAULT_FILE_LINK` 字面量:缺省改为仅读 `NLS_FILE_LINK` 环境变量,未设置时按既有缺参路径(exit 2)退出并提示——脚本已具 `--file-link`/`NLS_FILE_LINK` 双通道(:112-115),改动即删常量 + 调整缺省值。配套把签名 URL 模式纳入 scripts/ 可用的静态门禁(miniprogram_lint 的密钥启发式只扫小程序;将 scripts/ 纳入 lint 范围或增仓库级预提交 grep,与 HYP-25 移交项同一修复面)。git 历史清洗(filter-repo)属可选项:值已过期且系临时凭证,清洗收益低于历史重写成本,留给修复里程碑裁量。
+- **工作量:** S(单文件;门禁增补另计,与 HYP-25 修复面合并)
+- **关联发现:** 无;关联线索: HYP-07(本条即其核实结论,证实)、HYP-25(scripts/ 无门禁,TEST 维度移交);scans/secrets.md #14/#15 销号去向即本条
+- **上线判定:**
+- **状态:** draft

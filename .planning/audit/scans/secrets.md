@@ -154,8 +154,8 @@ git grep -nE 'SecurityToken=|security_token' 5927f36 -- . | cut -d: -f1-3
 | 11 | .planning/codebase/CONCERNS.md:55 | `OSSAccessKeyId=` 签名 URL 模式 | 误报 | 审计研究文档对 test_asr.py 事故的描述性引用(仅模式名叙述,无值) |
 | 12 | .planning/codebase/CONCERNS.md:58 | `OSSAccessKeyId=` 签名 URL 模式 | 误报 | 同 #11,修复建议叙述 |
 | 13 | .planning/research/PITFALLS.md:250 | `OSSAccessKeyId=` 签名 URL 模式 | 误报 | 研究文档红线示例引用(叙述"不得复制值本体"的规则本身),无值 |
-| 14 | scripts/test_asr.py:80 | `OSSAccessKeyId=` 签名 URL 模式 | 确认 | DEFAULT_FILE_LINK 常量赋值行符合签名 URL 模式(值本体略,per CHARTER 秘密红线);:78 行内注释自认"OSS 签名 URL 会过期"——过期预签名 URL 曾入库先例的核实对象 → 深挖线索(03-06 test_asr 普审,HYP-07) |
-| 15 | scripts/test_asr.py:80 | `Signature=` 签名参数模式 | 确认 | 与 #14 同一行同时命中签名参数模式(值本体略)→ 深挖线索(03-06 test_asr 普审,HYP-07) |
+| 14 | scripts/test_asr.py:80 | `OSSAccessKeyId=` 签名 URL 模式 | 确认 | DEFAULT_FILE_LINK 常量赋值行符合签名 URL 模式(值本体略,per CHARTER 秘密红线);:78 行内注释自认"OSS 签名 URL 会过期"——03-06 核实结论:入库先例证实 → F-TOOL-05(MEDIUM,"已过期凭证曾入库"锚;HYP-07 证实,回填见 HYPOTHESES.md) |
+| 15 | scripts/test_asr.py:80 | `Signature=` 签名参数模式 | 确认 | 与 #14 同一行同时命中签名参数模式(值本体略)→ F-TOOL-05(与 #14 同一去向,03-06 核实) |
 | 16 | apps/fc/shared/fc_shared/env.py:52 | app_secret 赋值模式 | 误报 | dataclass 字段类型声明(`wx_app_secret: str`),标识符非值 |
 | 17 | apps/fc/shared/fc_shared/env.py:148 | app_secret 赋值模式 | 误报 | 从环境变量 WX_APP_SECRET 读取的代码行,无字面量值 |
 | 18 | docs/runbook/fc-deploy.md:309 | app_secret 赋值模式 | 误报 | runbook 环境变量清单的尖括号占位符行,无实际值 |
