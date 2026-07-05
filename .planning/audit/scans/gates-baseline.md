@@ -36,7 +36,7 @@ Found 1 error in 1 file (checked 67 source files)
 uv run ruff check   # 直调,不经 make;实跑加 --frozen 防 lock 更新
 ```
 
-**结果:exit=1,Found 89 errors(43 fixable)**。命中文件分布注记:全部 89 条落在 `docs/example/start-fc-main/`(vendored 外部仓库,80 条)、`scripts/test_asr.py`(6 条)、`scripts/ralph/`(3 条),80 + 6 + 3 = 89 ✓——被审三层主体代码(apps/)零命中;裸跑 `ruff check` 无路径参数时扫描范围覆盖 CHARTER 扫描排除清单内目录,该现象本身是 TOOL 维度观察点(Makefile lint 目标的实际调用口径待 03-06 静读核对),此处只存档不判断。
+**结果:exit=1,Found 89 errors(43 fixable)**。命中文件分布注记:全部 89 条落在 `docs/example/start-fc-main/`(vendored 外部仓库,80 条)、`scripts/test_asr.py`(6 条)、`scripts/ralph/`(3 条),80 + 6 + 3 = 89 ✓——被审三层主体代码(apps/)零命中;裸跑 `ruff check` 无路径参数时扫描范围覆盖 CHARTER 扫描排除清单内目录,该现象本身是 TOOL 维度观察点(Makefile lint 目标的实际调用口径待 03-06 静读核对),此处只存档不判断。——03-06 静读结论:lint 目标实际调用 `ruff check apps/`(`Makefile:167 @ 5927f36`),范围限定使 vendored/scripts 裸跑违例不入门禁,差异系调用口径而非配置;scripts/ 排除为注释自认(`Makefile:166`),证据面归 HYP-25 移交(HANDOFF-PHASE4.md TEST 节)。
 
 **完整输出:**
 
@@ -1081,13 +1081,13 @@ git diff --stat 5927f36 -- apps/ scripts/ docs/
 
 | # | 命中(path:line @ 5927f36) | 规则/模式 | 销号 | 理由/去向 |
 |---|---------------------------|-----------|------|-----------|
-| 1 | apps/fc/shared/app.py:14 | mypy import-not-found | 确认 | `from handler import handler` 系部署态导入(handler.py 仅在部署 zip 内与 app.py 同目录),仓内直调 mypy 必 exit=1——strict 门禁在仓内结构性不可绿,门禁实态与 Makefile typecheck 目标口径属真实工具链可疑点 → 深挖线索(03-06 Makefile/门禁普审;交叉 03-04 HYP-12 审 app.py 本体) |
-| 2 | scripts/test_asr.py:2 | UP009 | 确认 | 门禁规则集(E,F,I,UP,B)内真实违例;scripts/ 未纳入门禁保护面的实证 → 深挖线索(03-06 scripts 普审,HYP-25) |
-| 3 | scripts/test_asr.py:38 | E501 | 确认 | 同上,门禁规则集内真实违例(docstring 示例行 102 字符)→ 深挖线索(03-06 scripts 普审,HYP-25) |
-| 4 | scripts/test_asr.py:166 | B904 | 确认 | except 内 raise 未带 `from`,违反仓库既定异常链约定(CLAUDE.md "Chain exceptions")且属门禁 B 规则集 → 深挖线索(03-06 scripts 普审,HYP-25) |
-| 5 | scripts/test_asr.py:197 | E501 | 确认 | 同 #3,门禁规则集内真实违例 → 深挖线索(03-06 scripts 普审,HYP-25) |
-| 6 | scripts/test_asr.py:275 | E501 | 确认 | 同 #3 → 深挖线索(03-06 scripts 普审,HYP-25) |
-| 7 | scripts/test_asr.py:283 | E501 | 确认 | 同 #3 → 深挖线索(03-06 scripts 普审,HYP-25) |
+| 1 | apps/fc/shared/app.py:14 | mypy import-not-found | 确认 | `from handler import handler` 系部署态导入(handler.py 仅在部署 zip 内与 app.py 同目录),仓内直调 mypy 必 exit=1——strict 门禁在仓内结构性不可绿,门禁实态与 Makefile typecheck 目标口径属真实工具链可疑点 → 深挖线索(03-06 Makefile/门禁普审;交叉 03-04 HYP-12 审 app.py 本体);03-06 静读核实立 F-TOOL-06(`make typecheck` 结构性恒红,MEDIUM;app.py 本体 CODE 侧无发现,见 COVERAGE app.py 行) |
+| 2 | scripts/test_asr.py:2 | UP009 | 确认 | 门禁规则集(E,F,I,UP,B)内真实违例;scripts/ 未纳入门禁保护面的实证 → 深挖线索(03-06 scripts 普审,HYP-25);03-06 已核实并移交 HANDOFF-PHASE4.md TEST 节(HYP-25 状态不动) |
+| 3 | scripts/test_asr.py:38 | E501 | 确认 | 同上,门禁规则集内真实违例(docstring 示例行 102 字符)→ 深挖线索(03-06 scripts 普审,HYP-25);03-06 已核实并移交 HANDOFF-PHASE4.md TEST 节(HYP-25 状态不动) |
+| 4 | scripts/test_asr.py:166 | B904 | 确认 | except 内 raise 未带 `from`,违反仓库既定异常链约定(CLAUDE.md "Chain exceptions")且属门禁 B 规则集 → 深挖线索(03-06 scripts 普审,HYP-25);03-06 已核实并移交 HANDOFF-PHASE4.md TEST 节(HYP-25 状态不动) |
+| 5 | scripts/test_asr.py:197 | E501 | 确认 | 同 #3,门禁规则集内真实违例 → 深挖线索(03-06 scripts 普审,HYP-25);03-06 已核实并移交 HANDOFF-PHASE4.md TEST 节(HYP-25 状态不动) |
+| 6 | scripts/test_asr.py:275 | E501 | 确认 | 同 #3 → 深挖线索(03-06 scripts 普审,HYP-25);03-06 已核实并移交 HANDOFF-PHASE4.md TEST 节(HYP-25 状态不动) |
+| 7 | scripts/test_asr.py:283 | E501 | 确认 | 同 #3 → 深挖线索(03-06 scripts 普审,HYP-25);03-06 已核实并移交 HANDOFF-PHASE4.md TEST 节(HYP-25 状态不动) |
 | 8 | scripts/ralph/dashboard.py:7 | I001 | 误报 | CHARTER 排除清单 #2(scripts/ralph/ 为 agent 元工具,非部署/验证工具链审计对象);存在级问题已按 D-09 口径另行承接 |
 | 9 | scripts/ralph/ralph.py:6 | I001 | 误报 | 同 #8,排除清单 #2 |
 | 10 | scripts/ralph/ralph.py:210 | F541 | 误报 | 同 #8,排除清单 #2 |
