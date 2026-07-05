@@ -32,15 +32,15 @@ Requirements for this milestone's audit report. Each maps to roadmap phases.
 
 ### 报告组装 (RPT)
 
-- [ ] **RPT-01**: 一页执行摘要:审计缘由、范围、按严重度的发现计数、总体上线判定
-- [ ] **RPT-02**: 发现汇总表(ID、严重度、维度、标题、工作量),按严重度再按工作量排序 — 即修复里程碑的 backlog
-- [ ] **RPT-03**: 每个发现附 BLOCKER / PRE-LAUNCH / POST-LAUNCH 上线阻断判定(严重度≠紧迫度)
-- [ ] **RPT-04**: 修复工作包:发现按共同修复位置分组、按影响÷工作量排序、标注工作包间依赖,可直接作为修复里程碑的阶段清单
-- [ ] **RPT-05**: "Do NOT fix" 登记表:核实过的故意设计(`issue-cedential` 在用域名、`whisper-local` 桩、handler mypy 豁免等),标注 `⚠ intentional — do not "fix"`
-- [ ] **RPT-06**: 优点盘点章节:刻意为之且正确的设计(MaskedSecret、单键 STS、`.done` 状态机等),防止修复里程碑误"优化"
-- [ ] **RPT-07**: 分维度置信声明:每个维度审到多深、哪些区域仅轻度覆盖
+- [x] **RPT-01**: 一页执行摘要:审计缘由、范围、按严重度的发现计数、总体上线判定
+- [x] **RPT-02**: 发现汇总表(ID、严重度、维度、标题、工作量),按严重度再按工作量排序 — 即修复里程碑的 backlog
+- [x] **RPT-03**: 每个发现附 BLOCKER / PRE-LAUNCH / POST-LAUNCH 上线阻断判定(严重度≠紧迫度)
+- [x] **RPT-04**: 修复工作包:发现按共同修复位置分组、按影响÷工作量排序、标注工作包间依赖,可直接作为修复里程碑的阶段清单
+- [x] **RPT-05**: "Do NOT fix" 登记表:核实过的故意设计(`issue-cedential` 在用域名、`whisper-local` 桩、handler mypy 豁免等),标注 `⚠ intentional — do not "fix"`
+- [x] **RPT-06**: 优点盘点章节:刻意为之且正确的设计(MaskedSecret、单键 STS、`.done` 状态机等),防止修复里程碑误"优化"
+- [x] **RPT-07**: 分维度置信声明:每个维度审到多深、哪些区域仅轻度覆盖
 - [ ] **RPT-08**: 可追溯映射表:发现 ↔ CONCERNS.md 线索 ↔ 本里程碑需求,含各维度"已检查,无发现"显式记录
-- [ ] **RPT-09**: 报告语言为中文正文 + 英文 ID/严重度术语(与仓库中文注释习惯一致)
+- [x] **RPT-09**: 报告语言为中文正文 + 英文 ID/严重度术语(与仓库中文注释习惯一致)
 
 ## v2 Requirements
 
@@ -83,15 +83,15 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AUDIT-03 | Phase 4 | Complete |
 | AUDIT-04 | Phase 4 | Complete |
 | AUDIT-05 | Phase 4 | Complete |
-| RPT-01 | Phase 5 | Pending |
-| RPT-02 | Phase 5 | Pending |
-| RPT-03 | Phase 5 | Pending |
-| RPT-04 | Phase 5 | Pending |
-| RPT-05 | Phase 5 | Pending |
-| RPT-06 | Phase 5 | Pending |
-| RPT-07 | Phase 5 | Pending |
+| RPT-01 | Phase 5 | Complete |
+| RPT-02 | Phase 5 | Complete |
+| RPT-03 | Phase 5 | Complete |
+| RPT-04 | Phase 5 | Complete |
+| RPT-05 | Phase 5 | Complete |
+| RPT-06 | Phase 5 | Complete |
+| RPT-07 | Phase 5 | Complete |
 | RPT-08 | Phase 5 | Pending |
-| RPT-09 | Phase 5 | Pending |
+| RPT-09 | Phase 5 | Complete |
 
 **Coverage:**
 
