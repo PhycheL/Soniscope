@@ -39,7 +39,9 @@
 - **来源:** CONCERNS.md §Tech Debt / Pure-JS SHA-256 on the recording thread
 - **假设:** `apps/miniprogram/utils/sha256.js` 为纯 JS 实现并在主线程对完整音频字节哈希(最长 10 分钟分片),在低端设备上会造成 UI 卡顿,且与 AGENTS.md 的 wasm-crypto 处方不符。
 - **待验证维度:** CODE
-- **状态:** 未验证
+- **状态:** 细化 — "纯 JS 实现 + 主线程全量字节同步哈希"半句证实(静态主判据);"低端设备 UI 卡顿"半句获微基准方向性支持但未经真机验证(Mac 环境非真机,量级参考);"与 wasm-crypto 处方不符"半句属实但系 docstring 自述的本期取舍而非未声明漂移。
+- **证据:** 静态主判据:`apps/miniprogram/utils/sha256.js:9-18,66-135 @ 5927f36`(手写 K 表 + hashWords 同步实现,无任何异步/分块让出;padding 阶段整段复制输入 `:76-77`,峰值内存约 2× 音频字节)、`apps/miniprogram/pages/index/index.js:30,640 @ 5927f36`(调用链:require → 主线程 `sha256Hex(buf)`,输入为 readFileSync 全量音频字节;单条 `:630-645`、长录音逐片 `:582`)、数据量级 = 600 s 分片阈值下典型 ≈10 MB、上限 50 MB(`apps/miniprogram/config.js` 阈值 + FC MAX_UPLOAD_BYTES);取舍自述 `sha256.js:4-5 @ 5927f36`("本期先用纯 JS……wasm 化属后续性能优化")。微基准辅助证据(**Mac 环境非真机,量级参考**):`scans/microbench-sha256.md`——10 MiB 中位 136.5 ms、50 MiB 中位 682.7 ms(≈73 MB/s,O(n) 线性),真机低端设备按引擎差距推断进入秒级可感知卡顿区间。
+- **备注:** 性能面不立独立发现:docstring 自述本期纯 JS 取舍(wasm 属后续优化),失败模式为保存路径 UI 卡顿而非数据丢失,个人单用户 MVP 语境(D-10)下属可辩护取舍——记 RPT-06/加固候选(wasm-crypto 或分块异步化),不占发现 ID(D-12);正确性有测试锁定(`apps/miniprogram/test/ids.test.js:139-163 @ 5927f36`,已知向量 + node crypto 随机字节对照)。与 D14-1(sha256 跨语言双实现债务)分立判断:本条裁性能疑点,重复实现债务的三要素裁定见 COVERAGE 深挖点登记 D14-1 行(结论:结构必然,不构成债务)。03-07 回填(D-16 微基准)。
 
 ### HYP-04: FC deploy tooling only supports code updates
 
@@ -243,4 +245,4 @@
 
 ---
 
-*未验证假设清单: 2026-07-04(25 条 HYP + 1 条 Known Bugs 显式无线索记录;对账 25 + 4 DNF = 29,Phase 4 AUDIT-05 逐条回填)。回填进度:已回填 13 条(03-03:HYP-10 证实、HYP-16 细化、HYP-19 证实;03-04:HYP-01 证实、HYP-08 细化、HYP-09 证实、HYP-12 证实、HYP-17 证实、HYP-20 证实;03-05:HYP-04 证实、HYP-15 细化;03-06:HYP-07 证实、HYP-18 细化,2026-07-05),余 12 条未验证(Phase 3 回填集 14 条中仅余 HYP-03 留待 03-07 微基准;TOOL 维度 4 条全部闭环;其余 11 条属 Phase 4 维度)。*
+*未验证假设清单: 2026-07-04(25 条 HYP + 1 条 Known Bugs 显式无线索记录;对账 25 + 4 DNF = 29,Phase 4 AUDIT-05 逐条回填)。回填进度:已回填 14 条(03-03:HYP-10 证实、HYP-16 细化、HYP-19 证实;03-04:HYP-01 证实、HYP-08 细化、HYP-09 证实、HYP-12 证实、HYP-17 证实、HYP-20 证实;03-05:HYP-04 证实、HYP-15 细化;03-06:HYP-07 证实、HYP-18 细化;03-07:HYP-03 细化,2026-07-05)——Phase 3 回填集 14 条(CODE 10:HYP-01/03/08/09/10/12/16/17/19/20 + TOOL 4:HYP-04/07/15/18)累计 14/14 全部闭环 ✓;余 11 条未验证(均属 Phase 4 维度:DOC 6 + TEST 4 + CON 1)。*
