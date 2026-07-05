@@ -1,8 +1,8 @@
 ---
 phase: 2
 slug: contract-extraction-drift
-status: draft
-nyquist_compliant: false
+status: planned
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-07-04
 ---
@@ -38,7 +38,16 @@ created: 2026-07-04
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| (filled by planner) | — | — | CONTRACT-01..04 | — | N/A (audit report phase — no product code changes) | manual/harness | see RESEARCH.md harness (git archive export + repo .venv + node) | ✅ | ⬜ pending |
+| 02-01-T1 | 02-01 | 1 | CONTRACT-01 | T-02-01/02 | 证据仅 path:line + 模式名,零 diff | doc check | `grep -o '@ 5927f36' .planning/audit/CONTRACT-MATRIX.md \| wc -l` ≥ 12 且 `git diff --stat 5927f36 -- apps/ scripts/ docs/` 为空 | ✅ | ⬜ pending |
+| 02-01-T2 | 02-01 | 1 | CONTRACT-01 | T-02-01/02 | 同上 | doc check | `grep -c 'x-oss-meta-' CONTRACT-MATRIX.md` ≥ 7 且引用总数 ≥ 30 | ✅ | ⬜ pending |
+| 02-02-T1 | 02-02 | 2 | CONTRACT-01 | T-02-01/02 | 同上 | doc check | 9 个错误码/reason 字符串逐一 grep 命中 | ✅ | ⬜ pending |
+| 02-02-T2 | 02-02 | 2 | CONTRACT-01 | T-02-01/02 | 同上 | doc check | 4 个镜像常量标识符 grep 命中 | ✅ | ⬜ pending |
+| 02-02-T3 | 02-02 | 2 | CONTRACT-03 | T-02-01/02 | 扫描输出入档前过目 | doc check | `grep -c 'git grep' CONTRACT-MATRIX.md` ≥ 5 + 移交/无新发现行命中 | ✅ | ⬜ pending |
+| 02-03-T1 | 02-03 | 3 | CONTRACT-02 | T-02-03/04 | 基线导出 + __file__ 断言 + 零云 IO | harness + doc check | `grep -c '^\| S-' CONTRACT-MATRIX.md` ≥ 11 + status 仅 .planning/ | ✅ | ⬜ pending |
+| 02-03-T2 | 02-03 | 3 | CONTRACT-02 | T-02-03/04 | 显式 TZ,样本全合成 | harness + doc check | TZ=Asia/Shanghai 与 TZ=America/New_York 记录 grep 命中 | ✅ | ⬜ pending |
+| 02-04-T1 | 02-04 | 4 | CONTRACT-02 | T-02-01/05 | 九字段留痕,DNF 负面清单前置 | doc cross-check | `grep -c '^### F-CON-' findings/contract.md` ≥ 1 + HYP-13/Postel 命中 | ✅ | ⬜ pending |
+| 02-04-T2 | 02-04 | 4 | CONTRACT-04 | T-02-02 | 纯纸面设计,零 diff | doc check | RECIPE 存在(含 S-NN + make test)或矩阵含"无需配方" | ✅ | ⬜ pending |
+| 02-04-T3 | 02-04 | 4 | CONTRACT-01..04 | T-02-02/05 | 零 diff 记录 + 机械对账 | smoke + doc check | `git diff --stat 5927f36 -- apps/ scripts/ docs/` 为空 + 对账行命中 | ✅ | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -61,11 +70,11 @@ Existing infrastructure covers all phase requirements. This phase produces audit
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 90s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references (none — no test infra needed, per RESEARCH)
+- [x] No watch-mode flags
+- [x] Feedback latency < 90s (all doc checks < 5s)
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** approved by planner 2026-07-05 (10 tasks mapped across 4 plans)
