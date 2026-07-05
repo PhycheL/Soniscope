@@ -183,7 +183,95 @@ git grep -n '600' 5927f36 -- apps/fc/ apps/worker/src/   # FC/Worker 侧 600s �
 
 ## 重复逻辑普查
 
-*(02-02 填)*
+> CONTRACT-03,D-13 双保险:① 候选清单 9 项逐项核实 + ② `git grep` 基线系统扫描存档。命中处理规则(D-14 / Pitfall 7):实现代码命中且承载契约 → 矩阵新行(行 49-51);测试目录(`apps/miniprogram/test/`、`apps/worker/tests/`、`apps/fc/tests/`)命中 → 不占列,记为对应矩阵格"测试锁定"辅助证据;"重复实现本身是否构成技术债"不在 CON 维度判断,逐点移交 Phase 3 CODE 维度(③ 移交记录)。
+
+### ① 候选清单逐项核实(9 项,D-13 + RESEARCH 定位表)
+
+| # | 候选 | 核实证据 @ 5927f36 | 结论(新行 / 指针 / 已检查无新发现) |
+|---|------|--------------------|--------------------------------------|
+| 1 | sha256 | 小程序纯 JS SHA-256:`apps/miniprogram/utils/sha256.js:1,138-143 @ 5927f36`(手写算法,调用端 `pages/index/index.js:30,640 @ 5927f36`);Worker stdlib:`apps/worker/src/soniscope_worker/fixtures.py:21,118 @ 5927f36`(hashlib)+ `poller.py:26,251 @ 5927f36`(下载后比对流程) | **指针** — 契约值语义(`x-oss-meta-sha256` hex digest)已由组① 行 13 对照覆盖;算法级跨语言重复实现(手写 SHA-256 vs stdlib hashlib)确认存在 → 移交 D14-1(挂 **HYP-03**:主线程纯 JS 哈希性能疑点) |
+| 2 | 日期格式 `YYYY-MM-DD` | `audio.js:63-67 @ 5927f36`(objectKeyDate 本地时区)vs `sts.py:54,59` / `oss_admin.py:45,50 @ 5927f36`(fragment_id 前缀拼接)已入组① 行 3/4;`poller.py:64-66 @ 5927f36` `date_of` 经核实为 `object_key_for(fragment_id).split("/")[1]` **复用单一来源派生**,非独立实现;`ops.py:64-68 @ 5927f36` 为运维 CLI 入参校验(fromisoformat),不承载三方契约 | **已检查,无新发现**(指针:组① 行 3/4) |
+| 3 | ULID / fragment_id 生成 | `apps/miniprogram/utils/ulid.js:3-4 @ 5927f36`(注释自证 Crockford base32 ⊂ 正则 `[0-9A-Za-z]{26}`);FC/Worker 生产代码只解析不生成(组① 行 1/5) | **已检查,无新发现** — 生产链路生成端唯一;正则宽于 Crockford 字符集的宽严差异属 02-03 既定样本类别(组① 行 1 已覆盖格式对照)。联调工具存在合成 fragment_id 生成(见扫描 4 注记,归 D14-3) |
+| 4 | 错误码字符串 | 已入组② 行 35-41;普查新命中:`fc_live.py:42-44 @ 5927f36`(ERR_* 三码第二份字面定义)、`verify_upload_live.py:34-35 @ 5927f36`(REASON_* 第三份字面定义);`e2e_scenarios.py:32-33 @ 5927f36` 从 fc_live 导入(消费端非独立副本) | **新行** — 行 50(错误码镜像)、行 51(reason 镜像);移交 D14-3 |
+| 5 | 重试表 | 已入组③ 行 44-45(nls.py / uploader.js / verify.js 三份常量,JS 两份独立) | **指针**(组③ 行 44-45);移交 D14-2 |
+| 6 | 大小上限 | 已入组③ 行 46;普查新命中:`fc_live.py:57-59 @ 5927f36`(SIZE_OK_BYTES=10MB / SIZE_EXCEEDED_BYTES=60MB,注释自证隐式编码"50MB 上限"假设) | **指针**(组③ 行 46)— fc_live 命中为隐式假设非字段级契约,记为行 46 辅助线索;移交 D14-3 |
+| 7 | HMAC / OSS V4 签名 | `apps/miniprogram/utils/hmac.js` + `utils/oss_sign.js @ 5927f36` 为小程序侧唯一手写实现;Worker/FC 侧签名由 OSS SDK 内置(`poller.py` RealOssSource / `head.py:102-136 @ 5927f36` RealObjectHeader 均走 alibabacloud-oss-v2) | **已检查,无新发现** — 签名协议的对手方是 OSS 服务端而非三方互相,无跨语言重复实现(n/a 素材) |
+| 8 | 配置解析 | 三种机制解析同族值:Worker `config.py`(pydantic + config.yaml)vs 小程序 `config.js:10-15,22-26 @ 5927f36`(硬编码常量模块)vs FC `env.py @ 5927f36`(环境变量)。同族值(region/bucket/endpoint/URL)在 Worker/FC 侧存于运行时配置(yaml/env),不在基线代码内 | **已检查,无新发现**(静态层面无可逐字段对照的代码内值重复;唯一代码内值为 config.js 硬编码侧)— "三机制并存 + 单侧硬编码"配置管理线索移交 D14-5 |
+| 9 | 第四处 key 反推 | `upload_queue.js:38-44 @ 5927f36` `fragmentIdFromObjectKey` — 02-01 已落组① 行 5(小程序格 diverge) | **指针**(组① 行 5);移交 D14-6。另核实:小程序 FC 请求组装在 utils(`queue_runtime.js:94-108,110-128 @ 5927f36`)与 pages(`uploads.js:340,365 @ 5927f36`)存在两份同构实现 → 移交 D14-4 |
+
+### 普查命中矩阵新行(行 49-51,D-14)
+
+| 契约要素 | FC (fc_shared) | Worker | 小程序 (utils) | 判定 |
+|----------|----------------|--------|----------------|------|
+| 49. issue-credential 响应 7 字段名清单(联调工具第三份字面清单) | agree `sts.py:106-114 @ 5927f36`(credential_response 组装即字段名权威来源) | agree `apps/worker/src/soniscope_worker/fc_live.py:47-55 @ 5927f36`(`CREDENTIAL_FIELDS` 元组,7 字段名逐字符一致;`fc_live.py:41 @ 5927f36` 注释自证"与 fc_shared 保持一致,避免跨包导入"——文档化的故意重复)——注意:此为 Worker 侧**联调工具**,非业务流水线;组② 行 19-25 Worker 列 n/a 裁决不变 | agree `uploader.js:17-25 @ 5927f36`(`CREDENTIAL_FIELDS`,`uploader.js:16 @ 5927f36` 注释自证"与 fc_live.CREDENTIAL_FIELDS 一致") | 待判定 |
+| 50. FC 错误码字符串镜像(联调工具第二份字面定义,3/7 码) | agree `errors.py:13,14,16 @ 5927f36`(INVALID_CODE / OPENID_NOT_ALLOWED / SIZE_EXCEEDED 定义端) | agree `fc_live.py:42-44 @ 5927f36`(ERR_INVALID_CODE / ERR_OPENID_NOT_ALLOWED / ERR_SIZE_EXCEEDED,值逐字符一致;消费端 `e2e_scenarios.py:32-33,210,228 @ 5927f36` 断言) | n/a — 小程序实现代码零字面量,裁决见组② 行 35-41(本行对照对象是 Worker 侧工具镜像) | 待判定 |
+| 51. verify reason 字符串镜像(第三份字面定义) | agree `errors.py:23-24 @ 5927f36`(定义端) | agree `verify_upload_live.py:34-35 @ 5927f36`(REASON_OBJECT_NOT_FOUND / REASON_SIZE_MISMATCH,值逐字符一致,断言端 :158,181) | agree `verify.js:20-21 @ 5927f36`(同组② 行 42-43,常量命名与 Worker 工具侧同构 REASON_*) | 待判定 |
+
+### ② 系统扫描存档(5 条命令,输出摘要 + 命中计数)
+
+扫描范围 `apps/` 全树;计数按"实现命中"(生产 + 工具代码)与"测试命中"(三个测试目录)分栏,per Pitfall 7。
+
+```bash
+# 扫描 1:key / meta / fragment 族
+git grep -nE 'recordings/|x-oss-meta|fragment_?[iI]d|object_?[kK]ey' 5927f36 -- apps/
+# → 总命中 954(实现 618 / 测试 336)。实现命中 39 个文件逐一核查:FC 6 文件与小程序
+#   utils 11 文件均已被组①/组② 行覆盖或为编排/展示层消费端(pages/*.js/wxml);Worker 18
+#   文件中业务流水线(poller/oss_admin/manifest/pipeline/recovery/retranscribe/locks 等)已被
+#   组① 覆盖,联调工具族(fc_live/verify_upload_live/e2e/e2e_scenarios/sts_escape/ops/
+#   verify_prep/cli)命中收敛为行 49-51 与 D14-3。无其他新发现。
+
+# 扫描 2:sha256 族
+git grep -nE 'sha256|SHA-?256' 5927f36 -- apps/
+# → 总命中 295(实现 172 / 测试 123)。实现命中即候选 1 的两侧实现 + 组① 行 13 触点;
+#   排除项:fc_deploy.py:181,442(部署包指纹,非音频契约);hmac.js/oss_sign.js(签名族,
+#   候选 7)。无新发现。
+
+# 扫描 3:重试与大小数值族
+git grep -nE '\b(5000|15000|45000)\b|\b(5\.0|15\.0|45\.0)\b|52428800' 5927f36 -- apps/
+# → 总命中 30(实现 8 / 测试 22)。实现命中逐条:env.py:41、uploader.js:28、verify.js:16、
+#   nls.py:45(均已入组③ 行 44-46);无关值 4 条人工排除:nls.py:53(NLS 轮询间隔)、
+#   poller.py:43(扫描容差)、retranscribe.py:419(文档样例)、verify_prep.py:88(轮询间隔)。
+#   测试命中含 uploader.test.js:55,112 / verify.test.js:54 等(组③ 行 44-45 测试锁定)与
+#   test_issue_credential.py:142,151(行 46 测试锁定)。无新发现。
+
+# 扫描 4:日期格式函数族
+git grep -nE 'YYYY-MM-DD|toISOString|isoformat|strftime|getTimezoneOffset' 5927f36 -- apps/
+# → 总命中 34(实现 33 / 测试 1)。契约承载命中已由组① 行 3/4/15 与候选 2 覆盖
+#   (audio.js:63,77,103、sts.py:49、oss_admin.py:38、poller.py:65);其余人工排除:CLI 帮助
+#   文本与运维入参(cli.py、ops.py、e2e.py、retranscribe.py)、部署时间戳(fc_deploy.py:463)、
+#   transcript/expiration 时间戳(pipeline.py:88、nls.py:251、verify_prep.py:656,718)、
+#   oss_sign.js:37(policy 过期 UTC,组③ 行 48)。注记:联调工具合成 fragment_id 时间前缀
+#   (fc_live.py:256、verify_upload_live.py:201,strftime("%Y%m%dT%H%M%S") 与契约前缀格式
+#   一致)→ 工具侧生成仅影响联调,不拆新行,归 D14-3 集群。
+
+# 扫描 5:错误码字符串族
+git grep -nE 'INVALID_CODE|OPENID_NOT_ALLOWED|SIZE_EXCEEDED|INVALID_REQUEST|OBJECT_NOT_FOUND|SIZE_MISMATCH|SERVER_MISCONFIGURED|STS_ISSUE_FAILED|HEAD_OBJECT_FAILED' 5927f36 -- apps/
+# → 总命中 234(实现 135 / 测试 99)。实现命中文件分布:fc_shared 族 + 两 handler(定义与
+#   raise,组② 行 35-43)、verify.js:6 / uploader.js:1 / queue_runtime.js:1 / uploads.js:1
+#   (组② 已裁决:注释/mock,非分支字面量)、联调工具 fc_live.py:24 / verify_upload_live.py:20 /
+#   e2e_scenarios.py:9 / cli.py:3 → 新发现即行 50/51。
+```
+
+### ③ 债务移交记录(D-14 → Phase 3 CODE 维度)
+
+每点仅记线索,债务与否由 Phase 3 判定:
+
+- **D14-1(移交 Phase 3):** sha256 跨语言双实现——小程序手写纯 JS 算法(`sha256.js`)vs Worker stdlib hashlib;关联 **HYP-03**(主线程哈希性能)。
+- **D14-2(移交 Phase 3):** 重试节奏三份常量(`nls.py:45` / `uploader.js:28` / `verify.js:16`)+ Worker `MAX_RETRIES = 3` 独立字面量与延时表长度无结构绑定(JS 侧为 `.length` 派生)——同一约定四处落点。
+- **D14-3(移交 Phase 3):** 联调工具契约镜像集群——`fc_live.py`(7 字段清单 :47-55、3 错误码 :42-44、50MB 隐式假设 :57-59、合成 fragment_id :256)、`verify_upload_live.py`(2 reason :34-35、合成 fragment_id :201)、`e2e_scenarios.py`(导入消费):契约变更需同步更新工具侧,当前靠注释约定("与 fc_shared 保持一致")无测试兜底。
+- **D14-4(移交 Phase 3):** 小程序 FC 请求组装两份同构实现——utils `queue_runtime.js:94-128` 与 pages `uploads.js:340,365`。
+- **D14-5(移交 Phase 3):** 配置三机制并存(pydantic yaml / env 解析 / 硬编码常量模块),小程序侧 `config.js:10-15` 为唯一代码内硬编码真实云值。
+- **D14-6(移交 Phase 3):** key → fragment_id 反推第四处实现 `upload_queue.js:38-44`(`fragmentIdFromObjectKey`,无校验字符串切割;语义对照已在组① 行 5,小程序格 diverge)。
+- **(移交 Phase 4 DOC,指针):** CLAUDE.md 错误码分支声明与实态不符——已在组② 行 35-41 行下注记录。
+
+### ④ 完成判定(机械对账,CONTRACT-03 可复核收口)
+
+- 扫描命令条数:**5**(上节 fenced bash 逐条存档,均可重放:`git grep ... 5927f36 -- apps/`)
+- 总命中数:954 + 295 + 30 + 34 + 234 = **1547**(实现 618 + 172 + 8 + 33 + 135 = **966**;测试 336 + 123 + 22 + 1 + 99 = **581**;逐条分栏见各命令注释,复算:966 + 581 = 1547 ✓)
+- 进矩阵新行数:**3**(行 49-51)
+- 候选清单 9 项三态分布:新行 **1** 项(候选 4)+ 指针 **4** 项(候选 1/5/6/9)+ 已检查无新发现 **4** 项(候选 2/3/7/8);1 + 4 + 4 = 9 ✓
+- 测试辅助证据("测试锁定"格内括注)数:本计划(02-02)新增 **6** 处(组② 行 35、行 42 各 1,组③ 行 44 两处、行 45、行 46 各 1);累计格内括注 = 02-01 的 7(组① 行 7-13)+ 02-02 的 6 = **13**;复算命令 `grep -o '测试锁定' .planning/audit/CONTRACT-MATRIX.md | wc -l` → **18**(= 13 格内 + 5 处非格内引用:普查规则句/扫描 3 存档注记×2/本行×2)
+- 矩阵行总数:组① 15 + 组② 28 + 组③ 5 + 普查 3 = **51 行**(主体三组 48 行,D-02 预估 30-50 区间内;普查新行为 D-14 增量)
 
 ## 往返校验结论
 
@@ -198,4 +286,4 @@ git grep -n '600' 5927f36 -- apps/fc/ apps/worker/src/   # FC/Worker 侧 600s �
 *(02-04 填)*
 
 ---
-*契约漂移矩阵: 2026-07-05(组① OSS 数据面 15 行全部落格:key 族 6 行 + 元数据 9 行;判定列待 02-04 回填)*
+*契约漂移矩阵: 2026-07-05(组① 15 行 + 组② 28 行 + 组③ 5 行 + 普查新行 3 行 = 51 行落格;普查 5 命令存档、9 候选核实、D14-1~6 移交;判定列待 02-04 回填,往返校验待 02-03)*
