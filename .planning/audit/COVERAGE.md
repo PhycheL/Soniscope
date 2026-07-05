@@ -43,39 +43,39 @@
 | `apps/worker/src/soniscope_worker/locks.py` | 64 | CODE | 普审 | 9/9 | 无发现 | flock advisory 排他锁按 fragment 粒度,跨进程互斥(主轮询 vs retranscribe)语义与 §3.7 一致;锁文件 0 字节不参与恢复扫描(docstring 明示 by-design);获取失败路径(LOCK_NB → LockBusyError)与 fd 关闭(finally)完整 |
 | `apps/worker/src/soniscope_worker/__main__.py` | 11 | CODE | 普审 | 9/9 | 无发现 | 纯入口委托 cli.app,无逻辑面 |
 | `apps/worker/src/soniscope_worker/__init__.py` | 7 | CODE | 普审 | 9/9 | 无发现 | 仅 `__version__ = "0.1.0"`;docstring "US-001 仅建立骨架"措辞滞后(face7 轻微),不立发现 |
-| `apps/fc/shared/fc_shared/sts.py` | 176 | CODE | 待审 | 待审 | 待审 | 深挖:HYP-09/17(单键策略核实);DNF-04 对照 |
-| `apps/fc/shared/fc_shared/env.py` | 150 | CODE | 待审 | 待审 | 待审 | 深挖:HYP-08 |
-| `apps/fc/shared/fc_shared/head.py` | 141 | CODE | 待审 | 待审 | 待审 | — |
-| `apps/fc/issue_credential/handler.py` | 110 | CODE | 待审 | 待审 | 待审 | 深挖:HYP-17(无限流);DNF-03 对照(mypy 豁免勿当发现) |
-| `apps/fc/verify_upload/handler.py` | 106 | CODE | 待审 | 待审 | 待审 | DNF-03 对照 |
-| `apps/fc/shared/fc_shared/__init__.py` | 106 | CODE | 待审 | 待审 | 待审 | — |
-| `apps/fc/shared/fc_shared/http.py` | 79 | CODE | 待审 | 待审 | 待审 | — |
-| `apps/fc/shared/fc_shared/audit.py` | 62 | CODE | 待审 | 待审 | 待审 | 深挖:HYP-08(is_sensitive 洗涤核实) |
-| `apps/fc/shared/fc_shared/wechat.py` | 52 | CODE | 待审 | 待审 | 待审 | — |
-| `apps/fc/shared/fc_shared/auth.py` | 52 | CODE | 待审 | 待审 | 待审 | 深挖:HYP-09 |
-| `apps/fc/shared/fc_shared/errors.py` | 51 | CODE | 待审 | 待审 | 待审 | D14 关联(错误码字面量真值源) |
-| `apps/fc/shared/app.py` | 35 | CODE | 待审 | 待审 | 待审 | 深挖:HYP-12(wsgiref;S104 bind-all 探针命中待人工核实) |
-| `apps/miniprogram/pages/index/index.js` | 796 | CODE | 待审 | 待审 | 待审 | D14-1(sha256 调用端 :30,640) |
-| `apps/miniprogram/pages/uploads/uploads.js` | 387 | CODE | 待审 | 待审 | 待审 | D14-4(请求组装第二份 :340,365) |
-| `apps/miniprogram/utils/queue_runtime.js` | 324 | CODE | 待审 | 待审 | 待审 | D14-4(请求组装 :94-128) |
-| `apps/miniprogram/utils/uploads_view.js` | 304 | CODE | 待审 | 待审 | 待审 | — |
-| `apps/miniprogram/utils/audio.js` | 185 | CODE | 待审 | 待审 | 待审 | HYP-13 相关(契约观察→移交) |
-| `apps/miniprogram/utils/sha256.js` | 171 | CODE | 待审 | 待审 | 待审 | 深挖:HYP-03 + D14-1(D-16 微基准对象) |
-| `apps/miniprogram/utils/uploader.js` | 164 | CODE | 待审 | 待审 | 待审 | D14-2(重试常量) |
-| `apps/miniprogram/utils/verify.js` | 138 | CODE | 待审 | 待审 | 待审 | D14-2 |
-| `apps/miniprogram/utils/fault_injection.js` | 124 | CODE | 待审 | 待审 | 待审 | HYP-14 顺带证据(→移交 Phase 4,D-11) |
-| `apps/miniprogram/utils/oss_sign.js` | 121 | CODE | 待审 | 待审 | 待审 | — |
-| `apps/miniprogram/utils/upload_queue.js` | 119 | CODE | 待审 | 待审 | 待审 | D14-6(`fragmentIdFromObjectKey` :38-44,关联 F-CON-03) |
-| `apps/miniprogram/utils/ulid.js` | 92 | CODE | 待审 | 待审 | 待审 | — |
-| `apps/miniprogram/utils/chunking.js` | 65 | CODE | 待审 | 待审 | 待审 | — |
-| `apps/miniprogram/utils/hmac.js` | 64 | CODE | 待审 | 待审 | 待审 | — |
-| `apps/miniprogram/pages/dev/dev.js` | 60 | CODE | 待审 | 待审 | 待审 | 小程序实为 3 页(index/uploads/dev,RESEARCH Pitfall 8);HYP-14 相关开发者页 |
-| `apps/miniprogram/utils/logger.js` | 60 | CODE | 待审 | 待审 | 待审 | — |
-| `apps/miniprogram/utils/device.js` | 60 | CODE | 待审 | 待审 | 待审 | — |
-| `apps/miniprogram/utils/retention.js` | 56 | CODE | 待审 | 待审 | 待审 | — |
-| `apps/miniprogram/utils/draft.js` | 52 | CODE | 待审 | 待审 | 待审 | — |
-| `apps/miniprogram/config.js` | 41 | CODE | 待审 | 待审 | 待审 | HYP-14/D14-5 顺带证据;DNF-02 对照(勿"修正"拼写域名) |
-| `apps/miniprogram/app.js` | 23 | CODE | 待审 | 待审 | 待审 | — |
+| `apps/fc/shared/fc_shared/sts.py` | 176 | CODE | 深挖 | 9/9 | 无发现 | 深挖 HYP-09/17:`single_key_policy`(`sts.py:62-73 @ 5927f36`)Resource 精确单 object key 无路径通配、仅 `oss:PutObject`,时效由 handler 固定传 `STS_MAX_DURATION_SECONDS = 900`(`sts.py:25 @ 5927f36`)——收窄程度与 docstring 红线(`:9-10`)一致;AssumeRole 失败不在本模块捕获,由 handler 统一收敛 500(见 handler 行)。DNF-04 对照:`credential_response`(`:102-114`)向小程序下发原始 STS 秘密系 by-design,负面清单排除不立发现;策略实现本身未见缺陷 |
+| `apps/fc/shared/fc_shared/env.py` | 150 | CODE | 深挖 | 9/9 | 无发现 | 深挖 HYP-08 采证(回填见 HYPOTHESES.md):三组必填变量仅存名字常量(`env.py:16-38 @ 5927f36`),缺失时 FcConfigError 只列变量名不含值(`:89-91,117-119,140-142`);秘密以普通 `str` 存 frozen dataclass(StsEnv/VerifyEnv/FcEnv,`:44-79`),无 Worker 侧 MaskedSecret 同等类型级掩码,防线在 log_event 字段名洗涤 + 调用纪律(docstring `:46,60-61,74-75` 明示"绝不进日志")——细化点入 HYP-08 回填,不立发现。`_parse_max_upload_bytes` 非法值静默回退默认 50MB(`:98-107`,face1 轻微:回退方向安全,无告警日志,不立发现) |
+| `apps/fc/shared/fc_shared/head.py` | 141 | CODE | 普审 | 9/9 | 无发现 | 错误分支完整性核查通过:404/NoSuchKey → `ObjectHead(exists=False)`(`head.py:127-130 @ 5927f36`),其余异常上抛由 handler 收敛 500;三态映射(`:42-55`)与 docstring 一致(仅校验存在性 + Content-Length,etag 只回传不比对,docstring `:9-10` 明示 HeadObject 无法校验 sha256);`_oss_error_code` 递归 unwrap 有终止条件(`:85-93`);读凭证仅入 SDK 参数不入日志/响应 |
+| `apps/fc/issue_credential/handler.py` | 110 | CODE | 深挖 | 9/9 | F-CODE-05 | 深挖 HYP-17:allowlist 之外无任何频控/配额——每个鉴权通过的 POST 触发一次 AssumeRole 无上限(`handler.py:71-81 @ 5927f36`),且每个匿名 POST 在鉴权前即触发一次 jscode2session 上游调用(pre-auth 成本面,`fc_shared/auth.py:50 @ 5927f36`)→ F-CODE-05。DNF-03 对照:mypy strict 豁免系显式工程取舍(pyproject 注释),负面清单排除不立发现(handler ruff-only)。秘密面:STS 签发失败统一 500,日志仅 reason=异常类名(`:82-93`)✓ |
+| `apps/fc/verify_upload/handler.py` | 106 | CODE | 普审 | 9/9 | 无发现 | DNF-03 对照:mypy 豁免同 issue_credential,负面清单排除不立发现。校验失败错误码路径完整:FcConfigError→500 SERVER_MISCONFIGURED(仅变量名)、FcHttpError→对应 4xx 稳定码、HeadObject 异常→500 HEAD_OBJECT_FAILED(仅异常类名)、业务三态走 200 响应体 reason(`handler.py:53-106 @ 5927f36`);无限流面与 issue-credential 同构,由 F-CODE-05 一并覆盖不重复立 |
+| `apps/fc/shared/fc_shared/__init__.py` | 106 | CODE | 普审 | 9/9 | 无发现 | re-export 门面无逻辑面;`__all__`(`__init__.py:56-106 @ 5927f36`)与实际导入一致,vendoring 部署形态在 docstring 明示 |
+| `apps/fc/shared/fc_shared/http.py` | 79 | CODE | 普审 | 9/9 | 无发现 | 错误路径统一 400 INVALID_REQUEST(空体/非法 JSON/非对象/缺字段,`http.py:54-79 @ 5927f36`),无静默分支;CONTENT_LENGTH 解析异常回退 0 → 按空体 400(`:56-59`);请求体无应用层大小上限,依托 FC 平台请求边界(face4 轻微,不立发现) |
+| `apps/fc/shared/fc_shared/audit.py` | 62 | CODE | 深挖 | 9/9 | 无发现 | 深挖 HYP-08(is_sensitive 洗涤覆盖面):精确名单 13 项(`audit.py:14-29 @ 5927f36`)+ 子串兜底 secret/token/appkey/api_key/session_key/password(`:31`),覆盖全部长期凭证与会话字段;边界:`ak_id`/`openid` 等非命中名不脱敏——现有调用点均只传 openid_hash(auth.py 组装)与安全标量,纪律依赖面作为细化点入 HYP-08 回填,不立发现;`hash_openid` sha256 前 16 位(`:35-37`)✓ |
+| `apps/fc/shared/fc_shared/wechat.py` | 52 | CODE | 普审 | 9/9 | 无发现 | 任意失败(网络/非 dict/无 openid)统一 401 INVALID_CODE,异常链不外传 code/secret(`wechat.py:41-51 @ 5927f36`);secret 经查询串传 jscode2session 系微信开放接口固有形态,URL 不入任何日志;`timeout=10` 显式(`:25`) |
+| `apps/fc/shared/fc_shared/auth.py` | 52 | CODE | 深挖 | 9/9 | 无发现 | 深挖 HYP-09 采证(回填见 HYPOTHESES.md):鉴权 = JSON 校验 → code 换 openid → allowlist 字符串成员判定(`auth.py:33-52 @ 5927f36`),无会话/无频控/无按用户隔离,与假设一致;AuthContext 提供 openid_hash 供日志(`:24-30`),openid 明文不出鉴权层 |
+| `apps/fc/shared/fc_shared/errors.py` | 51 | CODE | 普审 | 9/9 | 无发现 | D14-3 关联证据(D-15 只记不裁,供 03-07 裁定):稳定错误码字面量真值源 `errors.py:13-24 @ 5927f36`(7 个 HTTP 错误码 + 2 个 verify reason),小程序 JS 按同字符串分支、联调工具镜像同集群;FcHttpError payload 仅含稳定码 + 安全文案(`:34-43`),FcConfigError 只列变量名(`:46-51`) |
+| `apps/fc/shared/app.py` | 35 | CODE | 深挖 | 9/9 | 无发现 | 深挖 HYP-12:wsgiref `ThreadingWSGIServer`(daemon threads)为生产运行时(`app.py:17-31 @ 5927f36`),无请求上限/超时/HTTP 加固,健壮性依托 FC 网关边界——MVP 自评经 D-10 裁定成立,回填见 HYPOTHESES.md(RPT-06/DNF 候选)。S104 bind-all 销号确认项人工核实下落:容器内 `0.0.0.0` 监听(`:27`)为 FC 自定义运行时必需形态(平台网关为唯一公网入口,容器无直连面),不立发现,去向已回填 scans/ruff-extended.md #1 |
+| `apps/miniprogram/pages/index/index.js` | 796 | CODE | 深挖 | 9/9 | 无发现 | 深挖 D14-1 证据(D-15 只记不裁):sha256 调用端 `index.js:30 @ 5927f36`(require)与 `:640`(`sha256Hex(buf)`);主线程同步全量读文件 + 哈希于保存路径(`:630-645` 单条、`:582` 长录音逐片),数据量级 = 原始音频全字节(单片 mp3 ≤600s 常态、上限 50MB)。中断保护去重(`_interruptHandled` `:156-165`)、中断草稿即时落盘(`:325`)核查通过;`_computeOriginalSha256` 失败返回空串不阻断入队且有错误日志(`:629-645`,face1 受控降级,Worker 侧空 sha256 跳过比对);storage 读取 catch 回退安全;page=IO 层职责 by-design |
+| `apps/miniprogram/pages/uploads/uploads.js` | 387 | CODE | 深挖 | 9/9 | F-CODE-06(共证) | 深挖 D14-4 证据(只记不裁):FC 请求组装第二份 `uploads.js:330-345,347-370 @ 5927f36`(wx.request data 行 `:340`/`:365`),与 queue_runtime.js:94-128 同构。队列状态机漏态:自动驱动仅拾取 queued(`:126`)与 pending_verify(`:152`),`uploading` 残留无恢复路径 → F-CODE-06 共证。`_readQueue` catch 回退 [];自动清理仅删本地文件、保留队列记录与 OSS 对象(`:289-303`)红线核查通过 |
+| `apps/miniprogram/utils/queue_runtime.js` | 324 | CODE | 深挖 | 9/9 | F-CODE-06(共证) | 深挖 D14-4 证据(只记不裁):`queue_runtime.js:94-128 @ 5927f36` wxRequestSts/wxRequestVerify 与 uploads.js 同构两份,docstring(`:5-6`)自述"与 uploads 页保持一致、参照实现不改"——重复系已声明状态。`drive()` 仅拾取 queued/pending_verify(`:198,221`)→ F-CODE-06 主证。`:232` 残留脚手架注释 `PLACEHOLDER_PUBLIC`(face6 轻微,不立发现);isOnline 缺 getNetworkType 保守视为离线(`:62-81`) |
+| `apps/miniprogram/utils/uploads_view.js` | 304 | CODE | 普审 | 9/9 | F-CODE-06(共证) | `uploading` 不在 BACKLOG_STATUSES/MANUAL_RETRY_STATUSES/RE_VERIFY_STATUSES 任何可操作集合(`uploads_view.js:25-39 @ 5927f36`)——F-CODE-06 视图面证据(无手动出口、不计积压);纯函数视图模型,relativeDay 本地时区仅展示用途(face5 自洽) |
+| `apps/miniprogram/utils/audio.js` | 185 | CODE | 普审 | 9/9 | 无发现 | 契约观察移交(成功判据 4/D-11):fragment_id/object_key 派生与 `FRAGMENT_ID_RE`(`audio.js:95-106 @ 5927f36`)、本地时区日期段(`localDateParts` `:52-61`)已由 Phase 2 矩阵组① 覆盖(F-CON-01/02 引用行,HYP-13 归 CON 维度),本维度不判断不重复立。chunk_total null→OSS meta "0" 映射(`:157-170`)与 chunking.js 语义一致(face9) |
+| `apps/miniprogram/utils/sha256.js` | 171 | CODE | 深挖 | 9/9 | 无发现(静态采证) | 深挖 HYP-03 静态论证采证(D-16 微基准与 HYP-03 回填留 03-07):纯 JS SHA-256(K 表 `sha256.js:9-18 @ 5927f36`、`hashWords` `:66-135`)同步执行,padding 阶段整段复制输入(`:76-77`,峰值内存约 2× 音频字节);调用链 = index.js readFileSync→sha256Hex 主线程;与 AGENTS wasm-crypto 处方的差异系 docstring(`:4-5`)自述取舍(本期纯 JS,wasm 属后续优化)。D14-1 双实现证据:本文件 vs Worker stdlib hashlib(fixtures.py :21,118) |
+| `apps/miniprogram/utils/uploader.js` | 164 | CODE | 深挖 | 9/9 | F-CODE-06(共证) | 深挖 D14-2 证据(D-15 只记不裁):`RETRY_DELAYS_MS = [5000, 15000, 45000]`(`uploader.js:28 @ 5927f36`)、`MAX_UPLOAD_RETRIES = RETRY_DELAYS_MS.length`(`:29`,JS 侧 length 派生,对照 Worker MAX_RETRIES 独立字面量)。STATUS_UPLOADING 先落盘(`:72`)后进入可含 65s 退避的上传窗口,进程中断即残留 → F-CODE-06 时序主证。凭证仅入表单构造,日志只记 object_key/状态/错误码(`:110-113`)face3 核查通过 |
+| `apps/miniprogram/utils/verify.js` | 138 | CODE | 深挖 | 9/9 | 无发现 | 深挖 D14-2 证据(只记不裁):`VERIFY_RETRY_DELAYS_MS = [5000, 15000, 45000]`(`verify.js:16 @ 5927f36`)、MAX 派生 `.length`(`:17`)。四分类 verified/unverified/retryable/fatal(`:28-51`)错误路径完整;每次重试重新登录(code 一次性,`:67-82`);4xx 不重试、5xx/网络退避与 AGENTS 约定一致(face9) |
+| `apps/miniprogram/utils/fault_injection.js` | 124 | CODE | 普审 | 9/9 | 无发现 | HYP-14 顺带证据→移交 Phase 4 DOC(HANDOFF-PHASE4.md,状态不动):production 门控双兜底——`isDevEnv`(`fault_injection.js:38-40 @ 5927f36`)+ loadFaults/saveFaults 生产读全关写忽略(`:82-107`);门控实效完全取决于 config.js ENV 常量发布现值 |
+| `apps/miniprogram/utils/oss_sign.js` | 121 | CODE | 普审 | 9/9 | 无发现 | 秘密处理面核查通过:access_key_secret 仅入 HMAC 派生链(`oss_sign.js:93 @ 5927f36`),security_token 入表单字段系 OSS PostObject 协议必需(`:81,102`),模块零日志(docstring `:8` 红线);policy 条件精确 `eq $key`(`:77`)与 FC 单 key STS 对齐(face9);region 缺省回退 'cn-beijing'(`:59`,face4 轻微,调用方恒传 config 值,不立发现) |
+| `apps/miniprogram/utils/upload_queue.js` | 119 | CODE | 深挖 | 9/9 | F-CODE-06(共证) | 深挖 D14-6 证据(D-15 只记不裁,关联 F-CON-03):`fragmentIdFromObjectKey`(`upload_queue.js:38-44 @ 5927f36`)无校验字符串切割(去目录去扩展名),key↔id 第四处实现;US-015 后仅作 manifest 缺失时回退(`:53-54`)。八状态常量真值源(`:9-16`),`uploading` 定义于此而无恢复语义 → F-CODE-06 状态集证据;appendQueuedFragment 按 fragmentId 去重(`:75-84`) |
+| `apps/miniprogram/utils/ulid.js` | 92 | CODE | 普审 | 9/9 | 无发现 | Crockford base32 26 字符,monotonicFactory 同毫秒递增随机段保证唯一(`ulid.js:76-85 @ 5927f36`);Math.random 非密码学随机仅作 ID 用途,无秘密语义(face3) |
+| `apps/miniprogram/utils/chunking.js` | 65 | CODE | 普审 | 9/9 | 无发现 | 阈值消费 config 单一常量(`chunking.js:12 @ 5927f36`);chunk_total 单片 null/多片 N(`:40-55`)与 audio.js buildOssMetadata(null→"0")跨模块语义一致(face9) |
+| `apps/miniprogram/utils/hmac.js` | 64 | CODE | 普审 | 9/9 | 无发现 | 标准 HMAC 构造(BLOCK_SIZE 64、超长 key 先哈希、ipad/opad,`hmac.js:13-36 @ 5927f36`);base64 纯实现(小程序无 btoa,`:45-58`);零日志零 IO(face3) |
+| `apps/miniprogram/pages/dev/dev.js` | 60 | CODE | 普审 | 9/9 | 无发现 | 小程序实为 3 页(index/uploads/dev,RESEARCH Pitfall 8)。HYP-14 顺带证据→移交 Phase 4 DOC(HANDOFF-PHASE4.md,状态不动):开发者菜单三重 ENV 门控(onLoad/onShow/onToggleSwitch,`dev.js:18,28,52 @ 5927f36`),production 下入口不可见 + 页面兜底文案 |
+| `apps/miniprogram/utils/logger.js` | 60 | CODE | 普审 | 9/9 | 无发现 | 敏感键正则覆盖 AK/secret/token/session_key/api_key/password(`logger.js:8-9 @ 5927f36`),递归脱敏 + 前后 4 位掩码(`:11-32`);仅对象参数脱敏、标量透传属调用纪律面——现有调用点均以对象字段传值,face3 核查通过 |
+| `apps/miniprogram/utils/device.js` | 60 | CODE | 普审 | 9/9 | 无发现 | 持久化失败仍返回本次生成值并注释声明降级语义(`device.js:46-51 @ 5927f36`,face1 受控);6 字符落 fragment_id 正则 4-8 区间(`:10-14`) |
+| `apps/miniprogram/utils/retention.js` | 56 | CODE | 普审 | 9/9 | 无发现 | 自动清理三重前提 verified + 未清理 + 48h(`retention.js:19-34 @ 5927f36`),未 verified 永不自动删(AC#6);OSS 对象永不删除红线 docstring 明示,face2 核查通过 |
+| `apps/miniprogram/utils/draft.js` | 52 | CODE | 普审 | 9/9 | 无发现 | 单槽位中断草稿(`draft.js:13-14 @ 5927f36`)后到覆盖前份系 US-013 AC#2/#6 明示设计语义(face2 对照设计不立发现);恢复提示纯函数 |
+| `apps/miniprogram/config.js` | 41 | CODE | 普审 | 9/9 | 无发现 | DNF-02 对照:`issue-cedential` 拼写域名(`config.js:10 @ 5927f36`)系 Aliyun 真实分配值(`:8` 注释明示勿"修正"),负面清单排除不立发现。D14-5 证据(D-15 只记不裁):唯一代码内硬编码真实云值 `:10-15`。HYP-14 顺带证据→移交 Phase 4 DOC(HANDOFF-PHASE4.md,状态不动):`ENV = 'development'`(`:29`)现值即 development,生产发布依赖手工翻转该单点常量 |
+| `apps/miniprogram/app.js` | 23 | CODE | 普审 | 9/9 | 无发现 | 极薄入口:device_short_id 幂等生成(`app.js:16 @ 5927f36`),globalData 仅 env/deviceShortId,无长期密钥无业务鉴权(docstring 红线一致,face3) |
 
 ## TOOL 维度
 

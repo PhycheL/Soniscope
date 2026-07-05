@@ -22,8 +22,9 @@
 - **来源:** CONCERNS.md §Tech Debt / FC-direct transcription decided but not implemented (largest open item)
 - **假设:** 基线上 `apps/fc/` 仅存在 `issue_credential/` 与 `verify_upload/` 两个函数目录,已决策为主转写路径的 `transcribe_audio/` 无任何代码,已决策架构与已部署架构在基线处分叉。
 - **待验证维度:** CODE
-- **状态:** 未验证
-- **备注:** 与 §Missing Critical Features 首条(HYP-20)同根,互以 ID 关联。
+- **状态:** 证实 — 基线 apps/fc 仅两函数目录,transcribe_audio 零代码,现役转写路径完全在 Worker 侧(nls filetrans)。
+- **证据:** `git ls-tree 5927f36 apps/fc` → 仅 issue_credential/、verify_upload/、shared/、tests/ 与 README.md(无 transcribe_audio/);现役转写主路径 `apps/worker/src/soniscope_worker/nls.py:454-455 @ 5927f36`(filetrans 域名+版本消费点)、`apps/worker/src/soniscope_worker/transcriber.py:168-183 @ 5927f36`(工厂仅 cloud-speech/whisper-local 两分支,无 FC 直转实现)
+- **备注:** 与 §Missing Critical Features 首条(HYP-20)同根,互以 ID 关联。架构分叉系已知决策落差而非代码缺陷,按 D-12 存在级处理不占发现 ID,供 RPT 汇总呈现(实现属 XL 档,CHARTER 工作量分档示例即此项)。03-04 回填。
 
 ### HYP-02: Authoritative docs moved but deletions uncommitted and references stale
 
@@ -83,15 +84,18 @@
 - **来源:** CONCERNS.md §Security Considerations / Long-term credentials in FC env vars and local config.yaml
 - **假设:** `WX_APP_SECRET`、`ALIYUN_AK_ID`/`ALIYUN_AK_SECRET`、`RAM_ROLE_ARN` 以 FC 函数环境变量存放,Worker 侧 OSS/NLS 密钥明文存于 `$SONISCOPE_HOME/config.yaml`;CONCERNS.md 评现有缓解(`is_sensitive` 日志洗涤、`MaskedSecret`、600 权限校验)为 "Strong",该评价待核实。
 - **待验证维度:** CODE
-- **状态:** 未验证
+- **状态:** 细化 — 存放形态半句证实(FC 三组 env 变量 + Worker config.yaml 明文);"Strong" 缓解评价整体成立但有两处细化边界:Worker 600 权限校验在 CLI 侧仅警告不拒载,FC 侧秘密以普通 str 存 dataclass、无 MaskedSecret 同等类型级掩码(防线在 log_event 字段名洗涤 + 调用纪律)。
+- **证据:** Worker 侧:`apps/worker/src/soniscope_worker/config.py:31-35 @ 5927f36`(MaskedSecret._display 前后 4 位脱敏)、`config.py:148-150 @ 5927f36`(恰 600 权限判定)、`apps/worker/src/soniscope_worker/cli.py:48-53 @ 5927f36`(权限不符仅警告不拒载);FC 侧:`apps/fc/shared/fc_shared/env.py:16-38 @ 5927f36`(RAM_ROLE_ARN/ALIYUN_AK_ID/ALIYUN_AK_SECRET/WX_APP_SECRET 经环境变量装载)、`env.py:89-91 @ 5927f36`(缺失仅报变量名不含值)、`apps/fc/shared/fc_shared/audit.py:14-31,40-45 @ 5927f36`(is_sensitive 精确名单 + 子串兜底双层洗涤)
+- **备注:** 双侧脱敏机制(MaskedSecret / is_sensitive+hash_openid)经核实有效,记 RPT-06 优点候选;两处细化边界按 D-10 上线语境均不构成发现(600 警告方向安全、FC 现有 log 调用点全部只传安全标量),记加固候选不占发现 ID。03-04 回填(合并 03-03 worker 侧采证)。
 
 ### HYP-09: Single-user auth via openid allowlist
 
 - **来源:** CONCERNS.md §Security Considerations / Single-user auth via openid allowlist
 - **假设:** 授权仅为 `OPENID_ALLOWLIST` 字符串成员判定,无会话、无限流、无按用户隔离;CONCERNS.md 评 STS 爆炸半径受 `single_key_policy` 严格约束(单 key、仅 PutObject、≤900 s)故可接受,该判断待核实。
 - **待验证维度:** CODE
-- **状态:** 未验证
-- **备注:** CONCERNS.md 自评可接受("Acceptable and explicit for the personal-use MVP"),待 Phase 3/4 核实该判断是否成立(RESEARCH A4 分流依据)。
+- **状态:** 证实 — 业务鉴权确为 allowlist 字符串成员判定单点(无会话/无频控/无按用户隔离);single_key_policy 约束经逐行核实属实:Resource 精确单 object key 无路径通配、仅 oss:PutObject、时效恒为 900 秒。
+- **证据:** `apps/fc/shared/fc_shared/auth.py:33-36,50-51 @ 5927f36`(check_allowlist 成员判定即全部业务鉴权)、`apps/fc/shared/fc_shared/sts.py:62-73 @ 5927f36`(single_key_policy 精确单 key、单 Action)、`sts.py:25 @ 5927f36` + `apps/fc/issue_credential/handler.py:79 @ 5927f36`(duration 恒传 STS_MAX_DURATION_SECONDS = 900)
+- **备注:** CONCERNS.md 自评可接受经 D-10 上线语境裁定**成立**:个人单用户 MVP,单凭证爆炸半径受单 key policy 严格限定且有 `make test-sts-escape` 实测背书——记 RPT-06 优点候选兼 DNF 候选,不占发现 ID(D-12);"无限流"半句的上线风险面另立 F-CODE-05(关联 HYP-17)。03-04 回填。
 
 ## Performance Bottlenecks
 
@@ -117,8 +121,9 @@
 - **来源:** CONCERNS.md §Performance Bottlenecks / `wsgiref.simple_server` as the FC custom runtime server
 - **假设:** `apps/fc/shared/app.py` 以 `wsgiref` `ThreadingWSGIServer` 承载 FC 自定义运行时,无请求限制、HTTP 健壮性最小化。
 - **待验证维度:** CODE
-- **状态:** 未验证
-- **备注:** CONCERNS.md 自评可接受("Fine for MVP"),待 Phase 3/4 核实该判断是否成立(RESEARCH A4 分流依据)。
+- **状态:** 证实 — wsgiref ThreadingWSGIServer(daemon threads)承载生产运行时属实,无请求上限/超时/HTTP 加固;健壮性与请求边界实际依托 FC 平台网关(容器无公网直连面)。
+- **证据:** `apps/fc/shared/app.py:17-31 @ 5927f36`(ThreadingWSGIServer + make_server + serve_forever 全部运行时形态)、`app.py:27 @ 5927f36`(容器内 0.0.0.0 监听,S104 探针命中经 scans/ruff-extended.md #1 人工核实为 FC 自定义运行时必需形态)
+- **备注:** CONCERNS.md 自评可接受("Fine for MVP")经 D-10 上线语境裁定**成立**:FC 网关为唯一公网入口并承担请求限制/超时职责,容器内 wsgiref 只服务平台转发流量,个人量级下无实测瓶颈——记 DNF 候选,不占发现 ID(D-12)。03-04 回填。
 
 ## Fragile Areas
 
@@ -159,7 +164,9 @@
 - **来源:** CONCERNS.md §Scaling Limits / No FC rate limiting or quota per openid
 - **假设:** `issue-credential` 对每个合法请求签发一份 STS、无上限;被攻陷的白名单客户端可无限刷上传(单对象仍受 50 MB `MAX_UPLOAD_BYTES` 约束)。
 - **待验证维度:** CODE
-- **状态:** 未验证
+- **状态:** 证实 — 全链路(handler 与 fc_shared)无任何频控/配额/计数面:每个鉴权通过的 POST 触发一次 AssumeRole 无上限,且每个匿名 POST 在 allowlist 判定前即消耗一次 jscode2session 上游调用(pre-auth 成本面)。
+- **证据:** `apps/fc/issue_credential/handler.py:71-81 @ 5927f36`(每合法请求一次 AssumeRole,无计数/窗口/配额判定)、`apps/fc/shared/fc_shared/auth.py:50 @ 5927f36`(code 换 openid 先于 allowlist 判定执行)、`apps/fc/shared/fc_shared/sts.py:91-99 @ 5927f36`(check_size 为唯一按请求约束,仅限单对象 50 MB)
+- **备注:** 本条无 CONCERNS 可接受自评,经 03-04 深挖立发现 F-CODE-05(LOW:成本/可用性面,单凭证爆炸半径仍受单 key policy 约束,见 HYP-09)。03-04 回填。
 
 ## Dependencies at Risk
 
@@ -186,8 +193,9 @@
 - **来源:** CONCERNS.md §Missing Critical Features / `transcribe-audio` FC function (decided, unbuilt)
 - **假设:** 已决策的主转写路径 `transcribe-audio` 无任何代码,阻塞 FC 直转架构的部署阶段验收与"常开本地 Worker 退出热路径"。
 - **待验证维度:** CODE
-- **状态:** 未验证
-- **备注:** 与 §Tech Debt 首条(HYP-01)同根,互以 ID 关联。
+- **状态:** 证实 — transcribe-audio 零代码属实(基线 apps/fc 仅 issue_credential/verify_upload 两函数目录);"常开本地 Worker"现状由 Worker 侧轮询主循环承担全部转写。
+- **证据:** `git ls-tree 5927f36 apps/fc` → 无 transcribe_audio/ 目录;现役依赖 `apps/worker/src/soniscope_worker/poller.py:378-391 @ 5927f36`(Worker 单线程轮询为唯一转写驱动)、`apps/worker/src/soniscope_worker/nls.py:454-455 @ 5927f36`(filetrans 消费点)
+- **备注:** 与 §Tech Debt 首条(HYP-01)同根,互以 ID 关联,证据同源。缺失系已决策未实现的范围落差,按 D-12 存在级不占发现 ID(实现属 XL 档);"阻塞部署阶段验收"半句属里程碑管理事实,超出代码审计判定范围,原样移交 RPT 汇总。03-04 回填。
 
 ### HYP-21: Transcript consumption/display
 
@@ -229,4 +237,4 @@
 
 ---
 
-*未验证假设清单: 2026-07-04(25 条 HYP + 1 条 Known Bugs 显式无线索记录;对账 25 + 4 DNF = 29,Phase 4 AUDIT-05 逐条回填)。回填进度:已回填 3 条(HYP-10 证实、HYP-16 细化、HYP-19 证实,03-03,2026-07-05),余 22 条未验证。*
+*未验证假设清单: 2026-07-04(25 条 HYP + 1 条 Known Bugs 显式无线索记录;对账 25 + 4 DNF = 29,Phase 4 AUDIT-05 逐条回填)。回填进度:已回填 9 条(03-03:HYP-10 证实、HYP-16 细化、HYP-19 证实;03-04:HYP-01 证实、HYP-08 细化、HYP-09 证实、HYP-12 证实、HYP-17 证实、HYP-20 证实,2026-07-05),余 16 条未验证(CODE 维度仅余 HYP-03,留待 03-07 微基准)。*

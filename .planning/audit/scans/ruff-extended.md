@@ -773,7 +773,7 @@ No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` opti
 
 | # | 命中(path:line @ 5927f36) | 规则/模式 | 销号 | 理由/去向 |
 |---|---------------------------|-----------|------|-----------|
-| 1 | apps/fc/shared/app.py:27 | S104 | 确认 | ThreadingWSGIServer 绑定 0.0.0.0——FC 容器运行时或属必需形态,但与 HYP-12(wsgiref 作生产运行时)同点,须结合触发器/网络边界逐行核实 → 深挖线索(03-04 FC 层普审,HYP-12) |
+| 1 | apps/fc/shared/app.py:27 | S104 | 确认 | ThreadingWSGIServer 绑定 0.0.0.0——FC 容器运行时或属必需形态,但与 HYP-12(wsgiref 作生产运行时)同点,须结合触发器/网络边界逐行核实 → 深挖线索(03-04 FC 层普审,HYP-12)。**03-04 人工核实下落(降级理由,不立发现):** 容器内 bind-all 为 FC 自定义运行时必需形态——FC 平台网关是唯一公网入口,容器无直连暴露面,`app.py:27 @ 5927f36` 的 0.0.0.0 监听仅在容器网络命名空间内可达;HYP-12 回填(HYPOTHESES.md)引用本行 |
 | 2 | apps/fc/tests/test_custom_runtime_app.py:18 | ARG002 | 误报 | 假 start_response 须匹配 WSGI 回调签名,headers 形参系协议契合非疏漏 |
 | 3 | apps/fc/tests/test_fc_handlers.py:54 | ARG002 | 误报 | 同 #2,WSGI 假回调签名契合 |
 | 4 | apps/fc/tests/test_fc_handlers.py:76 | ARG001 | 误报 | parametrize 元组字段须与形参名一一对应,function 仅供测试 ID 展示,pytest 惯例 |
