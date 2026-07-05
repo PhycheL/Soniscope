@@ -52,13 +52,13 @@
 | `apps/worker/tests/test_transcriber.py` | 158 | pytest-worker | 普审 | 8/8 | 无缺口线索 | 面⑦ raises×2::68 未知 name→TranscriberError、:81 whisper-local→NotImplementedError(placeholder 行为锁定);面③ monkeypatch×1 @ 5927f36 |
 | `apps/worker/tests/test_verify_prep.py` | 438 | pytest-worker | 普审 | 8/8 | 无新增线索(F-TOOL-01 已入反向映射) | 面⑦ :234-251 check_sts_escape 二分行为锁定(F-TOOL-01)+ raises×3;面⑤ :227 check_config_security 不泄密断言;面② FakeProbes :96;面③ monkeypatch×5/tmp_path×24 @ 5927f36 |
 | `apps/worker/tests/test_verify_upload_live.py` | 276 | pytest-worker | 普审 | 8/8 | 无新增线索(F-TOOL-03 已入反向映射) | 面⑤ :51,58 泄漏检出断言(object info/verified true);:202-223 清理成功路径(F-TOOL-03,失败吞并分支无测试);面② FakeProbes :126 @ 5927f36 |
-| `apps/fc/tests/test_custom_runtime_app.py` | 57 | pytest-fc | - | 0/8 | - | — |
-| `apps/fc/tests/test_fc_handlers.py` | 133 | pytest-fc | - | 0/8 | - | — |
-| `apps/fc/tests/test_fc_shared.py` | 270 | pytest-fc | - | 0/8 | - | :196 is_sensitive 白名单断言(面⑤) |
-| `apps/fc/tests/test_head.py` | 93 | pytest-fc | - | 0/8 | - | :16-45 verify 三态行为锁定(F-CON-04 参照) |
-| `apps/fc/tests/test_issue_credential.py` | 229 | pytest-fc | - | 0/8 | - | 面④线索::142,151 上限 52428800 字面锁定(F-CON-06 FC 侧) |
-| `apps/fc/tests/test_sts.py` | 163 | pytest-fc | - | 0/8 | - | 单 key policy 断言(HYP-09/17 关联) |
-| `apps/fc/tests/test_verify_upload.py` | 203 | pytest-fc | - | 0/8 | - | — |
+| `apps/fc/tests/test_custom_runtime_app.py` | 57 | pytest-fc | 普审 | 8/8 | 面⑧线索::57 直测私有 `_port()` → 04-08 候选面(轻) | 面② fake handler 模块经 monkeypatch.setitem(sys.modules) 注入,application 委托行为锁定 :23-43;面③ monkeypatch×3(FC_SERVER_PORT 隔离) @ 5927f36 |
+| `apps/fc/tests/test_fc_handlers.py` | 133 | pytest-fc | 普审 | 8/8 | 无缺口线索(HYP-23 补偿主承载,见专项节) | importlib 唯一模块名动态加载双 handler :41-45(绕开 mypy 豁免的行为级驱动);GET 存活 :83-85、缺 env 500 :92-101、非法 body 400 :106-114、403 :118-133 全部双 handler 参数化 @ 5927f36 |
+| `apps/fc/tests/test_fc_shared.py` | 270 | pytest-fc | 普审 | 8/8 | 无缺口线索 | 面⑤ :185-188 hash_openid 非明文、:192-197 is_sensitive 白名单、:200-219 log_event 脱敏+None 省略;面④ :58,124 错误码字面锁定(`"INVALID_REQUEST"`/`"OPENID_NOT_ALLOWED"` 裸字符串);面⑦ raises×13 @ 5927f36 |
+| `apps/fc/tests/test_head.py` | 93 | pytest-fc | 普审 | 8/8 | 无新增线索(F-CON-04 已入反向映射) | :16-45 verify 三态行为锁定(OBJECT_NOT_FOUND :17/SIZE_MISMATCH :25);面② stub 经 `_unwrap_to` :90-93 注入;面⑦ raises×2 @ 5927f36 |
+| `apps/fc/tests/test_issue_credential.py` | 229 | pytest-fc | 普审 | 8/8 | 无新增线索(F-CON-06 已入反向映射) | 面④ :142,151 上限 52428800 字面锁定(F-CON-06 FC 侧);:122-137 单 key policy + `recordings/*` not in resource(最小权限负断言);面⑦ :215-228 签发失败 500 无泄漏(STS_ISSUE_FAILED);面③ monkeypatch×13 @ 5927f36 |
+| `apps/fc/tests/test_sts.py` | 163 | pytest-fc | 普审 | 8/8 | 无缺口线索 | 单 key policy 断言(HYP-09/17 关联);面⑦ raises×5 + SIZE_EXCEEDED shared 级 :87;面①强(31 断言) @ 5927f36 |
+| `apps/fc/tests/test_verify_upload.py` | 203 | pytest-fc | 普审 | 8/8 | 无缺口线索 | 面⑦ handler 级三态 :123-148(OBJECT_NOT_FOUND :130/SIZE_MISMATCH :144)+ :194-202 HeadObject 失败 500 无泄漏(HEAD_OBJECT_FAILED);面⑤ :175-188 伪造 code 不返回对象信息;面③ monkeypatch×6 @ 5927f36 |
 | `apps/miniprogram/test/chunking.test.js` | 220 | node | - | 0/8 | - | :168 FRAGMENT_ID_RE 正样本断言 |
 | `apps/miniprogram/test/draft_confirm.test.js` | 208 | node | - | 0/8 | - | 手写 wx/Page mock 模式(面②③) |
 | `apps/miniprogram/test/fault_injection.test.js` | 272 | node | - | 0/8 | - | — |
@@ -69,6 +69,26 @@
 | `apps/miniprogram/test/uploader.test.js` | 226 | node | - | 0/8 | - | 面④线索::55-56 重试常量字面锁定(F-CODE-07);:11 加载 uploads 页(F-CODE-08 参照实现);:47-50 错误码透传断言(F-CON-05) |
 | `apps/miniprogram/test/uploads_view.test.js` | 288 | node | - | 0/8 | - | :70 断言 uploading 不计积压——现行死态行为正向锁定(F-CODE-06) |
 | `apps/miniprogram/test/verify.test.js` | 351 | node | - | 0/8 | - | 面④线索::54-55 verify 重试常量字面锁定(F-CODE-07) |
+
+## HYP-23 专项:FC handler 行为测试补偿事实清单
+
+两个面向公网的 WSGI 入口 `handler.py` 处于 mypy strict 之外(DNF-03 豁免,本节不质疑豁免本身,仅登记行为测试补偿事实)。错误码全集以 `git show 5927f36:apps/fc/shared/fc_shared/errors.py` 实际枚举为准 = **9 个**(计划预列 7 个,另有 INVALID_REQUEST、HEAD_OBJECT_FAILED 两码,以实际枚举为准):
+
+| 错误码(errors.py 行号) | fc/tests 行为覆盖(@ 5927f36) | handler 入口级驱动 |
+|--------------------------|-------------------------------|---------------------|
+| INVALID_CODE(:13) | 有:`test_fc_shared.py:163`、`test_issue_credential.py:187,196`、`test_verify_upload.py:180,188` | 是(伪造 code POST 双 handler) |
+| OPENID_NOT_ALLOWED(:14) | 有:`test_fc_handlers.py:133`、`test_fc_shared.py:121-124,264` | 是(双 handler 参数化 403) |
+| INVALID_REQUEST(:15) | 有:`test_fc_handlers.py:114`、`test_fc_shared.py:56-58,77`、`test_issue_credential.py:164,210` | 是(非法 body POST 双 handler) |
+| SIZE_EXCEEDED(:16) | 有:`test_issue_credential.py:150`、`test_sts.py:87` | 是(issue-credential 400) |
+| SERVER_MISCONFIGURED(:17) | 有:`test_fc_handlers.py:101`、`test_issue_credential.py:178`、`test_verify_upload.py:171` | 是(缺 env 500 双 handler + 各自专属 env) |
+| STS_ISSUE_FAILED(:18) | 有:`test_issue_credential.py:228`(500 且无泄漏) | 是 |
+| HEAD_OBJECT_FAILED(:19) | 有:`test_verify_upload.py:202`(500 且无泄漏) | 是 |
+| OBJECT_NOT_FOUND(:23) | 有:`test_head.py:17`、`test_verify_upload.py:130` | 是(verified:false 三态) |
+| SIZE_MISMATCH(:24) | 有:`test_head.py:25`、`test_verify_upload.py:144` | 是(verified:false 三态) |
+
+**handler 入口路径驱动证据:** 双 handler 经 importlib 唯一模块名动态加载后作为 WSGI callable 被真实调用(`test_fc_handlers.py:41-45,70 @ 5927f36`):GET 存活探针 `test_fc_handlers.py:83-85`;POST 主流程成功路径 `test_issue_credential.py:99-121`(完整 STS 四字段)与 `test_verify_upload.py:105-122`(verified:true);异常分支 `test_fc_handlers.py:92-133`(500/400/403)+ 两侧上游失败 500 无泄漏(`test_issue_credential.py:215-228`、`test_verify_upload.py:194-202`)。
+
+**结论行:** 补偿覆盖面事实清单 = 9/9 错误码均有行为测试且全部在 handler 入口级被驱动;GET/POST 成功/异常分支三类入口路径均被测试驱动;`fc_shared`(逻辑下沉层)本身在 mypy strict 范围内 → HYP-23(04-09 回填锚点;充分性判断在回填时依此清单下,不质疑 DNF-03 豁免本身)。
 
 ## 反向映射清单(D-09)
 
