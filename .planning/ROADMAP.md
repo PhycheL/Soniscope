@@ -165,12 +165,12 @@ Plans:
   4. 报告含 "Do NOT fix" 登记表(`issue-cedential` 在用域名、`whisper-local` 桩、handler mypy 豁免等)、优点盘点章节、分维度置信声明与可追溯映射表(发现↔CONCERNS.md 线索↔需求,含"已检查,无发现"显式记录)
   5. 报告为中文正文 + 英文 ID/严重度术语,且 apps/、scripts/、docs/ 相对钉住 SHA 的零 diff 验证通过
 
-**Plans**: 3 plans
+**Plans**: 1/3 plans executed
 
 Plans:
 **Wave 1**
 
-- [ ] 05-01-PLAN.md — 校准与判定层:跨维度对齐/真重复/聚类/工作包/判定准则,D-02+D-12 批量呈报批准后落账 CALIBRATION.md
+- [x] 05-01-PLAN.md — 校准与判定层:跨维度对齐/真重复/聚类/工作包/判定准则,D-02+D-12 批量呈报批准后落账 CALIBRATION.md
 
 **Wave 2** *(blocked on Wave 1)*
 
@@ -191,4 +191,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5(Phase 2 与 Phase 3 �
 | 2. 契约抽取与漂移分析 | 4/4 | Complete    | 2026-07-05 |
 | 3. 组件与工具链深潜 | 7/7 | Complete    | 2026-07-05 |
 | 4. 文档配置与测试审计 | 9/9 | Complete    | 2026-07-05 |
-| 5. 汇总校准与报告组装 | 0/? | Not started | - |
+| 5. 汇总校准与报告组装 | 1/3 | In Progress|  |
