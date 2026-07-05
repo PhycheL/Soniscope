@@ -69,3 +69,38 @@
 | `apps/miniprogram/test/uploader.test.js` | 226 | node | - | 0/8 | - | 面④线索::55-56 重试常量字面锁定(F-CODE-07);:11 加载 uploads 页(F-CODE-08 参照实现);:47-50 错误码透传断言(F-CON-05) |
 | `apps/miniprogram/test/uploads_view.test.js` | 288 | node | - | 0/8 | - | :70 断言 uploading 不计积压——现行死态行为正向锁定(F-CODE-06) |
 | `apps/miniprogram/test/verify.test.js` | 351 | node | - | 0/8 | - | 面④线索::54-55 verify 重试常量字面锁定(F-CODE-07) |
+
+## 反向映射清单(D-09)
+
+**定级规则(预置,供 04-08 引用):** 脆弱区无测试兜底的缺口,定级参照原发现严重度;无关联脆弱区的一般覆盖缺口,按 CHARTER LOW 锚点(『lint/typecheck/测试覆盖缺口』类)定级。
+
+**行集与去重说明:** 行集 = Phase 2/3 全部 22 条 F-* 发现(F-CON-01~06、F-CODE-01~08、F-TOOL-01~08)。CONTRACT-MATRIX 全部 12 个非 agree 格(组① 行 2/4/5/13、组② 行 35-41、组③ 行 46)经与既有 F-CON 去重核对,已由 F-CON-01~06 完整承载(对账依据:CONTRACT-MATRIX §机械对账第 3 条——12 格 = 5 条 × 1 格 + F-CON-05 × 7 格),矩阵追加行数 = 0。
+
+**图例:** 兜底列取值 = `文件:行号 @ 5927f36`(有关联测试)或『无』;缺口判定列取值 = 终态(参照原严重度 / 无缺口)或占位态(静读不可定判,待 04-07 逐面普审佐证后销号)。兜底初判方法:按原发现证据字段符号执行 `git grep -n '<符号>' 5927f36 -- apps/worker/tests apps/fc/tests apps/miniprogram/test`;发现正文已含兜底证据的直接反查引用。
+
+| 条目 | 原严重度 | 应重点覆盖行为 | 现有测试兜底(@ 5927f36) | 缺口判定 |
+|------|----------|----------------|--------------------------|----------|
+| F-CON-01 | LOW | 小程序侧 fragment_id 非法日期(13 月/非闰 2-29 类)应被拒绝 | `apps/worker/tests/test_oss_admin.py:75`、`apps/worker/tests/test_ops.py:74`(仅 Worker 消费端拒绝断言);小程序 `apps/miniprogram/test/ids.test.js:65-79` 的 FRAGMENT_ID_RE 断言仅正样本,无非法日期样本 | 缺口参照原严重度 LOW |
+| F-CON-02 | MEDIUM | preview key 目录日期须与 fragment_id 前缀一致(双入参不得产出错位 key) | 无(`git grep buildObjectKeyPreview` 测试零命中);AC#4『上传 key 用 FC 返回值』仅有间接锁定(`apps/miniprogram/test/uploader.test.js:37` 断言凭证 object_key 透传) | 缺口参照原严重度 MEDIUM |
+| F-CON-03 | MEDIUM | key 反推应拒绝非法/非 .wav/错位 key(与 Worker None 行为对齐) | 无(`git grep fragmentIdFromObjectKey` 测试零命中) | 缺口参照原严重度 MEDIUM |
+| F-CON-04 | LOW | verify-upload 对 `x-oss-meta-sha256` 的取舍应有测试面表达;Worker 重下环无告警面 | 现行三态行为锁定:`apps/fc/tests/test_head.py:16-45`;生产端 meta 写入锁定:`apps/miniprogram/test/ids.test.js:134`;sha256 校验缺失面无测试(§4.2 设计取舍) | 缺口参照原严重度 LOW |
+| F-CON-05 | INFO | 错误码经 body.error 通用透传行为保持稳定 | `apps/miniprogram/test/uploader.test.js:47-50,92-97`(码字符串透传断言) | 无缺口(良性,INFO 维持) |
+| F-CON-06 | LOW | 小程序上传前应有 50 MB 预检或镜像常量 | FC 侧上限字面锁定:`apps/fc/tests/test_issue_credential.py:142,151`;小程序侧 `git grep '52428800\|MAX_UPLOAD' -- apps/miniprogram/test` 零预检命中(仅 MAX_UPLOAD_RETRIES 无关命中) | 缺口参照原严重度 LOW |
+| F-CODE-01 | LOW | process_plan 幂等判定职责边界(fragments_root 未用)不被误信 | `apps/worker/tests/test_poller.py:171-172,188-189`(仅锁定调用形态,不能检测形参未用) | 缺口参照原严重度 LOW |
+| F-CODE-02 | MEDIUM | 持久失败对象应有失败计数/隔离/告警(重复轮次不无界) | 单轮行为锁定:`apps/worker/tests/test_poller.py:182-191`(sha 失配删 .part)、`apps/worker/tests/test_pipeline.py:293`(失配无 .done)、`apps/worker/tests/test_audio.py:215`(探测失败留档);多轮重复/计数缺失面静读未见断言 | 补证中 |
+| F-CODE-03 | LOW | fragment 目录内 mkstemp 孤儿 `*.tmp` 应有清理/检出路径 | 正常路径无残留锁定:`apps/worker/tests/test_recovery.py:47-53`;孤儿清理路径无测试(功能缺失) | 缺口参照原严重度 LOW |
+| F-CODE-04 | LOW | `.env` 向上搜索应有仓库边界(或与文档口径一致) | 正向解析锁定:`apps/worker/tests/test_skeleton.py:52-58`;无界搜索行为无测试 | 缺口参照原严重度 LOW |
+| F-CODE-05 | LOW | STS 签发与上游调用应有频控/配额面 | 无(功能缺失;`apps/fc/tests` 无频控/计数相关断言) | 缺口参照原严重度 LOW |
+| F-CODE-06 | MEDIUM | uploading 残留项应有自动复位或手动出口 | 现行死态行为被正向锁定:`apps/miniprogram/test/uploads_view.test.js:70`(断言 uploading 不计积压)、`apps/miniprogram/test/uploader.test.js:84`(uploading 先落盘);恢复路径无测试(功能缺失,修复需同步改既有断言) | 缺口参照原严重度 MEDIUM |
+| F-CODE-07 | LOW | 四落点重试常量的字面/结构锁定应对称 | `apps/miniprogram/test/uploader.test.js:55-56`、`apps/miniprogram/test/verify.test.js:54-55`(JS 字面锁定);`apps/worker/tests/test_nls.py:401,449-450`(结构锁定,数值字面无断言)——发现正文内已列,反查引用 | 缺口参照原严重度 LOW |
+| F-CODE-08 | LOW | utils/pages 两份 FC 请求组装应有同步断言或共享源 | uploads 页参照实现有单测:`apps/miniprogram/test/uploader.test.js:11`(加载 pages/uploads/uploads.js);queue_runtime 编排有测试:`apps/miniprogram/test/redesign_view.test.js:146`;两份组装的同步断言静读未见 | 补证中 |
+| F-TOOL-01 | LOW | 反例异常应三分(意外成功/拒绝/探测失败)不误报越权 | 现行二分行为锁定:`apps/worker/tests/test_verify_prep.py:234-251`;error_code 渲染缺失面无测试(功能缺失) | 缺口参照原严重度 LOW |
+| F-TOOL-02 | LOW | 非首次部署备份失败应阻断(或显式 --force) | 首次部署跳过备份锁定:`apps/worker/tests/test_fc_deploy.py:331`;非首次备份失败不阻断面无区分测试 | 缺口参照原严重度 LOW |
+| F-TOOL-03 | LOW | 清理失败应报告残留 key 不静默吞并 | 清理成功路径锁定:`apps/worker/tests/test_verify_upload_live.py:202-203,221-223`;失败吞并分支无测试 | 缺口参照原严重度 LOW |
+| F-TOOL-04 | LOW | 小程序 JS 语义类静态门禁应存在 | 现有五族规则锁定:`apps/worker/tests/test_miniprogram_lint.py:53-180`;语义规则面无(功能缺失) | 缺口参照原严重度 LOW |
+| F-TOOL-05 | MEDIUM | scripts/ 应有签名 URL/秘密模式静态门禁 | 无(scripts/ 零测试零门禁;原发现证据 `scripts/test_asr.py:79-81` 签名 URL 模式 + 签名参数模式,值本体略,per CHARTER 秘密红线) | 缺口参照原严重度 MEDIUM |
+| F-TOOL-06 | MEDIUM | typecheck 门禁应可绿(退出码二值信号有效) | 无(门禁自身无测试;实跑证据见 `scans/gates-baseline.md` #1) | 缺口参照原严重度 MEDIUM |
+| F-TOOL-07 | LOW | Makefile 声明面与实现面应一致(.PHONY 无幻影目标) | 无(Makefile 无对账测试) | 缺口参照原严重度 LOW |
+| F-TOOL-08 | LOW | 联调工具契约镜像应有跨侧一致性测试绑定 | 自侧行为有测试:`apps/worker/tests/test_fc_live.py:105-112,126`(镜像常量自证消费);跨侧绑定断言无(发现自证『全集群零测试断言』) | 缺口参照原严重度 LOW |
+
+**机械对账:** 行总数 = 22 条 F-* + 0 条矩阵追加 = 22;缺口判定分布 = 终态 20(参照原严重度 19 + 无缺口 1)+ 占位态 2(F-CODE-02、F-CODE-08,待 04-07 逐面普审销号);22 = 20 + 2 ✓
