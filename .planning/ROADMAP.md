@@ -128,7 +128,29 @@ Plans:
   3. 覆盖率测量结果作为证据归档,仅作输入证据,未被当作质量评分写入发现
   4. CONCERNS.md 假设清单每条状态为证实/证伪/细化之一,均附新鲜 file:line@SHA 证据,无一遗留"未验证"
 
-**Plans**: TBD
+**Plans**: 9 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 04-01-PLAN.md — worktree 基线专区建立与离线门禁实跑观测(D-01/D-02,喂 D-11)
+- [ ] 04-03-PLAN.md — DOC-CLAIMS.md 骨架 + PRD/tech-spec 深核四态销号(AUDIT-03)
+- [ ] 04-06-PLAN.md — TEST-AUDIT.md 骨架:D-10 八面清单 + 41 模块台账 + D-09 反向映射清单
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 04-02-PLAN.md — 双语言覆盖率实测归档(D-03/D-04,含 pytest-cov 合法性检查点)+ 专区拆除
+- [ ] 04-04-PLAN.md — runbook 4 份深核销号 + HYP-14 发布翻转口径核对(HANDOFF DOC ×2 销号)
+- [ ] 04-07-PLAN.md — 41 测试模块逐面普审 + HYP-23/24 专项 + 反向映射收敛
+
+**Wave 3** *(blocked on Wave 2)*
+
+- [ ] 04-05-PLAN.md — AGENTS/README×3/config 三份深核 + 普审/引用/存在级 + F-DOC 聚合立条与 DOC 收口
+- [ ] 04-08-PLAN.md — D-11 门禁三方对照 + F-TEST 按面聚合立条(D-12)与 TEST 收口
+
+**Wave 4** *(blocked on Wave 3)*
+
+- [ ] 04-09-PLAN.md — HYP 余 11 条回填 + 25/25 总对账(D-13/14/15)+ 零 diff 阶段收尾(AUDIT-05)
 
 ### Phase 5: 汇总校准与报告组装
 
@@ -155,5 +177,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5(Phase 2 与 Phase 3 �
 | 1. 审计章程与基线 | 2/2 | Complete    | 2026-07-04 |
 | 2. 契约抽取与漂移分析 | 4/4 | Complete    | 2026-07-05 |
 | 3. 组件与工具链深潜 | 7/7 | Complete    | 2026-07-05 |
-| 4. 文档配置与测试审计 | 0/? | Not started | - |
+| 4. 文档配置与测试审计 | 0/9 | Not started | - |
 | 5. 汇总校准与报告组装 | 0/? | Not started | - |
