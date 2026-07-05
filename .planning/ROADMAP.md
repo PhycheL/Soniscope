@@ -17,7 +17,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: 契约抽取与漂移分析** - 三处实现的契约漂移矩阵、往返校验、分歧分类与重复逻辑普查 (completed 2026-07-05)
 - [x] **Phase 3: 组件与工具链深潜** - 三层主体代码与部署工具链的债务/脆弱区盘点,人工核实进台账 (completed 2026-07-05)
 - [x] **Phase 4: 文档配置与测试审计** - 以代码实态为基准审 docs/config/AGENTS.md 与双语言测试,关闭 CONCERNS.md 假设清单 (completed 2026-07-05)
-- [ ] **Phase 5: 汇总校准与报告组装** - 去重、根因聚类、单一口径校准,产出最终审计报告
+- [x] **Phase 5: 汇总校准与报告组装** - 去重、根因聚类、单一口径校准,产出最终审计报告 (completed 2026-07-05)
 
 ## Phase Details
 
@@ -165,7 +165,7 @@ Plans:
   4. 报告含 "Do NOT fix" 登记表(`issue-cedential` 在用域名、`whisper-local` 桩、handler mypy 豁免等)、优点盘点章节、分维度置信声明与可追溯映射表(发现↔CONCERNS.md 线索↔需求,含"已检查,无发现"显式记录)
   5. 报告为中文正文 + 英文 ID/严重度术语,且 apps/、scripts/、docs/ 相对钉住 SHA 的零 diff 验证通过
 
-**Plans**: 2/3 plans executed
+**Plans**: 3/3 plans complete
 
 Plans:
 **Wave 1**
@@ -178,7 +178,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2)*
 
-- [ ] 05-03-PLAN.md — 附录 A 追溯映射(RPT-08)+ 附录 B 聚类明细 + 收尾验证 8 项机械门禁照录(零 diff/计数等式/秘密反扫)
+- [x] 05-03-PLAN.md — 附录 A 追溯映射(RPT-08)+ 附录 B 聚类明细 + 收尾验证 8 项机械门禁照录(零 diff/计数等式/秘密反扫)
 
 ## Progress
 
@@ -191,4 +191,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5(Phase 2 与 Phase 3 �
 | 2. 契约抽取与漂移分析 | 4/4 | Complete    | 2026-07-05 |
 | 3. 组件与工具链深潜 | 7/7 | Complete    | 2026-07-05 |
 | 4. 文档配置与测试审计 | 9/9 | Complete    | 2026-07-05 |
-| 5. 汇总校准与报告组装 | 2/3 | In Progress|  |
+| 5. 汇总校准与报告组装 | 3/3 | Complete   | 2026-07-05 |
