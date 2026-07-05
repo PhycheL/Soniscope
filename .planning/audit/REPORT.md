@@ -269,3 +269,10 @@ MEDIUM 11 / LOW 26 / INFO 3(CRITICAL 0 / HIGH 0)
 
 - **跨语言契约测试设计配方:** `CONTRACT-TEST-RECIPE.md`(黄金样本跨语言契约测试设计配方,D-16 五要素:单一 JSON 真值源 + pytest/node 双侧消费,样本集 = CONTRACT-MATRIX 附录 S-01~S-18 全合成数据)——**显式移交 FUTURE-02**(REQUIREMENTS v2 条目),设计深度达"修复里程碑拿到即可写代码,不用再设计"。
 - **backlog 与排期清单使用说明:** 本报告"发现汇总表"(RPT-02)即修复里程碑的 backlog 全量清单(40 行逐条含严重度/工作量/判定/处置);"修复工作包"(RPT-04)的 WP-01~09 即排期阶段清单(按序数规则排序,含依赖),必做清单三条(`F-CODE-02`/`F-CODE-06`/`F-DOC-03`)由 WP-03/WP-04/WP-07 承载须先行。
+
+## 附录索引
+
+> 机械性长内容按 D-14 分文件承载,主报告在此链入(相对路径,与本文件同目录):
+
+- **附录 A — RPT-08 可追溯映射表:** [REPORT-APPENDIX-A-traceability.md](REPORT-APPENDIX-A-traceability.md) — 29 条溯源闭环主表(25 HYP + 4 DNF,含报告落点与需求映射两列)、Known Bugs 显式无线索行照录、五维度"已检查,无发现"代表性记录、发现↔发现补边表(findings `关联发现` 字段规整转写 46 行)。
+- **附录 B — CL-NN 根因聚类明细:** [REPORT-APPENDIX-B-clusters.md](REPORT-APPENDIX-B-clusters.md) — 5 簇根因明细照搬 CALIBRATION.md 零改判(根因陈述/成员/关联工作包互指/证据锚),未入簇孤条 11 条显式清单,成员全覆盖对账等式 29 + 11 = 40 ✓。
