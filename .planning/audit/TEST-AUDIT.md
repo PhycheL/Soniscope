@@ -140,3 +140,24 @@
 | F-TOOL-08 | LOW | 联调工具契约镜像应有跨侧一致性测试绑定 | 自侧行为有测试:`apps/worker/tests/test_fc_live.py:105-112,126`(镜像常量自证消费);跨侧绑定断言无(发现自证『全集群零测试断言』) | 缺口参照原严重度 LOW |
 
 **机械对账(04-07 终态):** 行总数 = 22 条 F-* + 0 条矩阵追加 = 22;缺口判定分布 = 终态 22(参照原严重度 21 + 无缺口 1)+ 占位态 0(F-CODE-02、F-CODE-08 已由 04-07 逐面普审补证销号);22 = 22 + 0 ✓
+
+## 门禁完整性三方对照(D-11)
+
+**对照口径(结构先例:CONTRACT-MATRIX 行×列+判定列):** 声称 = 文档/Makefile help 文案层(AGENTS.md、`.planning/codebase/TESTING.md`、DOC-CLAIMS 销号行);静态配置 = `git show 5927f36:<path>` 提取的门禁配置实态;实跑观测 = `scans/gate-run-worktree.md`(04-01)与 `scans/coverage-*.md`(04-02)归档计数。判定列落终态;缺口候选行注去向(F-TEST 终态编号由收口反填)。
+
+| # | 对照项 | 声称 | 静态配置 | 实跑观测 | 判定 |
+|---|--------|------|----------|----------|------|
+| 1 | pytest 套件范围 | `Makefile:170-171 @ 5927f36`(test 目标 = `uv run pytest`,help『pytest 单元测试(mock 云端依赖)』);`AGENTS.md:130,363 @ 5927f36`(make test 列为提交前最低质量门);DOC-CLAIMS DG-07 已 agree 销号(五目标实存同口径) | `pyproject.toml:56 @ 5927f36` testpaths = ["apps/worker/tests", "apps/fc/tests"];`pyproject.toml:58 @ 5927f36` pythonpath = ["apps/fc/shared"] | gate-run-worktree.md:collected 567 / passed 565 / failed 2 / skipped 0;`--collect-only` 底数 567 与 -rs 收集数一致 | **一致**(声称目标、静态 testpaths、实跑收集数三方吻合;2 条 FAILED 系执行环境依赖,单列行 6 判定) |
+| 2 | JS 测试进门禁的路径 | `.planning/codebase/TESTING.md:15 @ 5927f36`(『so `make test` is the single quality gate』)、`:24`(『make test — includes JS tests via node』) | `apps/worker/tests/test_miniprogram_js.py:24 @ 5927f36` skipif `shutil.which("node") is None` → 静默 SKIP;pytest skip 不改退出码(exit 0) | 本机 node v22.18.0 存在时 JS 桥实际执行且 passed(gate-run-worktree.md -rs 观测,skipped 0);反事实剔除 node → collected 1 / skipped 1 / exit=0(gate-run-worktree.md 反事实观测节) | **缺口候选**(『全绿 ≠ 全跑』结构性缺口:node 缺失时 make test 全绿而 126 个 JS 用例 0 跑,声称『single quality gate 含 JS』落空)→ findings/test.md 立条 |
+| 3 | 静态门禁(lint/typecheck)范围 | `AGENTS.md:358-366 @ 5927f36`(make typecheck/lint/test 为提交前最低质量门,无范围限定语,全仓印象) | `pyproject.toml:32 @ 5927f36`(mypy files 仅 apps/ 四路径)、`pyproject.toml:50 @ 5927f36`(ruff src 仅 apps/ 四路径)、`Makefile:166-167 @ 5927f36`(lint 目标仅 `ruff check apps/`,行内注释自认『遗留 scripts/ 由各自 story 收口』) | 实害样本(移交证据,静态门禁自身无实跑面):test_asr.py 存在门禁规则集(E,F,I,UP,B)内违例 6 条(UP009×1/E501×4/B904×1,`scripts/test_asr.py:2,38,166,197,275,283 @ 5927f36`)与已提交签名 URL(OSS 签名 URL 模式,位置 `scripts/test_asr.py:80 @ 5927f36`,值本体不引),均在 make lint 全绿下入库 | **缺口候选**(scripts/ 在全部静态门禁之外且已有实害样本)→ findings/test.md 立条;销号引 HANDOFF-PHASE4.md TEST 节第 2 条(门禁范围静态证据);销号引 HANDOFF-PHASE4.md TEST 节第 3 条(实害样本) |
+| 4 | 覆盖率门禁 | 无——`.planning/codebase/TESTING.md:129 @ 5927f36`『None enforced — no pytest-cov dependency, no coverage config』(声称面显式自认无门禁) | 仓库无任何覆盖率配置:`git grep -in 'cov' 5927f36 -- pyproject.toml Makefile apps/worker/pyproject.toml` 零命中;无 coverage 相关 make 目标 | `scans/coverage-pytest.md` 与 `scans/coverage-node.md` 均系本审计临时注入所得(pytest-cov ephemeral `--with` / node `--experimental-test-coverage`),非任何门禁产物 | **一致**(『无覆盖率门禁』三方自洽的事实行)——不立条理由:声称与实态无落差且声称面显式自认;覆盖率数字用途限 F-TEST 证据引用(成功判据 3) |
+| 5 | 活体路径(test-fc-live 等) | `Makefile:50,57 @ 5927f36`(test-fc-live / test-verify-upload 目标存在;DOC-CLAIMS DG-13/FD-13 agree 销号在案) | `apps/worker/src/soniscope_worker/fc_live.py:15-16 @ 5927f36`(wx.login code 一次性,缺失场景标 SKIP)、`apps/worker/src/soniscope_worker/verify_upload_live.py:14 @ 5927f36`(缺 code 即 SKIP,docstring 自述『本地 CI 也能 exit 0』)——全部真实鉴权/签发/校验场景依赖手工传入一次性 code | 不适用——真云目标绝不执行(D-01);本行判定口径 = 静态 + 移交证据判定 | **缺口候选**(活体路径零自动化覆盖:无 CI,本地缺 code 即全 SKIP 且 exit 0)→ findings/test.md 立条;销号引 HANDOFF-PHASE4.md TEST 节第 1 条 |
+| 6 | 门禁结果的执行环境依赖 | `AGENTS.md:358-364 @ 5927f36`(make test 为提交前最低质量门,门禁说明层无执行环境预置前提;SONISCOPE_HOME 预置属运行时文档口径) | `apps/worker/tests/test_skeleton.py:33-35 @ 5927f36`(invoke `run` 无 SONISCOPE_HOME 注入,依赖环境实态)、`apps/worker/tests/test_retranscribe.py:268-280 @ 5927f36`(monkeypatch 仅及 load_config,SONISCOPE_HOME 解析在其上游不受隔离) | gate-run-worktree.md:make test exit=2 / failed 2,两条 FAILED 断言现场均含 RuntimeHomeError(实跑 shell `SONISCOPE_HOME=<unset>` 且上溯无 .env);coverage-pytest.md 全量实跑同两条复现 | **缺口候选**(门禁结果对执行环境存在依赖:干净检出 + 未设 SONISCOPE_HOME 时 make test 非绿,门禁二值信号失真)→ findings/test.md 立条 |
+
+**HANDOFF TEST 3 条移交逐条销号:**
+
+- 销号引 HANDOFF-PHASE4.md TEST 节第 1 条(HYP-22:fc_live/verify_upload_live 手工 code 依赖)→ 对照行 5 已消费,去向 findings/test.md 立条
+- 销号引 HANDOFF-PHASE4.md TEST 节第 2 条(HYP-25:scripts/ 三文件在 mypy files 与 ruff src 之外,`pyproject.toml:32,50 @ 5927f36`、`Makefile:166-167 @ 5927f36`)→ 对照行 3 静态列已消费,去向 findings/test.md 立条
+- 销号引 HANDOFF-PHASE4.md TEST 节第 3 条(HYP-25 实害样本:test_asr.py 6 条违例 + 已提交签名 URL 位置引用)→ 对照行 3 实跑/实害列已消费,去向 findings/test.md 立条
+
+**机械对账行(D-11):** 对照项 6;判定分布 = 一致 2(行 1/4)+ 缺口候选 4(行 2/3/5/6);缺口候选去向 4/4 → findings/test.md 立条;HANDOFF-PHASE4.md TEST 节 3 条移交全部显式销号(第 1 条 → 行 5;第 2/3 条 → 行 3)✓
