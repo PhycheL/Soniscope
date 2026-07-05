@@ -129,4 +129,30 @@
 
 ## 完成判定
 
-(占位——03-07 收口时填:覆盖对象总数对账、深挖点逐点下落、已过面 9/9 全模块核对、可复算命令 + 数字 + ✓,格式仿 CONTRACT-MATRIX ④完成判定。)
+(03-07 收口填写,格式仿 CONTRACT-MATRIX ④完成判定——逐条可复算命令 + 数字 + ✓;命令均自仓库根执行。)
+
+1. **覆盖对象总数 63** — `grep -cE '^\| \`' .planning/audit/COVERAGE.md` → **63**(CODE 47 + TOOL 16 = 63,对照 03-RESEARCH.md 审计对象全量清单)✓
+2. **"待审"残留 0** — `awk '/## CODE 维[度]/,/## 完成判[定]/' .planning/audit/COVERAGE.md | grep -c '待审'` → **0**(覆盖 CODE/TOOL 两表与深挖点登记节全部台账行;标记用字符类写法避免本句自匹配,与朴素标记写法计数结果一致)✓
+3. **已过面全 9/9** — `grep -c '| 9/9 |' .planning/audit/COVERAGE.md` → **63** = 对象总数(每模块 D-04 九面全过)✓
+4. **深挖点 20 处全有下落** — 深挖点登记节 20 行(14 HYP + 6 D14):14 条 HYP 全部"已回填(证实/细化,03-0N)";6 条 D14 全部"裁定(03-07)"——D14-2 → F-CODE-07、D14-3 → F-TOOL-08、D14-4 → F-CODE-08 立发现,D14-1/D14-5/D14-6 "不构成债务"结论(三要素理由与行号证据在各行,D14-6 销号落点 = 既有 F-CON-03)✓
+5. **发现计数** — `grep -c '^### F-CODE-' .planning/audit/findings/code.md` → 9,扣 F-CODE-00 示例 = **8 条**(F-CODE-01~08);`grep -c '^### F-TOOL-' .planning/audit/findings/toolchain.md` → 9,扣 F-TOOL-00 示例 = **8 条**(F-TOOL-01~08);Phase 3 合计 **16 条**,严重度分布 MEDIUM 4(F-CODE-02/06、F-TOOL-05/06)/ LOW 12 ✓
+6. **HYP 回填 14/14** — Phase 3 回填集(RESEARCH Pitfall 4 写死):CODE 10 条 HYP-01(证实)/03(细化)/08(细化)/09(证实)/10(证实)/12(证实)/16(细化)/17(证实)/19(证实)/20(证实)+ TOOL 4 条 HYP-04(证实)/07(证实)/15(细化)/18(细化)——14 个指定 ID 状态全部 ≠ "未验证" ✓;全清单行首锚定统计 `grep -c '^- \*\*状态:\*\* 未验证' .planning/audit/HYPOTHESES.md` → **11**(25 − 14 = 11,余量均属 Phase 4 维度:DOC 6 + TEST 4 + CON 1)✓
+7. **scans/ 五档对账等式复核** — gates-baseline 90 + ruff-extended 69 + vulture 1 + eslint 29 + secrets 69 = **258** 命中全部销号(确认 15 / 误报 243 / 移交 0,见 scans/secrets.md 尾部封版行);15 条确认项去向列**零未决占位**——gates #1 → F-TOOL-06、#2-7 → HYP-25 移交(HANDOFF TEST 节)、ruff #1 → HYP-12 回填、#41/#45/#49 → 降级理由(不立发现)、#55 → F-CODE-01、vulture #1 → 降级理由、secrets #14/#15 → F-TOOL-05,逐条含"03-0N 核实"最终下落 ✓;本计划新增 scans/microbench-sha256.md(D-16 档案,非销号类,不入 258 等式)
+8. **HANDOFF-PHASE4.md 移交条目计数** — `grep -c '^- \*\*(移交' .planning/audit/HANDOFF-PHASE4.md` → **6**(DOC 3:HYP-16 半句 / HYP-14 ×2;TEST 3:HYP-22 / HYP-25 ×2),每条含去向 + 一句观察 + `@ 5927f36` 行号证据,被移交 HYP 状态均未动(D-11)✓
+9. **秘密反扫零命中(T-03-01 门禁)** — `grep -rE 'OSSAccessKeyId=[0-9A-Za-z]{8,}|Signature=[0-9A-Za-z%+/=]{16,}|LTAI[0-9A-Za-z]{10,}' .planning/audit/` → 零命中(exit=1),`.planning/audit/` 全目录(scans/findings/COVERAGE/HANDOFF/HYPOTHESES/CHARTER 等)无任何秘密模式二次入库 ✓
+10. **零 diff(T-03-02/D-08)** — 见下节"零 diff 验证记录":`git diff --stat 5927f36 -- apps/ scripts/ docs/` 输出为空 ✓
+
+**Phase 3 四条成功判据机械核验:** ①三层发现进台账(判据 1/2:F-CODE 8 + F-TOOL 8,九字段 schema 合规,HYP-07 有结论 → F-TOOL-05)✓ ②点名线索有结论(判据 2:14 HYP 回填 + 6 D14 裁定 = 20 深挖点全下落)✓ ③无原始输出充当发现(判据 3:scans/ 与 findings/ 分离,每条发现证据字段含 `@ 5927f36` 引用片段)✓ ④契约观察全移交不判断(判据 4:oss_admin.py/audio.js/errors.py 等契约观察均记"移交/不判断",findings/code.md 无 CON 维度发现)✓
+
+### 零 diff 验证记录(CHARTER D-03,阶段收尾必跑必记)
+
+```bash
+git diff --stat 5927f36 -- apps/ scripts/ docs/
+# 实际输出:(空)——apps/、scripts/、docs/ 相对基线零改动;D-16 微基准全程在会话 scratchpad
+# 执行(基线导出副本 + 仓外 bench_sha256.js),零仓库写入
+```
+
+`git status --porcelain` 检查结论:输出仅含 `.planning/` 路径条目(审计台账文档),无任何 apps/、scripts/、docs/ 或 scratchpad 工件路径——Phase 3 全部改动落 `.planning/audit/` 与 `.planning/phases/`,审计基线未被污染。
+
+---
+*覆盖台账: 2026-07-05(63 对象全落格 47 CODE + 16 TOOL、已过面 63×9/9、深挖点 20/20 下落(14 HYP 回填 + 6 D14 裁定)、发现 F-CODE 8 + F-TOOL 8、秘密反扫零命中、零 diff 为空——03-07 收口,Phase 3 产物封版)*
