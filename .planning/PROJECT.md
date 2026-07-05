@@ -48,6 +48,7 @@ SoniScope 是一条个人录音转写流水线:WeChat 小程序录音 → Aliyun
 - 项目处于部署阶段(2026-07),FC 直转已定为未来主转写路径,但本审计以现状为基准
 - Phase 1(审计章程与基线)已完成(2026-07-04):审计基线钉住 5927f36,CHARTER.md(严重度体系/工作量分档/发现 schema/排除清单)与 HYPOTHESES.md(25 条假设)、DO-NOT-FIX.md(4 条预录入)定稿,验证 13/13 通过
 - Phase 2(契约抽取与漂移分析)已完成(2026-07-05):CONTRACT-MATRIX.md 51 行封版,FC↔Worker 主链零漂移;判定分布:潜伏 2(MEDIUM)/覆盖洞 3(LOW)/良性 1(INFO)/活跃失配 0;F-CON-01~06 入台账,CONTRACT-TEST-RECIPE.md 产出,6 条 D14 重复逻辑移交 Phase 3,验证 5/5 通过
+- Phase 3(组件与工具链深潜)已完成(2026-07-05):COVERAGE.md 63 对象(47 CODE + 16 TOOL)全落格封版;新发现 F-CODE-01~08(MEDIUM 2:无界重下载循环、uploading 卡死态)+ F-TOOL-01~08(MEDIUM 2:过期预签名 URL 曾入库、mypy 门禁结构性恒红);258 条扫描命中三态销号(确认 15/误报 243),14 条假设回填(累计 14/25,余 11 条留 Phase 4),D14-1~6 全部裁定,HANDOFF-PHASE4.md 封版(DOC 3 + TEST 3),零 diff 红线全程成立,验证 13/13 通过
 
 ## Constraints
 
