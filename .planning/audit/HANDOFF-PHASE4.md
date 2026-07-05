@@ -16,3 +16,5 @@
 ## TEST 维度移交
 
 - **(移交 Phase 4 TEST,HYP-22):** 联调工具侧证据——fc_live 与 verify_upload_live 的全部真实鉴权/签发/校验场景依赖手工传入一次性 `wx.login` code,缺 code 即 SKIP(本地 CI exit 0 但活体路径零覆盖),与 HYP-22"CI 无法运行活体路径"假设同源 — `apps/worker/src/soniscope_worker/fc_live.py:15-16 @ 5927f36`(docstring:code 一次性、缺失场景标 SKIP)、`apps/worker/src/soniscope_worker/verify_upload_live.py:14 @ 5927f36`(同口径)(03-05 采证,HYP-22 状态未动)。
+- **(移交 Phase 4 TEST,HYP-25):** scripts/ 缩窄清单三文件确在全部静态门禁之外——mypy `files` 与 ruff `src` 均只含 apps/ 四路径,Makefile lint 目标实际只跑 `ruff check apps/` 且行内注释自认"遗留 scripts/ 由各自 story 收口" — `pyproject.toml:32,50 @ 5927f36`、`Makefile:166-167 @ 5927f36`(03-06 采证,HYP-25 状态未动)。
+- **(移交 Phase 4 TEST,HYP-25):** 门禁缺席已有实害样本:test_asr.py 存在门禁规则集(E,F,I,UP,B)内真实违例 6 条(UP009 ×1 / E501 ×4 / B904 ×1,逐条见 scans/gates-baseline.md #2-7)与已提交签名 URL(F-TOOL-05,位置 `scripts/test_asr.py:80 @ 5927f36`,只引位置不引值),均在 `make lint` 全绿下入库;fetch_test_fixtures.py 以 `# type: ignore`/`noqa` 自我豁免 — `scripts/test_asr.py:2,38,166,197,275,283 @ 5927f36`、`scripts/fetch_test_fixtures.py:42,103,108 @ 5927f36`(03-06 采证,HYP-25 状态未动)。

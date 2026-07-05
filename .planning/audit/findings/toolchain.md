@@ -69,3 +69,41 @@
 - **关联发现:** 无;关联线索: HYP-15、HYP-24(页面胶水层无测试,TEST 维度)
 - **上线判定:**
 - **状态:** draft
+
+> 03-06 判定产物(AUDIT-02 收尾:scripts/ 缩窄清单三文件 847 行 + Makefile 171 行 45 目标):普审 fetch_test_fixtures.py / gen_worker_config.sh / Makefile,深挖 test_asr.py(HYP-07 核实结论 + HYP-18 采证)。严重度按工具级影响定级(D-03);D-08 零执行——三个脚本与全部 make 目标均未运行,取证仅 `git show 5927f36:<path>`;HYP-07 证据全程遵守 CHARTER 秘密值本体红线(只写位置+模式名,不含任何值本体,含已过期值)。
+
+### F-TOOL-05: test_asr.py 内置样例 URL 为已提交的带签名 OSS 预签名 URL(已过期),签名 URL 入库先例成立
+
+- **维度:** 部署与验证工具链 (TOOL)
+- **严重度:** MEDIUM — 影响:符合签名 URL 模式的完整预签名 GET URL(含 STS 临时 AccessKeyId 与签名参数)随脚本入库,git 历史不可撤回,构成"签名 URL 可以进 git"的先例惯性(对照 CHARTER MEDIUM 锚点"已过期凭证曾入库(泄露习惯风险)",逐字命中);URL 已过期且为 STS 临时凭证 + 单对象 GET 范围,无现行可利用价值,不触 CRITICAL"有效长期凭证泄露"锚;可能性:入库已是基线既成事实,风险面在惯性复发——:78 行内注释明示"过期后请用 --file-link 传新链接",下次更新若再以字面量内置新 URL 即重演,且 scripts/ 无任何静态门禁可拦截(HYP-25)
+- **证据:** `scripts/test_asr.py:79-81 @ 5927f36`(`OSSAccessKeyId=` 签名 URL 模式 + `Signature=` 签名参数模式同行双命中,值本体略,per CHARTER 秘密红线)
+  > `DEFAULT_FILE_LINK = (` — 常量赋值即完整预签名 URL 字面量(此处仅引变量名与赋值号,不截值本体)。过期状态可静态判定:URL 内 `Expires=` 参数为 unix 时间戳,对应 2026-05-29,早于审计日 2026-07-05;AccessKeyId 为 `TMP.` 前缀(STS 临时凭证形态,非 LTAI 长期 AK)。佐证::78 行内注释自认"OSS 签名 URL 会过期,过期后请用 --file-link 传新链接";:112-115 `--file-link` 缺省链回落至该常量(NLS_FILE_LINK 环境变量可覆盖)。
+- **修复建议:** 移除 `DEFAULT_FILE_LINK` 字面量:缺省改为仅读 `NLS_FILE_LINK` 环境变量,未设置时按既有缺参路径(exit 2)退出并提示——脚本已具 `--file-link`/`NLS_FILE_LINK` 双通道(:112-115),改动即删常量 + 调整缺省值。配套把签名 URL 模式纳入 scripts/ 可用的静态门禁(miniprogram_lint 的密钥启发式只扫小程序;将 scripts/ 纳入 lint 范围或增仓库级预提交 grep,与 HYP-25 移交项同一修复面)。git 历史清洗(filter-repo)属可选项:值已过期且系临时凭证,清洗收益低于历史重写成本,留给修复里程碑裁量。
+- **工作量:** S(单文件;门禁增补另计,与 HYP-25 修复面合并)
+- **关联发现:** 无;关联线索: HYP-07(本条即其核实结论,证实)、HYP-25(scripts/ 无门禁,TEST 维度移交);scans/secrets.md #14/#15 销号去向即本条
+- **上线判定:**
+- **状态:** draft
+
+### F-TOOL-06: `make typecheck` 门禁在仓内结构性恒红——app.py 的部署态导入使 mypy strict 必然 exit 1
+
+- **维度:** 部署与验证工具链 (TOOL)
+- **严重度:** MEDIUM — 影响:mypy strict 是仓库声明的核心质量门禁(pyproject strict + `make typecheck` 唯一类型闸),但该目标每次运行必以既有结构性错误退出,退出码永远无法区分"仅结构性旧错"与"引入了新类型回归",门禁二值信号失效——新回归只能靠肉眼比对错误列表发现,操作者对红灯习惯化后等同无门禁(对照 CHARTER MEDIUM"可诱发高危误操作的误导性文档"锚系:门禁声明口径(可通过的质量闸)与实态(结构性不可绿)不符,取影响最接近锚点);可能性:恒定——基线事实,任何时点运行 `make typecheck` 即现
+- **证据:** `apps/fc/shared/app.py:14 @ 5927f36`、`pyproject.toml:32,37-45 @ 5927f36`、`Makefile:163-164 @ 5927f36`
+  > `from handler import handler as application` — `handler.py` 仅在部署 zip 内与 app.py 同目录(fc_deploy vendoring 部署形态),仓内 `apps/fc/shared/` 无该模块;mypy `files` 含 `apps/fc/shared`(pyproject.toml:32),overrides 名单(:37-45)仅含云 SDK 五项、无 `handler`,strict 下 import-not-found 必报;`make typecheck` 即 `uv run mypy`(Makefile:163-164)。实测佐证:scans/gates-baseline.md 门禁基线直调 `uv run mypy` exit=1,全部输出恰此一条命中(#1)。
+- **修复建议:** 三选一,均为配置级改动:①在 app.py:14 加 `# type: ignore[import-not-found]` + 行内注释说明部署态导入(最小改动);②pyproject 增补 `[[tool.mypy.overrides]] module = ["handler"]` + `ignore_missing_imports = true`(与"两个 handler.py 故意不查"的既定豁免口径一致,需注释说明缘由);③mypy `files` 排除 app.py 单文件。任选其一后 `make typecheck` 恢复可绿基线,新类型回归重新可由退出码捕获。
+- **工作量:** S(单文件配置)
+- **关联发现:** 无;关联线索: HYP-12(app.py 运行时形态,CODE 侧无发现)、HYP-23(handler.py mypy 豁免系故意,TEST 维度——本条不质疑豁免本身,只针对门禁恒红);scans/gates-baseline.md #1 销号去向即本条
+- **上线判定:**
+- **状态:** draft
+
+### F-TOOL-07: Makefile .PHONY 声明幻影目标 lint-miniprogram,按声明名调用即硬错误
+
+- **维度:** 部署与验证工具链 (TOOL)
+- **严重度:** LOW — 影响:Makefile 声明面与实现面不一致——`.PHONY` 含 `lint-miniprogram` 但全文件无对应规则,按声明名调用 `make lint-miniprogram` 得 "No rule to make target" 硬错误;小程序 lint 能力无缺失(经 `make lint` 第二条命令执行,README 口径正确);可能性:操作者/agent 按声明名调用即触发——基线 `.claude/CLAUDE.md` 恰以 `make lint-miniprogram` 为该检查的调用口径(该文件属排除目录,仅作旁证)
+- **证据:** `Makefile:19,166-168 @ 5927f36`
+  > :19 `.PHONY` 列表含 `lint-miniprogram`;机械对账:全文件 45 个已定义目标全数在 `.PHONY`(46 条目),幻影条目仅此 1 个,无对应 `lint-miniprogram:` 规则;实体命令在 `lint` 目标内(:168 `uv run python -m soniscope_worker lint-miniprogram`)。旁证:`.claude/CLAUDE.md:53 @ 5927f36` 以 "via `make lint-miniprogram`" 表述调用方式(排除目录,口径漂移仅记事实);`apps/miniprogram/README.md:27 @ 5927f36` 正确经 `make lint` 表述。
+- **修复建议:** 二选一:①新增独立目标 `lint-miniprogram: ## 小程序源码静态检查`(命令即 :168 现有行),与 `.PHONY` 及 agent 文档口径对齐——更符合仓库"每个 make 目标映射一个子命令"惯例;②从 `.PHONY` 移除该条目并同步修正 `.claude/CLAUDE.md:53` 表述。
+- **工作量:** S(单文件)
+- **关联发现:** 无;关联线索: HYP-15(miniprogram_lint 规则面同模块,TOOL 已回填)
+- **上线判定:**
+- **状态:** draft

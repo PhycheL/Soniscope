@@ -77,8 +77,9 @@
 - **来源:** CONCERNS.md §Security Considerations / Committed presigned OSS URL with STS token
 - **假设:** `scripts/test_asr.py` 的 `DEFAULT_FILE_LINK`(约 80 行,以 `git show 5927f36` 核实为准)内嵌符合 `OSSAccessKeyId=TMP.*` 模式的 STS 预签名 GET URL;token 已过期(Expires 时间戳 2026-05-29 已过)但入库先例使签名 URL 泄露常态化。
 - **待验证维度:** TOOL
-- **状态:** 未验证
-- **备注:** 本条只引位置与模式名,不复制任何签名/token 值本体(含已过期值)。
+- **状态:** 证实 — DEFAULT_FILE_LINK 确为已提交的带签名 OSS 预签名 GET URL(`OSSAccessKeyId=` 签名 URL 模式 + `Signature=` 签名参数模式同行双命中,AccessKeyId 为 TMP. 前缀 STS 临时凭证形态),过期状态可由 URL 内 `Expires=` unix 时间戳参数静态判定(对应 2026-05-29,早于审计日 2026-07-05),签名 URL 入库先例成立。
+- **证据:** `scripts/test_asr.py:79-81 @ 5927f36`(双模式命中行,值本体略,per CHARTER 秘密红线)、`scripts/test_asr.py:78 @ 5927f36`(行内注释自认"OSS 签名 URL 会过期,过期后请用 --file-link 传新链接")、`scripts/test_asr.py:112-115 @ 5927f36`(--file-link 缺省链回落该常量,NLS_FILE_LINK 环境变量可覆盖)
+- **备注:** → F-TOOL-05(MEDIUM,对照 CHARTER"已过期凭证曾入库(泄露习惯风险)"锚定级;非 CRITICAL:值已过期、STS 临时凭证、单对象 GET 范围)。scans/secrets.md #14/#15 销号去向闭环至该 ID。本条证据全程只引位置+模式名,不含任何值本体(含已过期值)。03-06 回填。
 
 ### HYP-08: Long-term credentials in FC env vars and local config.yaml
 
@@ -178,7 +179,9 @@
 - **来源:** CONCERNS.md §Dependencies at Risk / `aliyun-python-sdk-core` (legacy SDK) in `scripts/test_asr.py`
 - **假设:** 手工 ASR 探针脚本使用已弃代 Aliyun SDK(`AcsClient`),与 Worker 正式路径的 `alibabacloud-*` v2 SDK 并存两代 SDK 理解成本;仅脚本级影响、不随 Worker/FC 打包。
 - **待验证维度:** TOOL
-- **状态:** 未验证
+- **状态:** 细化 — "两代 SDK 并存"半句证实(test_asr.py 全程 legacy AcsClient/CommonRequest POP 形态);"仅脚本级影响、不随 Worker/FC 打包"半句在 Worker 侧证伪:aliyunsdkcore 是 apps/worker 声明的运行时依赖并承载生产转写主路径(nls.py 经 verify_prep._import_nls_core 构造 AcsClient),FC 侧属实(两函数 requirements.txt 均无该包)。
+- **证据:** `scripts/test_asr.py:22-23,159,167,174,217 @ 5927f36`(docstring 钉定 `aliyun-python-sdk-core==2.16.0`;AcsClient/CommonRequest 用法)、`apps/worker/pyproject.toml:13 @ 5927f36`(`aliyun-python-sdk-core>=2.16.0` 声明依赖)、`apps/worker/src/soniscope_worker/nls.py:441-448,454-455 @ 5927f36`(生产 oss-url 主路径经 legacy AcsClient 构造 filetrans 请求)、`apps/fc/issue_credential/requirements.txt:3-4` / `apps/fc/verify_upload/requirements.txt:3 @ 5927f36`(FC 依赖清单无 aliyunsdkcore)
+- **备注:** 评估以现状互审为基准,不引入弃用时间表判断(03-RESEARCH §State of the Art 口径);生产侧 legacy SDK 证据与 HYP-19 回填同源互引(`verify_prep.py:775-776` 即 `_import_nls_core` 实体)。两代 SDK 并存的理解成本属存量技术债观察,工具级无独立发现(test_asr.py 的发现面在 F-TOOL-05)。03-06 回填。
 
 ### HYP-19: `alibabacloud-nls20180628` / NLS filetrans API (2018 vintage)
 
@@ -240,4 +243,4 @@
 
 ---
 
-*未验证假设清单: 2026-07-04(25 条 HYP + 1 条 Known Bugs 显式无线索记录;对账 25 + 4 DNF = 29,Phase 4 AUDIT-05 逐条回填)。回填进度:已回填 11 条(03-03:HYP-10 证实、HYP-16 细化、HYP-19 证实;03-04:HYP-01 证实、HYP-08 细化、HYP-09 证实、HYP-12 证实、HYP-17 证实、HYP-20 证实;03-05:HYP-04 证实、HYP-15 细化,2026-07-05),余 14 条未验证(CODE 维度仅余 HYP-03 留待 03-07 微基准;TOOL 维度余 HYP-07/HYP-18 留待 03-06 scripts 侧)。*
+*未验证假设清单: 2026-07-04(25 条 HYP + 1 条 Known Bugs 显式无线索记录;对账 25 + 4 DNF = 29,Phase 4 AUDIT-05 逐条回填)。回填进度:已回填 13 条(03-03:HYP-10 证实、HYP-16 细化、HYP-19 证实;03-04:HYP-01 证实、HYP-08 细化、HYP-09 证实、HYP-12 证实、HYP-17 证实、HYP-20 证实;03-05:HYP-04 证实、HYP-15 细化;03-06:HYP-07 证实、HYP-18 细化,2026-07-05),余 12 条未验证(Phase 3 回填集 14 条中仅余 HYP-03 留待 03-07 微基准;TOOL 维度 4 条全部闭环;其余 11 条属 Phase 4 维度)。*
