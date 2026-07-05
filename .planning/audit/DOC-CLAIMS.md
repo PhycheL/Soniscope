@@ -41,14 +41,14 @@
 | `README.md` | 深核 | §README.md(04-05) | 已审:1 条销号无发现 |
 | `apps/fc/README.md` | 深核 | §apps/fc/README.md(04-05) | 已审:6 条销号;drift ×1 → F-DOC-05 |
 | `apps/miniprogram/README.md` | 深核 | §apps/miniprogram/README.md(04-05) | 已审:6 条销号;drift ×1 → F-DOC-05 |
-| `apps/miniprogram/config.js` | 深核 | (04-05) | 待审 |
+| `apps/miniprogram/config.js` | 深核 | §config.js(04-05) | 已审:8 条销号无发现级 drift;issue-cedential 核实结论闭环 DNF-02;ENV 现值 → HYP-14 证据行 |
 | `docs/architecture/architecture-review-2026-07-02.md` | 普审 | (04-05) | 待审 |
 | `docs/transcribe-approach-comparison.md` | 普审 | (04-05) | 待审 |
 | `docs/agents/domain.md` | 普审 | (04-05) | 待审 |
 | `docs/agents/issue-tracker.md` | 普审 | (04-05) | 待审 |
 | `docs/agents/triage-labels.md` | 普审 | (04-05) | 待审 |
-| `apps/miniprogram/project.config.json` | 普审(配置) | (04-05) | 待审 |
-| `apps/miniprogram/app.json` | 普审(配置) | (04-05) | 待审 |
+| `apps/miniprogram/project.config.json` | 普审(配置) | §project.config.json(04-05) | 已审:3 条销号无发现;平台侧真值标『无法静态核实』 |
+| `apps/miniprogram/app.json` | 普审(配置) | §app.json(04-05) | 已审:3 条销号无发现;页面四件套静态复核通过 |
 | `docs/fc-transcribe-design.md` | 只审引用与自洽 | (04-05) | 待审(目标态对照未审,章程排除) |
 | `docs/multi-user-design.md` | 只审引用与自洽 | (04-05) | 待审(目标态对照未审,章程排除) |
 | `docs/小程序原型/`(PixPin PNG ×4) | 只记存在 | (04-05) | 待审 |
@@ -344,3 +344,44 @@
 | RM-06 | 后续 story 节:"录音/草稿/上传/状态机等在 US-012 ~ US-020 逐步实现;本 story(US-011)只交付骨架与环境配置" | `apps/miniprogram/README.md:33-35 @ 5927f36` | 基线小程序为全量实现:三页 + 16 个 utils 模块(录音/草稿/分片/上传队列 8 状态/OSS V4 签名/verify/故障注入全在)——"现状"叙述停留在 US-011 时点未随实现更新 | `git ls-tree -r --name-only 5927f36 apps/miniprogram/utils/`(16 模块)、`apps/miniprogram/utils/upload_queue.js:9-27 @ 5927f36` | drift → F-DOC-05 |
 
 **apps/miniprogram/README.md 节机械对账:** 清单条目总数 **6**(RM-01 ~ RM-06);四态计数:agree **5**(内含闭环 DNF-02 ×1)+ drift **1**(RM-06 → F-DOC-05)+ dead-ref **0** + 无法静态核实 **0**;复算:5 + 1 + 0 + 0 = 6 ✓。
+
+## §config.js 深核(04-05,D-08 配置边界)
+
+> 对象:`apps/miniprogram/config.js`(41 行 @ 5927f36)。取证命令:`git show 5927f36:apps/miniprogram/config.js`。本节方向与文档节相反:**配置侧声明 ↔ 文档侧登记**逐条对照,闭合 04-03/04-04 留下的互指行(T-19/CS-01/CS-08/CS-12 各行"配置侧对照行见 config.js 节");config.js 头注自证的一致性声明(:3"与 cloud-setup §3-4 登记的真实云资源一致")本身也是可核声明,判定其是否属实。ROADMAP 成功判据 1 点名线索之一(issue-cedential 拼写域名)的核实结论行在本节(CF-02)。
+
+| # | 配置侧声明 | 配置证据 | 文档/代码侧实态 | 文档/代码证据 | 判定 |
+|---|-----------|----------|----------------|----------|------|
+| CF-01 | 头注一致性自证:"这些 URL 与 docs/runbook/cloud-setup.md §3-4 登记的真实云资源一致,同时必须在微信公众平台按清单配置(request 两条 / uploadFile 一条)" | `apps/miniprogram/config.js:1-6 @ 5927f36` | 声明属实:三 URL 与 cloud-setup §3.2(:85-86)/§4.3(:108-110)逐字符一致(CF-02~CF-04 逐值复核);清单划分(request ×2 / uploadFile ×1)与 cloud-setup §4.3 同款;头注引用的 cloud-setup.md 路径本身有效(runbook 现行路径非旧路径) | `docs/runbook/cloud-setup.md:85-86,107-110 @ 5927f36`、`git ls-tree -r --name-only 5927f36 docs/runbook/` | agree |
+| CF-02 | 【核实结论——ROADMAP 成功判据 1 点名线索】`FC_ISSUE_CREDENTIAL_URL = 'https://issue-cedential-ottfirocds.cn-beijing.fcapp.run'`(:10),:8 行内注释自证"issue-cedential 子域名确实少一个 r,是阿里云分配的真实 URL,不要'修正'拼写" | `apps/miniprogram/config.js:8-10 @ 5927f36` | **核实结论:拼写域名系 Aliyun FC 系统分配的真实 URL,非笔误**——配置注释(:8)、cloud-setup 勿改拼写警示(:83"已在控制台核实就是此拼写")、PRD US-001(:108)、tech-spec §4.0 注(:346)、AGENTS.md(:273,282)五处文档登记逐字符同值且警示口径一致;lint 拼写守卫防"好心修正"在案 | `docs/runbook/cloud-setup.md:83,85 @ 5927f36`、`docs/v1.0.0 prd/PRD_v1.md:108 @ 5927f36`、`docs/v1.0.0 prd/tech-spec.md:346 @ 5927f36`、`AGENTS.md:273,282 @ 5927f36`、`apps/worker/src/soniscope_worker/miniprogram_lint.py:107-118 @ 5927f36` | agree,闭环 DNF-02(不立 F-DOC) |
+| CF-03 | `FC_VERIFY_UPLOAD_URL = 'https://verify-upload-nnjpaoamhw.cn-beijing.fcapp.run'` | `apps/miniprogram/config.js:11 @ 5927f36` | 与 cloud-setup :86 / tech-spec :346 / PRD :108 / AGENTS.md :274 四文档登记逐字符同值(闭合 T-19/CS-08 互指的配置侧行) | `docs/runbook/cloud-setup.md:86 @ 5927f36`、`docs/v1.0.0 prd/tech-spec.md:346 @ 5927f36` | agree |
+| CF-04 | `OSS_UPLOAD_URL = 'https://soniscope-audio.oss-cn-beijing.aliyuncs.com'`(:12)+ `OSS_REGION = 'cn-beijing'`(:15,注释自证"与 runbook 登记一致,OSS V4 PostObject 签名所需") | `apps/miniprogram/config.js:12,14-15 @ 5927f36` | 上传域名与 cloud-setup §4.3(:110)/§1(桶/region/endpoint 三要素 :15-17)、tech-spec :346 逐字符同值;region 与桶登记一致(闭合 CS-01 互指的配置侧行) | `docs/runbook/cloud-setup.md:15-17,110 @ 5927f36`、`docs/v1.0.0 prd/tech-spec.md:346 @ 5927f36` | agree |
+| CF-05 | `REQUEST_LEGAL_DOMAINS = [FC_ISSUE_CREDENTIAL_URL, FC_VERIFY_UPLOAD_URL]` + `UPLOAD_LEGAL_DOMAINS = [OSS_UPLOAD_URL]`,:17 注释"两条,FC 3.0 每函数子域名独立,白名单不支持通配符" | `apps/miniprogram/config.js:17-20 @ 5927f36` | 清单结构与 cloud-setup §4.3 三条白名单登记一一对应,"每函数子域名独立、不支持通配符"注释与 :107 文档口径同款(闭合 CS-12 互指的配置侧行);微信平台实际登记状态平台侧(PC-02 统一标注) | `docs/runbook/cloud-setup.md:107-110 @ 5927f36` | agree |
+| CF-06 | `CHUNK_MAX_DURATION_SECONDS = 600`(:23),:22 注释自证"tech-spec §3.1:CHUNK_MAX_DURATION_SECONDS = 600,本期作为前端常量管理" | `apps/miniprogram/config.js:22-23 @ 5927f36` | tech-spec §3.1(:169)同名同值 600(10 分钟)且"定义在小程序配置文件中、本期作为前端常量管理不经后端下发"口径逐字对应(闭合 T-11 互指的配置侧行);消费点 chunking.js 阈值判定在案 | `docs/v1.0.0 prd/tech-spec.md:169 @ 5927f36`、`apps/miniprogram/utils/chunking.js:39-51 @ 5927f36` | agree |
+| CF-07 | `OSS_OBJECT_KEY_EXT = '.wav'`(:26),:25 注释"即使原始格式非 wav,object key 始终用 .wav,表示 Worker 侧标准化目标" | `apps/miniprogram/config.js:25-26 @ 5927f36` | tech-spec §3.2 key 模板(:175)与 §5.1(:471"OSS object key 始终用 .wav 扩展名")同口径;FC/Worker 两侧 key 模板 f-string 同款(T-12 同判) | `docs/v1.0.0 prd/tech-spec.md:175,471 @ 5927f36`、`apps/fc/shared/fc_shared/sts.py:46-59 @ 5927f36` | agree |
+| CF-08 | `ENV = 'development'`(:29),:28 注释"production 构建不显示开发者菜单 / 故障注入(US-020)" | `apps/miniprogram/config.js:28-29 @ 5927f36` | 注释声明的门控行为属实:dev 页 onLoad/onShow 经 `isDevEnv(config.ENV)` 双重兜底 + fault_injection 生产读全关写忽略(三重门控,03-04 采证 HANDOFF DOC 第 3 条);**现值登记:基线 ENV 即 `'development'`(HYP-14 证据行,配置侧)**——门控实效完全取决于发布时该常量取值,而发布文档未覆盖翻转步骤(文档侧证据见 FD-16,drift → F-DOC-03);配置自身无失实声明 | `apps/miniprogram/pages/dev/dev.js:18,28,52 @ 5927f36`、`apps/miniprogram/utils/fault_injection.js:38-40,82-107 @ 5927f36`(引 HANDOFF-PHASE4.md DOC 节第 2、3 条) | agree → HYP-14(04-09 回填锚点:配置侧现值证据) |
+
+**config.js 节机械对账:** 清单条目总数 **8**(CF-01 ~ CF-08);四态计数:agree **8**(内含核实结论闭环 DNF-02 ×1、→ HYP-14 证据行 ×1)+ drift **0** + dead-ref **0** + 无法静态核实 **0**;复算:8 + 0 + 0 + 0 = 8 ✓。
+
+## §project.config.json 普审(04-05,D-08 配置边界)
+
+> 对象:`apps/miniprogram/project.config.json`(41 行 @ 5927f36)。取证命令:`git show 5927f36:apps/miniprogram/project.config.json`。普审级:文档↔配置可静态核实,配置↔微信平台真值标『无法静态核实』(RESEARCH Open Question 2 口径,不猜测)。
+
+| # | 配置侧声明 | 配置证据 | 文档/平台侧实态 | 证据 | 判定 |
+|---|-----------|----------|----------------|------|------|
+| PC-01 | `"appid": "wx3f973c7297728b0c"` | `apps/miniprogram/project.config.json:2 @ 5927f36` | 与 PRD(:89)、cloud-setup §4.1(:95)、AGENTS.md(:274)三文档登记同值(P-05/CS-10 同判,文档↔配置互对一致) | `docs/v1.0.0 prd/PRD_v1.md:89 @ 5927f36`、`docs/runbook/cloud-setup.md:95 @ 5927f36`、`AGENTS.md:274 @ 5927f36` | agree |
+| PC-02 | appid 在微信平台的登记真值、合法域名平台侧配置状态、`libVersion: "3.5.5"` 在平台的可用性与实际运行基础库版本 | `apps/miniprogram/project.config.json:2,7 @ 5927f36` | 微信平台侧事实,静态取证不可判——只登记不猜测(RESEARCH OQ2 口径;CS-11 同判);libVersion 仓内权威文档无对应声明,无口径可互对 | (平台真值仓外) | 无法静态核实 |
+| PC-03 | DevTools 构建设置:`urlCheck: true`、`es6: true`、`minified: true` 等;`compileType: "miniprogram"`、`miniprogramRoot: "./"` | `apps/miniprogram/project.config.json:5-33 @ 5927f36` | urlCheck=true(DevTools 强制校验合法域名)与 config.js 头注"必须在平台配置合法域名"及 README 域名章节口径自洽;其余为构建开关,仓内文档无冲突声明 | `apps/miniprogram/config.js:1-6 @ 5927f36`、`apps/miniprogram/README.md:12-14 @ 5927f36` | agree |
+
+**project.config.json 节机械对账:** 清单条目总数 **3**(PC-01 ~ PC-03);四态计数:agree **2** + drift **0** + dead-ref **0** + 无法静态核实 **1**(PC-02);复算:2 + 0 + 0 + 1 = 3 ✓。
+
+## §app.json 普审(04-05,D-08 配置边界)
+
+> 对象:`apps/miniprogram/app.json`(18 行 @ 5927f36)。取证命令:`git show 5927f36:apps/miniprogram/app.json`。普审级:页面注册 ↔ 页面四件套存在性(miniprogram_lint 页面规则的静态复核)。
+
+| # | 配置侧声明 | 配置证据 | 文档/代码侧实态 | 证据 | 判定 |
+|---|-----------|----------|----------------|------|------|
+| AJ-01 | pages 注册三页:`pages/index/index`、`pages/uploads/uploads`、`pages/dev/dev` | `apps/miniprogram/app.json:2-6 @ 5927f36` | 三页四件套(.js/.json/.wxml/.wxss)基线全部实存(3 × 4 = 12 文件逐一在列)——miniprogram_lint 页面完整性规则的静态复核通过 | `git ls-tree -r --name-only 5927f36 apps/miniprogram/pages/`(12 文件)、`apps/worker/src/soniscope_worker/miniprogram_lint.py:80-104 @ 5927f36`(规则实体) | agree |
+| AJ-02 | 页面集合与文档口径:仅录音(index)/上传列表(uploads)/开发者菜单(dev)三页,无任何转写产物展示页 | `apps/miniprogram/app.json:2-6 @ 5927f36` | 与 PRD 范围声明一致(P-28 同判:NG-1/NG-2 明示无日稿展示,零 transcript 读取 UI);dev 页系 ENV 门控项(T-26/MA-05/CF-08 同源) | `docs/v1.0.0 prd/PRD_v1.md:15,722-723 @ 5927f36`、`apps/miniprogram/pages/dev/dev.js:18,28 @ 5927f36` | agree |
+| AJ-03 | window 导航栏标题"日观声记"与深色样式、`sitemapLocation: "sitemap.json"` | `apps/miniprogram/app.json:7-17 @ 5927f36` | 标题与 cloud-setup §4.1 小程序名称"日观声记"同值;sitemap.json 基线实存(引用有效) | `docs/runbook/cloud-setup.md:94 @ 5927f36`、`git ls-tree --name-only 5927f36 apps/miniprogram/`(sitemap.json 在) | agree |
+
+**app.json 节机械对账:** 清单条目总数 **3**(AJ-01 ~ AJ-03);四态计数:agree **3** + drift **0** + dead-ref **0** + 无法静态核实 **0**;复算:3 + 0 + 0 + 0 = 3 ✓。
