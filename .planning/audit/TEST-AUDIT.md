@@ -24,7 +24,7 @@
 
 ## 逐对象台账(41 个测试模块)
 
-对象清单以 `git ls-tree -r --name-only 5927f36 apps/worker/tests apps/fc/tests apps/miniprogram/test` 过滤 `test_*.py` 与 `*.test.js` 枚举——实测 41(worker 24 + fc 7 + node 10),与预期一致。行数为 `git show 5927f36:<path> | wc -l` 实测值;深度/已过面/产出三列由 04-07 回填(已过面初始 `0/8`,产出初始 `-`);备注列预置既有发现的已知线索,供 04-07 过账起点。
+对象清单以 `git ls-tree -r --name-only 5927f36 apps/worker/tests apps/fc/tests apps/miniprogram/test` 过滤 `test_*.py` 与 `*.test.js` 枚举——实测 41(worker 24 + fc 7 + node 10),与预期一致。行数为 `git show 5927f36:<path> | wc -l` 实测值;深度/已过面/产出三列已由 04-07 逐面普审回填完毕(41 行全部 8/8,产出/备注列非空);备注列含关键证据行号 @ 5927f36 与去向指针(→ 04-08 候选面 / → D-11 / 反向映射)。
 
 | 路径 | 行数 | 侧 | 深度 | 已过面 | 产出 | 备注 |
 |------|------|-----|------|--------|------|------|
@@ -59,16 +59,16 @@
 | `apps/fc/tests/test_issue_credential.py` | 229 | pytest-fc | 普审 | 8/8 | 无新增线索(F-CON-06 已入反向映射) | 面④ :142,151 上限 52428800 字面锁定(F-CON-06 FC 侧);:122-137 单 key policy + `recordings/*` not in resource(最小权限负断言);面⑦ :215-228 签发失败 500 无泄漏(STS_ISSUE_FAILED);面③ monkeypatch×13 @ 5927f36 |
 | `apps/fc/tests/test_sts.py` | 163 | pytest-fc | 普审 | 8/8 | 无缺口线索 | 单 key policy 断言(HYP-09/17 关联);面⑦ raises×5 + SIZE_EXCEEDED shared 级 :87;面①强(31 断言) @ 5927f36 |
 | `apps/fc/tests/test_verify_upload.py` | 203 | pytest-fc | 普审 | 8/8 | 无缺口线索 | 面⑦ handler 级三态 :123-148(OBJECT_NOT_FOUND :130/SIZE_MISMATCH :144)+ :194-202 HeadObject 失败 500 无泄漏(HEAD_OBJECT_FAILED);面⑤ :175-188 伪造 code 不返回对象信息;面③ monkeypatch×6 @ 5927f36 |
-| `apps/miniprogram/test/chunking.test.js` | 220 | node | - | 0/8 | - | :168 FRAGMENT_ID_RE 正样本断言 |
-| `apps/miniprogram/test/draft_confirm.test.js` | 208 | node | - | 0/8 | - | 手写 wx/Page mock 模式(面②③) |
-| `apps/miniprogram/test/fault_injection.test.js` | 272 | node | - | 0/8 | - | — |
-| `apps/miniprogram/test/ids.test.js` | 281 | node | - | 0/8 | - | :65-79 FRAGMENT_ID_RE 仅正样本(F-CON-01 缺口面);:134 meta sha256 写入锁定(F-CON-04 生产端) |
-| `apps/miniprogram/test/interruption.test.js` | 197 | node | - | 0/8 | - | — |
-| `apps/miniprogram/test/oss_sign.test.js` | 108 | node | - | 0/8 | - | 面⑤关注:签名派生链无秘密外泄 |
-| `apps/miniprogram/test/redesign_view.test.js` | 213 | node | - | 0/8 | - | :146 queue_runtime.drive 编排测试(F-CODE-08 关联) |
-| `apps/miniprogram/test/uploader.test.js` | 226 | node | - | 0/8 | - | 面④线索::55-56 重试常量字面锁定(F-CODE-07);:11 加载 uploads 页(F-CODE-08 参照实现);:47-50 错误码透传断言(F-CON-05) |
-| `apps/miniprogram/test/uploads_view.test.js` | 288 | node | - | 0/8 | - | :70 断言 uploading 不计积压——现行死态行为正向锁定(F-CODE-06) |
-| `apps/miniprogram/test/verify.test.js` | 351 | node | - | 0/8 | - | 面④线索::54-55 verify 重试常量字面锁定(F-CODE-07) |
+| `apps/miniprogram/test/chunking.test.js` | 220 | node | 普审 | 8/8 | 无缺口线索 | HYP-24:加载 index 页 :17,105(Page harness);面④ :168 FRAGMENT_ID_RE 正样本断言(F-CON-01 同源);面③ require.cache 清理 :104 隔离惯例 @ 5927f36 |
+| `apps/miniprogram/test/draft_confirm.test.js` | 208 | node | 普审 | 8/8 | 无缺口线索 | HYP-24:加载 index 页 :14,74;面②③ 手写 wx/Page mock(:69-74 loadPageConfig 模式),storage 每测新建对象隔离 @ 5927f36 |
+| `apps/miniprogram/test/fault_injection.test.js` | 272 | node | 普审 | 8/8 | 无缺口线索 | HYP-24:加载 dev 页 :11,148,176,199 + uploads 页 :12,214-255;面⑦ 离线注入 queued 保持 :221-229、恢复自动上传 :230;面④ 开关名与 tech-spec §6.1 一致断言 :26;production 门控负例 :70-90,192 @ 5927f36 |
+| `apps/miniprogram/test/ids.test.js` | 281 | node | 普审 | 8/8 | 无新增线索(F-CON-01/04 已入反向映射) | 面④ :65-79 FRAGMENT_ID_RE 仅正样本(F-CON-01 缺口面);:134 meta sha256 写入锁定(F-CON-04 生产端);HYP-24:加载 index 页 :19,211;面① assert.ok×13 多为存在性前置(可接受) @ 5927f36 |
+| `apps/miniprogram/test/interruption.test.js` | 197 | node | 普审 | 8/8 | 无缺口线索 | HYP-24:加载 index 页 :13,53(harness 注释 :47);录音中断回调经 mock recorder 真实驱动(胶水层被驱动直接证据);面③ 每测清 require.cache + storage 注入 @ 5927f36 |
+| `apps/miniprogram/test/oss_sign.test.js` | 108 | node | 普审 | 8/8 | 面⑤线索:秘密标记 `sts-secret-do-not-log`(:39)仅参与派生(:91),无『raw secret 不出现在表单/policy』负断言 → 04-08 候选面 | 面④ :61-74 表单字段逐一强断言 + key=FC 返回值不被前端覆盖(AC#4);面①强(23 断言);纯函数无 IO @ 5927f36 |
+| `apps/miniprogram/test/redesign_view.test.js` | 213 | node | 普审 | 8/8 | 无新增线索(F-CODE-08 已销号,见反向映射) | :146,163 queue_runtime.drive 编排(F-CODE-08);:126 FC URL 经 config 注入;面⑦ :169 缺 getNetworkType 视为离线负例 @ 5927f36 |
+| `apps/miniprogram/test/uploader.test.js` | 226 | node | 普审 | 8/8 | 无新增线索(F-CODE-07/F-CON-05 已入反向映射) | 面④ :55-56 RETRY_DELAYS_MS=[5000,15000,45000]/MAX_UPLOAD_RETRIES=3 字面锁定(与 Python 5/15/45s 镜像,F-CODE-07)+ :47-50 错误码字面透传(F-CON-05);HYP-24:加载 uploads 页 :11,168;面⑦ 403 落盘 manual 状态 :199-206 @ 5927f36 |
+| `apps/miniprogram/test/uploads_view.test.js` | 288 | node | 普审 | 8/8 | 无新增线索(F-CODE-06 已入反向映射) | :70 isBacklog('uploading')=false——现行死态行为正向锁定(F-CODE-06,修复需同步改此断言);HYP-24:加载 uploads 页 :11,222;面①强(57 断言零 assert.ok) @ 5927f36 |
+| `apps/miniprogram/test/verify.test.js` | 351 | node | 普审 | 8/8 | 无新增线索(F-CODE-07 已入反向映射) | 面④ :54 VERIFY_RETRY_DELAYS_MS=[5000,15000,45000] 字面锁定(F-CODE-07)+ :48-50 INVALID_CODE 字面;HYP-24:加载 uploads 页 :11,236;面⑦ 重试穷尽→manual_verify 路径覆盖 @ 5927f36 |
 
 ## HYP-23 专项:FC handler 行为测试补偿事实清单
 
@@ -90,6 +90,22 @@
 
 **结论行:** 补偿覆盖面事实清单 = 9/9 错误码均有行为测试且全部在 handler 入口级被驱动;GET/POST 成功/异常分支三类入口路径均被测试驱动;`fc_shared`(逻辑下沉层)本身在 mypy strict 范围内 → HYP-23(04-09 回填锚点;充分性判断在回填时依此清单下,不质疑 DNF-03 豁免本身)。
 
+## HYP-24 专项:pages 胶水层加载边界事实
+
+**检索方法备注:** 字面模式 `git grep "require.*pages/" 5927f36 -- apps/miniprogram/test` 为**零命中**——页面加载一律经 `path.resolve` 变量 + `require(INDEX_PAGE)` 形态,须以变量形态检索(`git grep "pages/"` 命中 10 处路径常量定义 + `require(<VAR>)` 8 处)。
+
+**加载矩阵(app.json 注册 3 页,全部被 node 测试真实加载,@ 5927f36):**
+
+| 页面 | 行数 | 加载测试(定义行,require 行) |
+|------|------|------------------------------|
+| `pages/index/index.js` | 796(`git show 5927f36:... \| wc -l` 实测) | `chunking.test.js:17,105`;`draft_confirm.test.js:14,74`;`ids.test.js:19,211`;`interruption.test.js:13,53` —— 4 文件均为 Page harness 模式(global.Page 捕获配置 + mock wx + require.cache 清理) |
+| `pages/uploads/uploads.js` | — | `uploader.test.js:11,168`;`uploads_view.test.js:11,222`;`verify.test.js:11,236`;`fault_injection.test.js:12,214-255` |
+| `pages/dev/dev.js` | — | `fault_injection.test.js:11,148,176,199` |
+
+**边界事实:** `pages/index/index.js` **被测试加载**——HYP-24 假设前提『页面文件中的 wx-API 胶水层无自动化测试』与实态不符(TESTING.md 仅记 uploader.test.js 加载 uploads 页,漏记 index 页 4 处 harness 加载);但驱动为选择性:录音中断回调(interruption)、草稿确认(draft_confirm)、分片(chunking)、ID 生成(ids)四条流程的 handler 被 mock wx 驱动,796 行内其余胶水(如 showModal 流程、storage IO 全路径)的行覆盖比例无实测数据。
+
+**结论行:** 页面级加载边界事实 = 3/3 注册页均被 node 测试真实加载;index.js(796 行)被 4 个测试文件经 Page harness 驱动(非『仅经抽出的纯 utils 模块测试』)→ HYP-24(04-09 回填锚点;coverage-node.md 的 pages/ 数据为实测佐证——本阶段 scans/ 目录未产出该文件,行覆盖率佐证缺位,由 04-08 补引)。
+
 ## 反向映射清单(D-09)
 
 **定级规则(预置,供 04-08 引用):** 脆弱区无测试兜底的缺口,定级参照原发现严重度;无关联脆弱区的一般覆盖缺口,按 CHARTER LOW 锚点(『lint/typecheck/测试覆盖缺口』类)定级。
@@ -107,13 +123,13 @@
 | F-CON-05 | INFO | 错误码经 body.error 通用透传行为保持稳定 | `apps/miniprogram/test/uploader.test.js:47-50,92-97`(码字符串透传断言) | 无缺口(良性,INFO 维持) |
 | F-CON-06 | LOW | 小程序上传前应有 50 MB 预检或镜像常量 | FC 侧上限字面锁定:`apps/fc/tests/test_issue_credential.py:142,151`;小程序侧 `git grep '52428800\|MAX_UPLOAD' -- apps/miniprogram/test` 零预检命中(仅 MAX_UPLOAD_RETRIES 无关命中) | 缺口参照原严重度 LOW |
 | F-CODE-01 | LOW | process_plan 幂等判定职责边界(fragments_root 未用)不被误信 | `apps/worker/tests/test_poller.py:171-172,188-189`(仅锁定调用形态,不能检测形参未用) | 缺口参照原严重度 LOW |
-| F-CODE-02 | MEDIUM | 持久失败对象应有失败计数/隔离/告警(重复轮次不无界) | 单轮行为锁定:`apps/worker/tests/test_poller.py:182-191`(sha 失配删 .part)、`apps/worker/tests/test_pipeline.py:293`(失配无 .done)、`apps/worker/tests/test_audio.py:215`(探测失败留档);多轮重复/计数缺失面静读未见断言 | 补证中 |
+| F-CODE-02 | MEDIUM | 持久失败对象应有失败计数/隔离/告警(重复轮次不无界) | 单轮行为锁定:`apps/worker/tests/test_poller.py:182-191`(sha 失配删 .part)、`apps/worker/tests/test_pipeline.py:293`(失配无 .done)、`apps/worker/tests/test_audio.py:215`(探测失败留档);重复轮次锁定仅及成功路径:`test_pipeline.py:276,289`(.done 后仅下载一次/二轮跳过);失败对象多轮重复/计数面 `git grep '多轮\|failed_count\|attempt' 5927f36 -- <三文件>` 零命中,面⑦普审(test_poller/test_pipeline/test_e2e_scenarios 均 8/8)确认无断言 | 缺口参照原严重度 MEDIUM |
 | F-CODE-03 | LOW | fragment 目录内 mkstemp 孤儿 `*.tmp` 应有清理/检出路径 | 正常路径无残留锁定:`apps/worker/tests/test_recovery.py:47-53`;孤儿清理路径无测试(功能缺失) | 缺口参照原严重度 LOW |
 | F-CODE-04 | LOW | `.env` 向上搜索应有仓库边界(或与文档口径一致) | 正向解析锁定:`apps/worker/tests/test_skeleton.py:52-58`;无界搜索行为无测试 | 缺口参照原严重度 LOW |
 | F-CODE-05 | LOW | STS 签发与上游调用应有频控/配额面 | 无(功能缺失;`apps/fc/tests` 无频控/计数相关断言) | 缺口参照原严重度 LOW |
 | F-CODE-06 | MEDIUM | uploading 残留项应有自动复位或手动出口 | 现行死态行为被正向锁定:`apps/miniprogram/test/uploads_view.test.js:70`(断言 uploading 不计积压)、`apps/miniprogram/test/uploader.test.js:84`(uploading 先落盘);恢复路径无测试(功能缺失,修复需同步改既有断言) | 缺口参照原严重度 MEDIUM |
 | F-CODE-07 | LOW | 四落点重试常量的字面/结构锁定应对称 | `apps/miniprogram/test/uploader.test.js:55-56`、`apps/miniprogram/test/verify.test.js:54-55`(JS 字面锁定);`apps/worker/tests/test_nls.py:401,449-450`(结构锁定,数值字面无断言)——发现正文内已列,反查引用 | 缺口参照原严重度 LOW |
-| F-CODE-08 | LOW | utils/pages 两份 FC 请求组装应有同步断言或共享源 | uploads 页参照实现有单测:`apps/miniprogram/test/uploader.test.js:11`(加载 pages/uploads/uploads.js);queue_runtime 编排有测试:`apps/miniprogram/test/redesign_view.test.js:146`;两份组装的同步断言静读未见 | 补证中 |
+| F-CODE-08 | LOW | utils/pages 两份 FC 请求组装应有同步断言或共享源 | uploads 页参照实现有单测:`apps/miniprogram/test/uploader.test.js:11,168`(加载 pages/uploads/uploads.js);queue_runtime 编排有测试:`apps/miniprogram/test/redesign_view.test.js:146,163`;面④/面⑧普审(两文件均 8/8)确认:两测试各驱动一份组装(uploader.test.js:68,92 mock requestSts;redesign_view.test.js:126 FC URL 经 config 注入),无任何跨份同步性断言或共享源绑定 | 缺口参照原严重度 LOW |
 | F-TOOL-01 | LOW | 反例异常应三分(意外成功/拒绝/探测失败)不误报越权 | 现行二分行为锁定:`apps/worker/tests/test_verify_prep.py:234-251`;error_code 渲染缺失面无测试(功能缺失) | 缺口参照原严重度 LOW |
 | F-TOOL-02 | LOW | 非首次部署备份失败应阻断(或显式 --force) | 首次部署跳过备份锁定:`apps/worker/tests/test_fc_deploy.py:331`;非首次备份失败不阻断面无区分测试 | 缺口参照原严重度 LOW |
 | F-TOOL-03 | LOW | 清理失败应报告残留 key 不静默吞并 | 清理成功路径锁定:`apps/worker/tests/test_verify_upload_live.py:202-203,221-223`;失败吞并分支无测试 | 缺口参照原严重度 LOW |
@@ -123,4 +139,4 @@
 | F-TOOL-07 | LOW | Makefile 声明面与实现面应一致(.PHONY 无幻影目标) | 无(Makefile 无对账测试) | 缺口参照原严重度 LOW |
 | F-TOOL-08 | LOW | 联调工具契约镜像应有跨侧一致性测试绑定 | 自侧行为有测试:`apps/worker/tests/test_fc_live.py:105-112,126`(镜像常量自证消费);跨侧绑定断言无(发现自证『全集群零测试断言』) | 缺口参照原严重度 LOW |
 
-**机械对账:** 行总数 = 22 条 F-* + 0 条矩阵追加 = 22;缺口判定分布 = 终态 20(参照原严重度 19 + 无缺口 1)+ 占位态 2(F-CODE-02、F-CODE-08,待 04-07 逐面普审销号);22 = 20 + 2 ✓
+**机械对账(04-07 终态):** 行总数 = 22 条 F-* + 0 条矩阵追加 = 22;缺口判定分布 = 终态 22(参照原严重度 21 + 无缺口 1)+ 占位态 0(F-CODE-02、F-CODE-08 已由 04-07 逐面普审补证销号);22 = 22 + 0 ✓
