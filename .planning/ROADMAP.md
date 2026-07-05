@@ -16,7 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: 审计章程与基线** - 钉住审计 SHA,定稿严重度体系、工作量分档、发现 schema 与范围声明 (completed 2026-07-04)
 - [x] **Phase 2: 契约抽取与漂移分析** - 三处实现的契约漂移矩阵、往返校验、分歧分类与重复逻辑普查 (completed 2026-07-05)
 - [x] **Phase 3: 组件与工具链深潜** - 三层主体代码与部署工具链的债务/脆弱区盘点,人工核实进台账 (completed 2026-07-05)
-- [ ] **Phase 4: 文档配置与测试审计** - 以代码实态为基准审 docs/config/AGENTS.md 与双语言测试,关闭 CONCERNS.md 假设清单
+- [x] **Phase 4: 文档配置与测试审计** - 以代码实态为基准审 docs/config/AGENTS.md 与双语言测试,关闭 CONCERNS.md 假设清单 (completed 2026-07-05)
 - [ ] **Phase 5: 汇总校准与报告组装** - 去重、根因聚类、单一口径校准,产出最终审计报告
 
 ## Phase Details
@@ -128,7 +128,7 @@ Plans:
   3. 覆盖率测量结果作为证据归档,仅作输入证据,未被当作质量评分写入发现
   4. CONCERNS.md 假设清单每条状态为证实/证伪/细化之一,均附新鲜 file:line@SHA 证据,无一遗留"未验证"
 
-**Plans**: 8/9 plans executed
+**Plans**: 9/9 plans complete
 
 Plans:
 **Wave 1**
@@ -150,7 +150,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3)*
 
-- [ ] 04-09-PLAN.md — HYP 余 11 条回填 + 25/25 总对账(D-13/14/15)+ 零 diff 阶段收尾(AUDIT-05)
+- [x] 04-09-PLAN.md — HYP 余 11 条回填 + 25/25 总对账(D-13/14/15)+ 零 diff 阶段收尾(AUDIT-05)
 
 ### Phase 5: 汇总校准与报告组装
 
@@ -177,5 +177,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5(Phase 2 与 Phase 3 �
 | 1. 审计章程与基线 | 2/2 | Complete    | 2026-07-04 |
 | 2. 契约抽取与漂移分析 | 4/4 | Complete    | 2026-07-05 |
 | 3. 组件与工具链深潜 | 7/7 | Complete    | 2026-07-05 |
-| 4. 文档配置与测试审计 | 8/9 | In Progress|  |
+| 4. 文档配置与测试审计 | 9/9 | Complete   | 2026-07-05 |
 | 5. 汇总校准与报告组装 | 0/? | Not started | - |
