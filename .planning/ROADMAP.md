@@ -85,7 +85,7 @@ Plans:
   3. 台账中不存在原始 linter/工具输出直接充当发现——每条发现均附人工确认的 file:line@SHA 证据片段
   4. 跨组件契约类观察已转交 Phase 2 的漂移矩阵作为线索,未在组件维度内单独下判断
 
-**Plans**: 4/7 plans executed
+**Plans**: 5/7 plans executed
 
 Plans:
 **Wave 1**
@@ -106,7 +106,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4)*
 
-- [ ] 03-05-PLAN.md — TOOL:Worker 包内验证/运维 12 模块普审+深挖,HYP-04/15 回填(AUDIT-02)
+- [x] 03-05-PLAN.md — TOOL:Worker 包内验证/运维 12 模块普审+深挖,HYP-04/15 回填(AUDIT-02)
 
 **Wave 6** *(blocked on Wave 5)*
 
@@ -154,6 +154,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5(Phase 2 与 Phase 3 �
 |-------|----------------|--------|-----------|
 | 1. 审计章程与基线 | 2/2 | Complete    | 2026-07-04 |
 | 2. 契约抽取与漂移分析 | 4/4 | Complete    | 2026-07-05 |
-| 3. 组件与工具链深潜 | 4/7 | In Progress|  |
+| 3. 组件与工具链深潜 | 5/7 | In Progress|  |
 | 4. 文档配置与测试审计 | 0/? | Not started | - |
 | 5. 汇总校准与报告组装 | 0/? | Not started | - |
