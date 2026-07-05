@@ -90,5 +90,50 @@ apps/miniprogram/utils/verify.js
 
 ## 三态销号表(03-02 填)
 
+核实方法:每条命中经 `git show 5927f36:<path>` 提取命中行及上下文人工判断。判据遵守 CHARTER 双语言适配声明与 RESEARCH Anti-Pattern:命中是否"确认"以仓库既有惯例为基准,不以外部 JS lint 标准作质量判据;纯风格类一律误报。行序与上方输出一致。
+
 | # | 命中(path:line @ 5927f36) | 规则/模式 | 销号 | 理由/去向 |
 |---|---------------------------|-----------|------|-----------|
+| 1 | apps/miniprogram/pages/index/index.js:379 | no-unused-vars('e') | 误报 | catch(e) 形参未用系仓库既有惯例(基础库 3.5.5 时代写法,未用 ES2019 可选 catch 绑定),非质量信号;计入 HYP-15 量化底数(见尾部小结) |
+| 2 | apps/miniprogram/pages/index/index.js:425 | no-unused-vars('e') | 误报 | 同 #1 |
+| 3 | apps/miniprogram/pages/index/index.js:552 | no-unused-vars('e') | 误报 | 同 #1 |
+| 4 | apps/miniprogram/pages/index/index.js:602 | no-unused-vars('e') | 误报 | 同 #1 |
+| 5 | apps/miniprogram/pages/index/index.js:656 | no-unused-vars('e') | 误报 | 同 #1 |
+| 6 | apps/miniprogram/pages/index/index.js:688 | no-unused-vars('e') | 误报 | 同 #1 |
+| 7 | apps/miniprogram/pages/uploads/uploads.js:100 | no-unused-vars('e') | 误报 | 同 #1 |
+| 8 | apps/miniprogram/pages/uploads/uploads.js:174 | no-unused-vars('e') | 误报 | 同 #1 |
+| 9 | apps/miniprogram/pages/uploads/uploads.js:311 | no-unused-vars('e') | 误报 | 同 #1 |
+| 10 | apps/miniprogram/utils/audio.js:160 | eqeqeq | 误报 | `manifest.chunk_total == null` 为故意宽松判空(同时捕获 undefined),仓库既有惯例写法 |
+| 11 | apps/miniprogram/utils/device.js:39 | no-unused-vars('e') | 误报 | 同 #1 |
+| 12 | apps/miniprogram/utils/device.js:48 | no-unused-vars('e') | 误报 | 同 #1 |
+| 13 | apps/miniprogram/utils/fault_injection.js:89 | no-unused-vars('e') | 误报 | 同 #1 |
+| 14 | apps/miniprogram/utils/fault_injection.js:103 | no-unused-vars('e') | 误报 | 同 #1 |
+| 15 | apps/miniprogram/utils/logger.js:40 | unused eslint-disable directive | 误报 | 仓库无 ESLint,`// eslint-disable-next-line no-console` 为遗留防御性注释,无行为影响;该注释存在本身作为 HYP-15 旁证记入尾部小结 |
+| 16 | apps/miniprogram/utils/queue_runtime.js:47 | no-unused-vars('e') | 误报 | 同 #1 |
+| 17 | apps/miniprogram/utils/queue_runtime.js:77 | no-unused-vars('e') | 误报 | 同 #1 |
+| 18 | apps/miniprogram/utils/queue_runtime.js:240 | no-unused-vars('e') | 误报 | 同 #1 |
+| 19 | apps/miniprogram/utils/retention.js:26 | eqeqeq | 误报 | `item.verifiedAt == null` 故意宽松判空,同 #10 |
+| 20 | apps/miniprogram/utils/uploader.js:36 | eqeqeq | 误报 | `data[f] == null` 故意宽松判空(凭证字段缺省检测),同 #10 |
+| 21 | apps/miniprogram/utils/uploader.js:78 | no-unused-vars('e') | 误报 | 同 #1 |
+| 22 | apps/miniprogram/utils/uploader.js:87 | no-unused-vars('e') | 误报 | 同 #1 |
+| 23 | apps/miniprogram/utils/uploader.js:131 | no-unused-vars('e') | 误报 | 同 #1 |
+| 24 | apps/miniprogram/utils/uploads_view.js:86 | eqeqeq | 误报 | `ms == null` 故意宽松判空(recordedAtMs 可返回 null),同 #10 |
+| 25 | apps/miniprogram/utils/uploads_view.js:89 | eqeqeq | 误报 | `earliest == null` 初值判空,同 #10 |
+| 26 | apps/miniprogram/utils/uploads_view.js:98 | eqeqeq | 误报 | `fromMs == null` 判空,同 #10 |
+| 27 | apps/miniprogram/utils/uploads_view.js:223 | eqeqeq | 误报 | `ms == null` 判空(后接 Number.isFinite 复核),同 #10 |
+| 28 | apps/miniprogram/utils/verify.js:72 | no-unused-vars('e') | 误报 | 同 #1 |
+| 29 | apps/miniprogram/utils/verify.js:88 | no-unused-vars('e') | 误报 | 同 #1 |
+
+**对账等式:** 确认 0 + 误报 29 + 移交 0 = 命中总数 29 ✓
+
+**移交说明:** 本档无移交项。
+
+## HYP-15 量化小结(供 03-05 审 miniprogram_lint.py 引用)
+
+ESLint 相对仓内自定义门禁 miniprogram_lint 的增量检出面(非测试 JS 全量,即 HYP-15 漏报面量化底数):**0 error / 29 warning**。主导规则分布:
+
+- `no-unused-vars` ×21——全部为 catch(e) 形参未用,仓库惯例写法,无一真实缺陷;
+- `eqeqeq` ×7——全部为 `== null` 故意宽松判空惯用式,无一跨类型误比较;
+- `unused eslint-disable directive` ×1——logger.js:40 遗留防御性注释,旁证开发时曾预期 ESLint 存在而仓库实际未配置。
+
+结论要点:本次配方下 ESLint 增量命中经逐条核实**零真实缺陷**——miniprogram_lint 未检出这 29 处并不构成漏报实害;但 ESLint 检出面(未用变量/宽松相等/坠落分支/重复键等语义类规则)与 miniprogram_lint 现有规则面(合法域名、硬编码密钥、四文件约定)完全不重叠,HYP-15 的"规则覆盖面狭窄"半句由此获得量化参照。03-05 深挖时据此判断 miniprogram_lint 覆盖面是否需立发现。

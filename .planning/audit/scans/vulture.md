@@ -24,5 +24,12 @@ apps/worker/src/soniscope_worker/miniprogram_lint.py:121: unused variable 'rel_p
 
 ## 三态销号表(03-02 填)
 
+核实方法:命中经 `git show 5927f36:apps/worker/src/soniscope_worker/miniprogram_lint.py` 提取 115-140 行上下文并检索全部调用点后人工判断。
+
 | # | 命中(path:line @ 5927f36) | 规则/模式 | 销号 | 理由/去向 |
 |---|---------------------------|-----------|------|-----------|
+| 1 | apps/worker/src/soniscope_worker/miniprogram_lint.py:121 | unused variable 'rel_path'(100% confidence) | 确认 | scan_hardcoded_secrets 声明 rel_path 形参却未使用,调用方(:190)传入 str(file) 落空——非 Protocol/typer/WSGI 动态引用误报类(RESEARCH A1 预记核对不符合),系真实未使用参数,与 ruff 扩展集 ARG001 同点命中互证 → 深挖线索(03-05 miniprogram_lint 普审,HYP-15) |
+
+**对账等式:** 确认 1 + 误报 0 + 移交 0 = 命中总数 1 ✓
+
+**移交说明:** 本档无移交项。

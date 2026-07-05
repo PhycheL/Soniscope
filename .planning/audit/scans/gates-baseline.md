@@ -1077,8 +1077,45 @@ git diff --stat 5927f36 -- apps/ scripts/ docs/
 
 ## 三态销号表(03-02 填)
 
+核实方法:每条命中经 `git show 5927f36:<path>` 提取命中行及上下文人工判断(D-07 三态);排除目录命中的判定依据为 CHARTER 扫描排除清单的路径归属(人工核对路径前缀)。门禁 3(miniprogram_lint)exit=0 零命中——门禁通过,无命中需销号。行 11-29 为 vendored 目录分文件聚合行(同一文件内命中合并一行,规则@行号逐条列明,条数注于命中列)。
+
 | # | 命中(path:line @ 5927f36) | 规则/模式 | 销号 | 理由/去向 |
 |---|---------------------------|-----------|------|-----------|
+| 1 | apps/fc/shared/app.py:14 | mypy import-not-found | 确认 | `from handler import handler` 系部署态导入(handler.py 仅在部署 zip 内与 app.py 同目录),仓内直调 mypy 必 exit=1——strict 门禁在仓内结构性不可绿,门禁实态与 Makefile typecheck 目标口径属真实工具链可疑点 → 深挖线索(03-06 Makefile/门禁普审;交叉 03-04 HYP-12 审 app.py 本体) |
+| 2 | scripts/test_asr.py:2 | UP009 | 确认 | 门禁规则集(E,F,I,UP,B)内真实违例;scripts/ 未纳入门禁保护面的实证 → 深挖线索(03-06 scripts 普审,HYP-25) |
+| 3 | scripts/test_asr.py:38 | E501 | 确认 | 同上,门禁规则集内真实违例(docstring 示例行 102 字符)→ 深挖线索(03-06 scripts 普审,HYP-25) |
+| 4 | scripts/test_asr.py:166 | B904 | 确认 | except 内 raise 未带 `from`,违反仓库既定异常链约定(CLAUDE.md "Chain exceptions")且属门禁 B 规则集 → 深挖线索(03-06 scripts 普审,HYP-25) |
+| 5 | scripts/test_asr.py:197 | E501 | 确认 | 同 #3,门禁规则集内真实违例 → 深挖线索(03-06 scripts 普审,HYP-25) |
+| 6 | scripts/test_asr.py:275 | E501 | 确认 | 同 #3 → 深挖线索(03-06 scripts 普审,HYP-25) |
+| 7 | scripts/test_asr.py:283 | E501 | 确认 | 同 #3 → 深挖线索(03-06 scripts 普审,HYP-25) |
+| 8 | scripts/ralph/dashboard.py:7 | I001 | 误报 | CHARTER 排除清单 #2(scripts/ralph/ 为 agent 元工具,非部署/验证工具链审计对象);存在级问题已按 D-09 口径另行承接 |
+| 9 | scripts/ralph/ralph.py:6 | I001 | 误报 | 同 #8,排除清单 #2 |
+| 10 | scripts/ralph/ralph.py:210 | F541 | 误报 | 同 #8,排除清单 #2 |
+| 11 | docs/example/start-fc-main/async-task/python3/src/code/async-task/index.py:1,2,15(3 条) | UP009@1 / I001@2 / UP032@15 | 误报 | CHARTER 排除清单 #1(vendored 外部仓库非项目代码);vendored 膨胀之存在级问题按 D-09 承接,不逐条立案(以下 vendored 行同此理由) |
+| 12 | docs/example/start-fc-main/async-task/python3/src/code/dest-fail/index.py:1,13(2 条) | UP009@1 / UP032@13 | 误报 | 同 #11,排除清单 #1 |
+| 13 | docs/example/start-fc-main/async-task/python3/src/code/dest-succ/index.py:1,13(2 条) | UP009@1 / UP032@13 | 误报 | 同 #11 |
+| 14 | docs/example/start-fc-main/custom-container-function/fc-custom-container-event-python3.9/src/code/app.py:1,56(2 条) | I001@1 / E501@56 | 误报 | 同 #11 |
+| 15 | docs/example/start-fc-main/custom-container-function/fc-custom-container-no-web-server-event-fibonacci/app.py:1,1,2(3 条) | I001@1 / F401@1 / F401@2 | 误报 | 同 #11 |
+| 16 | docs/example/start-fc-main/custom-container-function/fc-custom-container-websocket-python3.9/src/code/app.py:1(1 条) | I001@1 | 误报 | 同 #11 |
+| 17 | docs/example/start-fc-main/custom-function/f#/fc-custom-fsharp-http/src/init_helper.py:8(1 条) | UP015@8 | 误报 | 同 #11 |
+| 18 | docs/example/start-fc-main/custom-function/python37/fc-custom-python37-event/src/code/server.py:1,1,2(3 条) | I001@1 / F401@1 / F401@2 | 误报 | 同 #11 |
+| 19 | docs/example/start-fc-main/custom-function/python37/fc-custom-python37-grpc/src/code/greeter_client.py:3,3,40,46,55,56,57,58,70,77(10 条) | UP010@3 / I001@3 / UP031@40,46,55,56,57,58,70,77 | 误报 | 同 #11 |
+| 20 | docs/example/start-fc-main/custom-function/python37/fc-custom-python37-grpc/src/code/greeter_server.py:1,48(2 条) | I001@1 / UP031@48 | 误报 | 同 #11 |
+| 21 | docs/example/start-fc-main/custom-function/python37/fc-custom-python37-grpc/src/code/helloworld_pb2.py:1,5,16,20,23,24-39(21 条) | UP009@1 / I001@5 / E501@16,23 / E712@20 / F821@24-39(×16) | 误报 | 同 #11(protoc 生成代码,文件头自注 DO NOT EDIT) |
+| 22 | docs/example/start-fc-main/custom-function/python37/fc-custom-python37-grpc/src/code/helloworld_pb2_grpc.py:3,8,40,99,148,165(6 条) | I001@3 / UP004@8,40,99 / E501@148,165 | 误报 | 同 #11(gRPC 生成代码) |
+| 23 | docs/example/start-fc-main/custom-function/python37/fc-custom-python37-http/src/code/server.py:1,1,67,77,77,80,80(7 条) | I001@1 / F401@1 / UP004@67 / UP030@77,80 / UP032@77,80 | 误报 | 同 #11 |
+| 24 | docs/example/start-fc-main/custom-function/python37/fc-custom-python37-websocket/src/code/server.py:1(1 条) | I001@1 | 误报 | 同 #11 |
+| 25 | docs/example/start-fc-main/event-function/fc-event-python2.7/src/code/index.py:1(1 条) | UP009@1 | 误报 | 同 #11 |
+| 26 | docs/example/start-fc-main/event-function/fc-event-python3/src/code/index.py:1(1 条) | UP009@1 | 误报 | 同 #11 |
+| 27 | docs/example/start-fc-main/http-function/fc-http-python2.7/src/code/index.py:1,3,3,14,15,16(6 条) | UP009@1 / I001@3 / F401@3 / F841@14,15 / B007@16 | 误报 | 同 #11 |
+| 28 | docs/example/start-fc-main/http-function/fc-http-python3/src/code/index.py:1,3,3,14,15,16(6 条) | UP009@1 / I001@3 / F401@3 / F841@14,15 / B007@16 | 误报 | 同 #11 |
+| 29 | docs/example/start-fc-main/publish.py:12,13(2 条) | UP031@12 / E501@13 | 误报 | 同 #11 |
+
+**聚合行条数复算:** 行 11-29 覆盖 vendored 命中 3+2+2+2+3+1+1+3+10+2+21+6+7+1+1+1+6+6+2 = 80 条;行 8-10 覆盖 scripts/ralph 3 条;行 2-7 覆盖 test_asr.py 6 条;行 1 为 mypy 唯一命中。
+
+**对账等式:** 确认 7 + 误报 83 + 移交 0 = 命中总数 90(mypy 1 + ruff 89 + miniprogram_lint 0)✓
+
+**移交说明:** 本档无移交项。
 
 ## 阶段收尾零 diff 验证记录(03-01 Task 3 收尾,CHARTER D-03)
 

@@ -769,5 +769,80 @@ No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` opti
 
 ## 三态销号表(03-02 填)
 
+核实方法:每条命中经 `git show 5927f36:<path>` 提取命中行及上下文人工判断(D-07 三态;探针信号 S110/S104/DTZ/S105/S106/ARG 逐条核实,未批量定性)。行序与上方完整输出一致。
+
 | # | 命中(path:line @ 5927f36) | 规则/模式 | 销号 | 理由/去向 |
 |---|---------------------------|-----------|------|-----------|
+| 1 | apps/fc/shared/app.py:27 | S104 | 确认 | ThreadingWSGIServer 绑定 0.0.0.0——FC 容器运行时或属必需形态,但与 HYP-12(wsgiref 作生产运行时)同点,须结合触发器/网络边界逐行核实 → 深挖线索(03-04 FC 层普审,HYP-12) |
+| 2 | apps/fc/tests/test_custom_runtime_app.py:18 | ARG002 | 误报 | 假 start_response 须匹配 WSGI 回调签名,headers 形参系协议契合非疏漏 |
+| 3 | apps/fc/tests/test_fc_handlers.py:54 | ARG002 | 误报 | 同 #2,WSGI 假回调签名契合 |
+| 4 | apps/fc/tests/test_fc_handlers.py:76 | ARG001 | 误报 | parametrize 元组字段须与形参名一一对应,function 仅供测试 ID 展示,pytest 惯例 |
+| 5 | apps/fc/tests/test_fc_handlers.py:93 | ARG001 | 误报 | 同 #4,parametrize 惯例 |
+| 6 | apps/fc/tests/test_fc_handlers.py:107 | ARG001(function) | 误报 | 同 #4 |
+| 7 | apps/fc/tests/test_fc_handlers.py:107 | ARG001(field) | 误报 | 同 #4 |
+| 8 | apps/fc/tests/test_fc_handlers.py:119 | ARG001 | 误报 | 同 #4 |
+| 9 | apps/fc/tests/test_fc_handlers.py:125 | ARG001(code) | 误报 | 假 code_to_openid 须匹配被替换函数签名,monkeypatch 桩惯例 |
+| 10 | apps/fc/tests/test_fc_handlers.py:125 | ARG001(appid) | 误报 | 同 #9 |
+| 11 | apps/fc/tests/test_fc_handlers.py:125 | ARG001(secret) | 误报 | 同 #9 |
+| 12 | apps/fc/tests/test_fc_shared.py:207 | S106 | 误报 | 测试假值(SECRET-AK 字样自述假值),该测试恰为断言 audit 层脱敏行为 |
+| 13 | apps/fc/tests/test_fc_shared.py:208 | S106 | 误报 | 同 #12(SECRET-TOKEN 字样) |
+| 14 | apps/fc/tests/test_head.py:69 | S105 | 误报 | 断言右值为测试假值("sec"),对应上一行注入的假环境变量 |
+| 15 | apps/fc/tests/test_issue_credential.py:52 | ARG002 | 误报 | 同 #2,WSGI 假回调签名契合 |
+| 16 | apps/fc/tests/test_issue_credential.py:81 | S106 | 误报 | 测试假值(fake-secret 自述假值),构造假 StsCredential |
+| 17 | apps/fc/tests/test_issue_credential.py:82 | S106 | 误报 | 同 #16(fake-token) |
+| 18 | apps/fc/tests/test_issue_credential.py:88 | ARG001(code) | 误报 | 同 #9,monkeypatch 桩签名契合 |
+| 19 | apps/fc/tests/test_issue_credential.py:88 | ARG001(appid) | 误报 | 同 #9 |
+| 20 | apps/fc/tests/test_issue_credential.py:88 | ARG001(secret) | 误报 | 同 #9 |
+| 21 | apps/fc/tests/test_issue_credential.py:159 | PLW0108 | 误报 | lambda 包装延迟构造 _FakeIssuer,测试内风格取舍非缺陷 |
+| 22 | apps/fc/tests/test_issue_credential.py:186 | ARG001(code) | 误报 | 同 #9 |
+| 23 | apps/fc/tests/test_issue_credential.py:186 | ARG001(appid) | 误报 | 同 #9 |
+| 24 | apps/fc/tests/test_issue_credential.py:186 | ARG001(secret) | 误报 | 同 #9 |
+| 25 | apps/fc/tests/test_issue_credential.py:220 | ARG002 | 误报 | 假 assume_role 须匹配 StsIssuer 签名,故意抛异常验证脱敏 |
+| 26 | apps/fc/tests/test_issue_credential.py:223 | PLW0108 | 误报 | 同 #21 |
+| 27 | apps/fc/tests/test_sts.py:96 | S106 | 误报 | 测试假值("sec") |
+| 28 | apps/fc/tests/test_sts.py:97 | S106 | 误报 | 测试假值("tok") |
+| 29 | apps/fc/tests/test_sts.py:153 | S105 | 误报 | 断言右值为测试假值,151 行注释明言 audit 层负责脱敏、env 只承载值 |
+| 30 | apps/fc/tests/test_verify_upload.py:49 | ARG002 | 误报 | 同 #2,WSGI 假回调签名契合 |
+| 31 | apps/fc/tests/test_verify_upload.py:85 | ARG001(code) | 误报 | 同 #9 |
+| 32 | apps/fc/tests/test_verify_upload.py:85 | ARG001(appid) | 误报 | 同 #9 |
+| 33 | apps/fc/tests/test_verify_upload.py:85 | ARG001(secret) | 误报 | 同 #9 |
+| 34 | apps/fc/tests/test_verify_upload.py:179 | ARG001(code) | 误报 | 同 #9 |
+| 35 | apps/fc/tests/test_verify_upload.py:179 | ARG001(appid) | 误报 | 同 #9 |
+| 36 | apps/fc/tests/test_verify_upload.py:179 | ARG001(secret) | 误报 | 同 #9 |
+| 37 | apps/worker/src/soniscope_worker/audio.py:72 | S603 | 误报 | ffmpeg 参数列表为固定字面量,src/dest 为内部管道路径,无外部输入注入面 |
+| 38 | apps/worker/src/soniscope_worker/audio.py:73 | S607 | 误报 | 系统 ffmpeg 为文档化平台前提(verify_prep REQUIRED_TOOLS 校验其存在),部分路径系故意 |
+| 39 | apps/worker/src/soniscope_worker/audio.py:140 | TRY300 | 误报 | 风格建议(TRY 规则集非项目门禁),现写法带 pragma 注释语义清晰 |
+| 40 | apps/worker/src/soniscope_worker/e2e_scenarios.py:62 | S105 | 误报 | 结果状态常量("PASS")非口令 |
+| 41 | apps/worker/src/soniscope_worker/fc_deploy.py:419 | ARG001 | 确认 | rollback_one 接受 timestamp 形参但函数体始终回滚 find_latest_backup 结果——参数语义与实现不符,指定时间戳回滚可能被静默忽略 → 深挖线索(03-05 fc_deploy 普审) |
+| 42 | apps/worker/src/soniscope_worker/fc_deploy.py:463 | DTZ005 | 误报 | naive now() 仅生成备份目录时间戳文件名,单机本地语义无时区契约 |
+| 43 | apps/worker/src/soniscope_worker/fc_deploy.py:611 | TRY301 | 误报 | 风格建议,现写法(条件 raise + 显式重抛)语义清晰 |
+| 44 | apps/worker/src/soniscope_worker/fc_deploy.py:634 | TRY300 | 误报 | 风格建议,同 #39 |
+| 45 | apps/worker/src/soniscope_worker/fc_deploy.py:688 | ARG002 | 确认 | fetch_logs 接受 hours 时间窗形参但 688-730 区间函数体未使用——日志拉取窗口被静默忽略 → 深挖线索(03-05 fc_deploy 普审) |
+| 46 | apps/worker/src/soniscope_worker/fc_live.py:121 | S105 | 误报 | 结果状态常量("PASS")非口令 |
+| 47 | apps/worker/src/soniscope_worker/fixtures.py:131 | S603 | 误报 | 同 #37,ffprobe 固定参数列表 |
+| 48 | apps/worker/src/soniscope_worker/fixtures.py:132 | S607 | 误报 | 同 #38,系统 ffprobe 文档化前提 |
+| 49 | apps/worker/src/soniscope_worker/miniprogram_lint.py:121 | ARG001 | 确认 | scan_hardcoded_secrets 声明 rel_path 形参却未使用,调用方(:190)传入 str(file) 落空——findings 文本不含路径上下文,与 vulture 唯一命中同点 → 深挖线索(03-05 miniprogram_lint 普审,HYP-15) |
+| 50 | apps/worker/src/soniscope_worker/nls.py:251 | DTZ011 | 误报 | _today_iso 仅作当日成本累计的分日键(nls.py:381 counter.record),单机自洽,无跨组件日期契约参与 |
+| 51 | apps/worker/src/soniscope_worker/pipeline.py:582 | ARG002(fragment_id) | 误报 | _StubTranscriber(make test 占位桩)须契合 Transcriber Protocol 签名,桩实现故意忽略参数 |
+| 52 | apps/worker/src/soniscope_worker/pipeline.py:582 | ARG002(audio_path) | 误报 | 同 #51 |
+| 53 | apps/worker/src/soniscope_worker/pipeline.py:582 | ARG002(oss_key) | 误报 | 同 #51 |
+| 54 | apps/worker/src/soniscope_worker/pipeline.py:625 | ARG002 | 误报 | 假 OssSource 的 head_metadata 须契合 Protocol 签名 |
+| 55 | apps/worker/src/soniscope_worker/poller.py:249 | ARG001 | 确认 | process_plan 关键字形参 fragments_root 在函数体内未使用(.done 判定由调用方 done_check 闭包另行携带,poller.py:333)——疑为遗留 API 面 → 深挖线索(03-03 poller 普审) |
+| 56 | apps/worker/src/soniscope_worker/recovery.py:315 | ARG001 | 误报 | _stub_transcript 为 make test 确定性占位桩(docstring 明言),形参保留签名形状 |
+| 57 | apps/worker/src/soniscope_worker/retranscribe.py:371 | ARG002(fragment_id) | 误报 | 占位转写器契合 Transcriber Protocol 签名,同 #51 |
+| 58 | apps/worker/src/soniscope_worker/retranscribe.py:371 | ARG002(audio_path) | 误报 | 同 #57 |
+| 59 | apps/worker/src/soniscope_worker/retranscribe.py:371 | ARG002(oss_key) | 误报 | 同 #57 |
+| 60 | apps/worker/src/soniscope_worker/sts_escape.py:45 | S105 | 误报 | 结果状态常量("PASS")非口令 |
+| 61 | apps/worker/src/soniscope_worker/verify_prep.py:64 | S105 | 误报 | 值为环境变量名(ALIYUN_DEPLOY_AK_SECRET)非秘密值,62 行注释明言凭证从 .env/CI 注入绝不入库 |
+| 62 | apps/worker/src/soniscope_worker/verify_prep.py:636 | TRY300 | 误报 | 风格建议,同 #39(lazy import 惯用形) |
+| 63 | apps/worker/src/soniscope_worker/verify_prep.py:656 | DTZ011 | 误报 | _today 仅派生 STS 越权测试对象 key 的日期段(:661/:666),allowed/escape 两 key 同源自洽 |
+| 64 | apps/worker/src/soniscope_worker/verify_prep.py:675 | TRY300 | 误报 | 同 #62 |
+| 65 | apps/worker/src/soniscope_worker/verify_prep.py:778 | TRY300 | 误报 | 同 #62 |
+| 66 | apps/worker/src/soniscope_worker/verify_upload_live.py:50 | S105 | 误报 | 结果状态常量("PASS")非口令 |
+| 67 | apps/worker/src/soniscope_worker/verify_upload_live.py:259 | SIM105 | 误报 | 风格建议(contextlib.suppress 等价改写),现写法带注释说明 best-effort 清理 |
+| 68 | apps/worker/src/soniscope_worker/verify_upload_live.py:261 | S110 | 误报 | best-effort 清理故意吞异常,行内 noqa 注释已说明"清理失败不影响主断言",受控形态 |
+| 69 | scripts/fetch_test_fixtures.py:124 | TRY300 | 误报 | 风格建议,同 #62(lazy import 惯用形) |
+
+**对账等式:** 确认 5 + 误报 64 + 移交 0 = 命中总数 69 ✓
+
+**移交说明:** 本档无移交项(apps/fc/tests/ 的 35 条命中逐条核实后均为 pytest/WSGI/Protocol 签名契合惯例或自述测试假值,无测试质量信号,不构成 Phase 4 TEST 移交证据)。
