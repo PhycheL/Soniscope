@@ -88,6 +88,7 @@ None yet.
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 260705-obh | 将审计方法论沉淀为可复用文档 docs/audit-methodology.md | 2026-07-06 | a87f4c4 | [260705-obh-docs-audit-methodology-md](./quick/260705-obh-docs-audit-methodology-md/) |
+| 260706-70s | 沉淀 SoniScope 产品停止决策为 docs/decision-2026-07-06-product-pivot.md | 2026-07-06 | 08d2a49 | [260706-70s-soniscope-docs-decision-2026-07-06-produ](./quick/260706-70s-soniscope-docs-decision-2026-07-06-produ/) |
 
 ## Deferred Items
 
