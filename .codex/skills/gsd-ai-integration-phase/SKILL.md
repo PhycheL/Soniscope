@@ -101,9 +101,9 @@ Flow: Select Framework → Research Docs → Research Domain → Design Eval Str
 </objective>
 
 <execution_context>
-@/Volumes/Data/ProjectCode/my_soniscope/.codex/gsd-core/workflows/ai-integration-phase.md
-@/Volumes/Data/ProjectCode/my_soniscope/.codex/gsd-core/references/ai-frameworks.md
-@/Volumes/Data/ProjectCode/my_soniscope/.codex/gsd-core/references/ai-evals.md
+@/Users/bemied/ProjectCode/my_soniscope/.codex/gsd-core/workflows/ai-integration-phase.md
+@/Users/bemied/ProjectCode/my_soniscope/.codex/gsd-core/references/ai-frameworks.md
+@/Users/bemied/ProjectCode/my_soniscope/.codex/gsd-core/references/ai-evals.md
 </execution_context>
 
 <context>

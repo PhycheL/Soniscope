@@ -38,13 +38,13 @@ Mode routing:
 </routing>
 
 <execution_context>
-@/Volumes/Data/ProjectCode/my_soniscope/.claude/gsd-core/workflows/add-todo.md
-@/Volumes/Data/ProjectCode/my_soniscope/.claude/gsd-core/workflows/note.md
-@/Volumes/Data/ProjectCode/my_soniscope/.claude/gsd-core/workflows/add-backlog.md
-@/Volumes/Data/ProjectCode/my_soniscope/.claude/gsd-core/workflows/plant-seed.md
-@/Volumes/Data/ProjectCode/my_soniscope/.claude/gsd-core/workflows/check-todos.md
-@/Volumes/Data/ProjectCode/my_soniscope/.claude/gsd-core/workflows/list-seeds.md
-@/Volumes/Data/ProjectCode/my_soniscope/.claude/gsd-core/references/ui-brand.md
+@/Users/bemied/ProjectCode/my_soniscope/.claude/gsd-core/workflows/add-todo.md
+@/Users/bemied/ProjectCode/my_soniscope/.claude/gsd-core/workflows/note.md
+@/Users/bemied/ProjectCode/my_soniscope/.claude/gsd-core/workflows/add-backlog.md
+@/Users/bemied/ProjectCode/my_soniscope/.claude/gsd-core/workflows/plant-seed.md
+@/Users/bemied/ProjectCode/my_soniscope/.claude/gsd-core/workflows/check-todos.md
+@/Users/bemied/ProjectCode/my_soniscope/.claude/gsd-core/workflows/list-seeds.md
+@/Users/bemied/ProjectCode/my_soniscope/.claude/gsd-core/references/ui-brand.md
 </execution_context>
 
 <context>

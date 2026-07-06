@@ -5,7 +5,7 @@ Closes the plan → execute → verify → ship loop.
 </objective>
 
 <execution_context>
-@/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/ship.md
+@/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/ship.md
 </execution_context>
 
-Execute the ship workflow from @/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/ship.md end-to-end.
+Execute the ship workflow from @/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/ship.md end-to-end.

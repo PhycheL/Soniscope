@@ -8,7 +8,7 @@ Output: updated SECURITY.md.
 </objective>
 
 <execution_context>
-@/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/secure-phase.md
+@/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/secure-phase.md
 </execution_context>
 
 <context>

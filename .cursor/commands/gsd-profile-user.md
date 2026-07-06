@@ -5,8 +5,8 @@ Routes to the profile-user workflow which orchestrates the full flow: consent ga
 </objective>
 
 <execution_context>
-@/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/profile-user.md
-@/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/references/ui-brand.md
+@/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/profile-user.md
+@/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/references/ui-brand.md
 </execution_context>
 
 <context>

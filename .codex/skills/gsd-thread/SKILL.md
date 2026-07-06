@@ -101,7 +101,7 @@ doesn't belong to any specific phase.
 </objective>
 
 <execution_context>
-@/Volumes/Data/ProjectCode/my_soniscope/.codex/gsd-core/workflows/thread.md
+@/Users/bemied/ProjectCode/my_soniscope/.codex/gsd-core/workflows/thread.md
 </execution_context>
 
 <process>

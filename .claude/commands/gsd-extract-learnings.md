@@ -17,7 +17,7 @@ Extract structured learnings from completed phase artifacts (PLAN.md, SUMMARY.md
 </objective>
 
 <execution_context>
-@/Volumes/Data/ProjectCode/my_soniscope/.claude/gsd-core/workflows/extract-learnings.md
+@/Users/bemied/ProjectCode/my_soniscope/.claude/gsd-core/workflows/extract-learnings.md
 </execution_context>
 
-Execute the extract-learnings workflow from @/Volumes/Data/ProjectCode/my_soniscope/.claude/gsd-core/workflows/extract-learnings.md end-to-end.
+Execute the extract-learnings workflow from @/Users/bemied/ProjectCode/my_soniscope/.claude/gsd-core/workflows/extract-learnings.md end-to-end.

@@ -39,7 +39,7 @@ Routes to the pause-work workflow which handles:
 </objective>
 
 <execution_context>
-@/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/pause-work.md
+@/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/pause-work.md
 </execution_context>
 
 <context>
@@ -48,7 +48,7 @@ State and phase progress are gathered in-workflow with targeted reads.
 
 <process>
 If `--report` is in {{GSD_ARGS}}:
-Read and execute `/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/session-report.md` end-to-end.
+Read and execute `/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/session-report.md` end-to-end.
 
 **Follow the pause-work workflow**.
 

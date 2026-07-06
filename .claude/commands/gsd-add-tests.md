@@ -26,7 +26,7 @@ Output: Test files committed with message `test(phase-{N}): add unit and E2E tes
 </objective>
 
 <execution_context>
-@/Volumes/Data/ProjectCode/my_soniscope/.claude/gsd-core/workflows/add-tests.md
+@/Users/bemied/ProjectCode/my_soniscope/.claude/gsd-core/workflows/add-tests.md
 </execution_context>
 
 <context>

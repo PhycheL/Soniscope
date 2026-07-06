@@ -107,7 +107,7 @@ Flag handling rule:
 </objective>
 
 <execution_context>
-@/Volumes/Data/ProjectCode/my_soniscope/.codex/gsd-core/workflows/docs-update.md
+@/Users/bemied/ProjectCode/my_soniscope/.codex/gsd-core/workflows/docs-update.md
 </execution_context>
 
 <context>

@@ -34,8 +34,8 @@ Produces EVAL-REVIEW.md with score, verdict, gaps, and remediation plan.
 </objective>
 
 <execution_context>
-@/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/eval-review.md
-@/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/references/ai-evals.md
+@/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/eval-review.md
+@/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/references/ai-evals.md
 </execution_context>
 
 <context>

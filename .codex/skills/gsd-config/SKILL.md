@@ -116,9 +116,9 @@ Mode routing:
 </routing>
 
 <execution_context>
-@/Volumes/Data/ProjectCode/my_soniscope/.codex/gsd-core/workflows/settings.md
-@/Volumes/Data/ProjectCode/my_soniscope/.codex/gsd-core/workflows/settings-advanced.md
-@/Volumes/Data/ProjectCode/my_soniscope/.codex/gsd-core/workflows/settings-integrations.md
+@/Users/bemied/ProjectCode/my_soniscope/.codex/gsd-core/workflows/settings.md
+@/Users/bemied/ProjectCode/my_soniscope/.codex/gsd-core/workflows/settings-advanced.md
+@/Users/bemied/ProjectCode/my_soniscope/.codex/gsd-core/workflows/settings-integrations.md
 </execution_context>
 
 <context>

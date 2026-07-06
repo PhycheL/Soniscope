@@ -10,9 +10,9 @@ Phase 1 of the vertical-mvp-slice PRD shipped the planner-side machinery; this c
 </objective>
 
 <execution_context>
-@/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/mvp-phase.md
-@/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/references/spidr-splitting.md
-@/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/references/user-story-template.md
+@/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/mvp-phase.md
+@/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/references/spidr-splitting.md
+@/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/references/user-story-template.md
 </execution_context>
 
 <runtime_note>
@@ -26,6 +26,6 @@ The phase must already exist in ROADMAP.md (created via `/gsd new-project`, `/gs
 </context>
 
 <process>
-Execute the mvp-phase workflow from @/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/mvp-phase.md end-to-end.
+Execute the mvp-phase workflow from @/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/mvp-phase.md end-to-end.
 Preserve all gates: phase existence, status guard (refuse in_progress/completed), user-story format validation, SPIDR splitting check, ROADMAP write confirmation, plan-phase delegation.
 </process>

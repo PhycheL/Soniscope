@@ -108,13 +108,13 @@ Does not require prior new-project setup — auto-creates `.planning/sketches/` 
 </objective>
 
 <execution_context>
-@/Volumes/Data/ProjectCode/my_soniscope/.codex/gsd-core/workflows/sketch.md
-@/Volumes/Data/ProjectCode/my_soniscope/.codex/gsd-core/workflows/sketch-wrap-up.md
-@/Volumes/Data/ProjectCode/my_soniscope/.codex/gsd-core/references/ui-brand.md
-@/Volumes/Data/ProjectCode/my_soniscope/.codex/gsd-core/references/sketch-theme-system.md
-@/Volumes/Data/ProjectCode/my_soniscope/.codex/gsd-core/references/sketch-interactivity.md
-@/Volumes/Data/ProjectCode/my_soniscope/.codex/gsd-core/references/sketch-tooling.md
-@/Volumes/Data/ProjectCode/my_soniscope/.codex/gsd-core/references/sketch-variant-patterns.md
+@/Users/bemied/ProjectCode/my_soniscope/.codex/gsd-core/workflows/sketch.md
+@/Users/bemied/ProjectCode/my_soniscope/.codex/gsd-core/workflows/sketch-wrap-up.md
+@/Users/bemied/ProjectCode/my_soniscope/.codex/gsd-core/references/ui-brand.md
+@/Users/bemied/ProjectCode/my_soniscope/.codex/gsd-core/references/sketch-theme-system.md
+@/Users/bemied/ProjectCode/my_soniscope/.codex/gsd-core/references/sketch-interactivity.md
+@/Users/bemied/ProjectCode/my_soniscope/.codex/gsd-core/references/sketch-tooling.md
+@/Users/bemied/ProjectCode/my_soniscope/.codex/gsd-core/references/sketch-variant-patterns.md
 </execution_context>
 
 <runtime_note>

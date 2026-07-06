@@ -99,7 +99,7 @@ Display comprehensive project statistics including phase progress, plan executio
 </objective>
 
 <execution_context>
-@/Volumes/Data/ProjectCode/my_soniscope/.codex/gsd-core/workflows/stats.md
+@/Users/bemied/ProjectCode/my_soniscope/.codex/gsd-core/workflows/stats.md
 </execution_context>
 
 <process>

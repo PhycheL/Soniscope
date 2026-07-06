@@ -27,8 +27,8 @@ Uses ROADMAP.md phase discovery and Skill() flat invocations for each phase comm
 </objective>
 
 <execution_context>
-@/Volumes/Data/ProjectCode/my_soniscope/.claude/gsd-core/workflows/autonomous.md
-@/Volumes/Data/ProjectCode/my_soniscope/.claude/gsd-core/references/ui-brand.md
+@/Users/bemied/ProjectCode/my_soniscope/.claude/gsd-core/workflows/autonomous.md
+@/Users/bemied/ProjectCode/my_soniscope/.claude/gsd-core/references/ui-brand.md
 </execution_context>
 
 <context>

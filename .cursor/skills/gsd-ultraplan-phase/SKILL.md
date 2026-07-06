@@ -38,8 +38,8 @@ Requirements: Cursor v2.1.91+, claude.ai account, GitHub repository.
 </objective>
 
 <execution_context>
-@/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/ultraplan-phase.md
-@/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/references/ui-brand.md
+@/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/ultraplan-phase.md
+@/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/references/ui-brand.md
 </execution_context>
 
 <context>

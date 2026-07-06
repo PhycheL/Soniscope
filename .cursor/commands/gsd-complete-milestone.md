@@ -8,8 +8,8 @@ Output: Milestone archived (roadmap + requirements), PROJECT.md evolved, git tag
 <execution_context>
 **Load these files NOW (before proceeding):**
 
-- @/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/complete-milestone.md (main workflow)
-- @/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/templates/milestone-archive.md (archive template)
+- @/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/complete-milestone.md (main workflow)
+- @/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/templates/milestone-archive.md (archive template)
   </execution_context>
 
 <context>

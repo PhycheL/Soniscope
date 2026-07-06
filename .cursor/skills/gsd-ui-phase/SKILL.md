@@ -34,8 +34,8 @@ Flow: Validate → Research UI → Verify UI-SPEC → Done
 </objective>
 
 <execution_context>
-@/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/ui-phase.md
-@/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/references/ui-brand.md
+@/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/ui-phase.md
+@/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/references/ui-brand.md
 </execution_context>
 
 <context>

@@ -31,8 +31,8 @@ Create executable phase prompts (PLAN.md files) for a roadmap phase with integra
 </objective>
 
 <execution_context>
-@/Volumes/Data/ProjectCode/my_soniscope/.claude/gsd-core/workflows/plan-phase.md
-@/Volumes/Data/ProjectCode/my_soniscope/.claude/gsd-core/references/ui-brand.md
+@/Users/bemied/ProjectCode/my_soniscope/.claude/gsd-core/workflows/plan-phase.md
+@/Users/bemied/ProjectCode/my_soniscope/.claude/gsd-core/references/ui-brand.md
 </execution_context>
 
 <runtime_note>

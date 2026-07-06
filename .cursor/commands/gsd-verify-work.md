@@ -7,8 +7,8 @@ Output: {phase_num}-UAT.md tracking all test results. If issues found: diagnosed
 </objective>
 
 <execution_context>
-@/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/verify-work.md
-@/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/templates/UAT.md
+@/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/verify-work.md
+@/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/templates/UAT.md
 </execution_context>
 
 <context>

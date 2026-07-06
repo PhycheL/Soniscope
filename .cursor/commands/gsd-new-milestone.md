@@ -14,11 +14,11 @@ Brownfield equivalent of new-project. Project exists, PROJECT.md has history. Ga
 </objective>
 
 <execution_context>
-@/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/new-milestone.md
-@/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/references/questioning.md
-@/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/references/ui-brand.md
-@/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/templates/project.md
-@/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/templates/requirements.md
+@/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/new-milestone.md
+@/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/references/questioning.md
+@/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/references/ui-brand.md
+@/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/templates/project.md
+@/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/templates/requirements.md
 </execution_context>
 
 <context>

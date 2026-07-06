@@ -18,7 +18,7 @@ Output: {padded_phase}-REVIEW.md in phase directory + inline summary of findings
 </objective>
 
 <execution_context>
-@/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/code-review.md
+@/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/code-review.md
 </execution_context>
 
 <context>

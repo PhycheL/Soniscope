@@ -104,7 +104,7 @@ Output: updated VALIDATION.md + generated test files.
 </objective>
 
 <execution_context>
-@/Volumes/Data/ProjectCode/my_soniscope/.codex/gsd-core/workflows/validate-phase.md
+@/Users/bemied/ProjectCode/my_soniscope/.codex/gsd-core/workflows/validate-phase.md
 </execution_context>
 
 <context>

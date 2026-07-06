@@ -36,7 +36,7 @@ planning via /gsd-plan-phase --reviews.
 </objective>
 
 <execution_context>
-@/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/review.md
+@/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/review.md
 </execution_context>
 
 <context>

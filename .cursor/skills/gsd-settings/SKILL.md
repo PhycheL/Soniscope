@@ -39,7 +39,7 @@ Routes to the settings workflow which handles:
 </objective>
 
 <execution_context>
-@/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/settings.md
+@/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/settings.md
 </execution_context>
 
 <process>

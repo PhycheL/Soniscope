@@ -26,7 +26,7 @@ Flags:
 </objective>
 
 <execution_context>
-@/Volumes/Data/ProjectCode/my_soniscope/.claude/gsd-core/workflows/audit-fix.md
+@/Users/bemied/ProjectCode/my_soniscope/.claude/gsd-core/workflows/audit-fix.md
 </execution_context>
 
 <process>

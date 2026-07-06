@@ -47,10 +47,10 @@ Mode routing:
 </routing>
 
 <execution_context>
-@/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/new-workspace.md
-@/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/list-workspaces.md
-@/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/remove-workspace.md
-@/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/references/ui-brand.md
+@/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/new-workspace.md
+@/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/list-workspaces.md
+@/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/remove-workspace.md
+@/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/references/ui-brand.md
 </execution_context>
 
 <context>

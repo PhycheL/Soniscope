@@ -29,8 +29,8 @@ Clarify phase requirements through structured Socratic questioning with quantita
 </objective>
 
 <execution_context>
-@/Volumes/Data/ProjectCode/my_soniscope/.claude/gsd-core/workflows/spec-phase.md
-@/Volumes/Data/ProjectCode/my_soniscope/.claude/gsd-core/templates/spec.md
+@/Users/bemied/ProjectCode/my_soniscope/.claude/gsd-core/workflows/spec-phase.md
+@/Users/bemied/ProjectCode/my_soniscope/.claude/gsd-core/templates/spec.md
 </execution_context>
 
 <runtime_note>

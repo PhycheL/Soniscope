@@ -34,7 +34,7 @@ Verify milestone achieved its definition of done. Check requirements coverage, c
 </objective>
 
 <execution_context>
-@/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/audit-milestone.md
+@/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/audit-milestone.md
 </execution_context>
 
 <context>

@@ -105,7 +105,7 @@ Output ONLY the reference content of the chosen tier. Do NOT add:
 </objective>
 
 <execution_context>
-@/Volumes/Data/ProjectCode/my_soniscope/.codex/gsd-core/workflows/help.md
+@/Users/bemied/ProjectCode/my_soniscope/.codex/gsd-core/workflows/help.md
 </execution_context>
 
 <context>
@@ -113,5 +113,5 @@ Arguments: {{GSD_ARGS}}
 </context>
 
 <process>
-Follow /Volumes/Data/ProjectCode/my_soniscope/.codex/gsd-core/workflows/help.md with {{GSD_ARGS}}.
+Follow /Users/bemied/ProjectCode/my_soniscope/.codex/gsd-core/workflows/help.md with {{GSD_ARGS}}.
 </process>

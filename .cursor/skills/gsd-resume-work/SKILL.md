@@ -40,7 +40,7 @@ Routes to the resume-project workflow which handles:
   </objective>
 
 <execution_context>
-@/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/resume-project.md
+@/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/resume-project.md
 </execution_context>
 
 <process>

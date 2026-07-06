@@ -16,10 +16,10 @@ Spawned by `discuss-phase` via `Task()`. You do NOT present output directly to t
 - Return structured markdown output for the main agent to synthesize
 </role>
 
-@/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/references/untrusted-input-boundary.md
+@/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/references/untrusted-input-boundary.md
 
 <documentation_lookup>
-@/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/references/research-documentation-lookup.md
+@/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/references/research-documentation-lookup.md
 </documentation_lookup>
 
 <input>

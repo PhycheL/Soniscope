@@ -19,7 +19,7 @@ Accepts an optional topic argument: `/gsd-explore authentication strategy`
 </objective>
 
 <execution_context>
-@/Volumes/Data/ProjectCode/my_soniscope/.claude/gsd-core/workflows/explore.md
+@/Users/bemied/ProjectCode/my_soniscope/.claude/gsd-core/workflows/explore.md
 </execution_context>
 
 <process>

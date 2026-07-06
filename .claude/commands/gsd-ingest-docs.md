@@ -27,10 +27,10 @@ Auto-synthesizes most conflicts using the precedence rule `ADR > SPEC > PRD > DO
 </objective>
 
 <execution_context>
-@/Volumes/Data/ProjectCode/my_soniscope/.claude/gsd-core/workflows/ingest-docs.md
-@/Volumes/Data/ProjectCode/my_soniscope/.claude/gsd-core/references/ui-brand.md
-@/Volumes/Data/ProjectCode/my_soniscope/.claude/gsd-core/references/gate-prompts.md
-@/Volumes/Data/ProjectCode/my_soniscope/.claude/gsd-core/references/doc-conflict-engine.md
+@/Users/bemied/ProjectCode/my_soniscope/.claude/gsd-core/workflows/ingest-docs.md
+@/Users/bemied/ProjectCode/my_soniscope/.claude/gsd-core/references/ui-brand.md
+@/Users/bemied/ProjectCode/my_soniscope/.claude/gsd-core/references/gate-prompts.md
+@/Users/bemied/ProjectCode/my_soniscope/.claude/gsd-core/references/doc-conflict-engine.md
 </execution_context>
 
 <context>

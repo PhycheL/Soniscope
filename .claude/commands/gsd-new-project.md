@@ -34,11 +34,11 @@ Initialize a new project through unified flow: questioning → research (optiona
 </objective>
 
 <execution_context>
-@/Volumes/Data/ProjectCode/my_soniscope/.claude/gsd-core/workflows/new-project.md
-@/Volumes/Data/ProjectCode/my_soniscope/.claude/gsd-core/references/questioning.md
-@/Volumes/Data/ProjectCode/my_soniscope/.claude/gsd-core/references/ui-brand.md
-@/Volumes/Data/ProjectCode/my_soniscope/.claude/gsd-core/templates/project.md
-@/Volumes/Data/ProjectCode/my_soniscope/.claude/gsd-core/templates/requirements.md
+@/Users/bemied/ProjectCode/my_soniscope/.claude/gsd-core/workflows/new-project.md
+@/Users/bemied/ProjectCode/my_soniscope/.claude/gsd-core/references/questioning.md
+@/Users/bemied/ProjectCode/my_soniscope/.claude/gsd-core/references/ui-brand.md
+@/Users/bemied/ProjectCode/my_soniscope/.claude/gsd-core/templates/project.md
+@/Users/bemied/ProjectCode/my_soniscope/.claude/gsd-core/templates/requirements.md
 </execution_context>
 
 <process>

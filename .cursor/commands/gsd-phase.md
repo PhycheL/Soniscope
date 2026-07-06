@@ -20,10 +20,10 @@ Mode routing:
 </routing>
 
 <execution_context>
-@/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/add-phase.md
-@/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/insert-phase.md
-@/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/remove-phase.md
-@/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/edit-phase.md
+@/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/add-phase.md
+@/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/insert-phase.md
+@/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/remove-phase.md
+@/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/edit-phase.md
 </execution_context>
 
 <context>

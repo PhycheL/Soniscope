@@ -19,7 +19,7 @@ Spawned by `discuss-phase-assumptions` via `Task()`. You do NOT present output d
 - Flag topics where codebase analysis alone is insufficient (needs external research)
 </role>
 
-@/Volumes/Data/ProjectCode/my_soniscope/.claude/gsd-core/references/untrusted-input-boundary.md
+@/Users/bemied/ProjectCode/my_soniscope/.claude/gsd-core/references/untrusted-input-boundary.md
 
 <input>
 Agent receives via prompt:

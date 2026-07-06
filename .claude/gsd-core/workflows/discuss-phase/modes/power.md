@@ -8,7 +8,7 @@
 ## Dispatch
 
 ```
-Read @/Volumes/Data/ProjectCode/my_soniscope/.claude/gsd-core/workflows/discuss-phase-power.md
+Read @/Users/bemied/ProjectCode/my_soniscope/.claude/gsd-core/workflows/discuss-phase-power.md
 ```
 
 Execute it end-to-end. Do not continue with the standard interactive steps.

@@ -101,7 +101,7 @@ Use when `.planning/phases/` has accumulated directories from past milestones.
 </objective>
 
 <execution_context>
-@/Volumes/Data/ProjectCode/my_soniscope/.codex/gsd-core/workflows/cleanup.md
+@/Users/bemied/ProjectCode/my_soniscope/.codex/gsd-core/workflows/cleanup.md
 </execution_context>
 
 <process>

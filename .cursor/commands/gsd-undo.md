@@ -8,9 +8,9 @@ Three modes:
 </objective>
 
 <execution_context>
-@/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/undo.md
-@/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/references/ui-brand.md
-@/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/references/gate-prompts.md
+@/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/undo.md
+@/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/references/ui-brand.md
+@/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/references/gate-prompts.md
 </execution_context>
 
 <context>

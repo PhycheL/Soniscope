@@ -216,7 +216,7 @@ gsd-core/
 
 **New Workflow:**
 - Implementation: `gsd-core/workflows/{name}.md`
-- Usage: Reference from command with `@/Volumes/Data/ProjectCode/my_soniscope/.claude/gsd-core/workflows/{name}.md`
+- Usage: Reference from command with `@/Users/bemied/ProjectCode/my_soniscope/.claude/gsd-core/workflows/{name}.md`
 
 **New Reference Document:**
 - Implementation: `gsd-core/references/{name}.md`
@@ -229,12 +229,12 @@ gsd-core/
 ## Special Directories
 
 **gsd-core/**
-- Purpose: Resources installed to /Volumes/Data/ProjectCode/my_soniscope/.claude/
+- Purpose: Resources installed to /Users/bemied/ProjectCode/my_soniscope/.claude/
 - Source: Copied by bin/install.js during installation
 - Committed: Yes (source of truth)
 
 **commands/**
-- Purpose: Slash commands installed to /Volumes/Data/ProjectCode/my_soniscope/.claude/commands/
+- Purpose: Slash commands installed to /Users/bemied/ProjectCode/my_soniscope/.claude/commands/
 - Source: Copied by bin/install.js during installation
 - Committed: Yes (source of truth)
 

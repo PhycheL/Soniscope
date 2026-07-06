@@ -10,10 +10,10 @@ Replaces gsd-plan-phase's internal gsd-plan-checker with external AI reviewers (
 </objective>
 
 <execution_context>
-@/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/plan-review-convergence.md
-@/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/references/revision-loop.md
-@/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/references/gates.md
-@/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/references/agent-contracts.md
+@/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/plan-review-convergence.md
+@/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/references/revision-loop.md
+@/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/references/gates.md
+@/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/references/agent-contracts.md
 </execution_context>
 
 <runtime_note>

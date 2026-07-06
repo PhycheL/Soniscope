@@ -10,9 +10,9 @@ requires: [config, update]
 ---
 
 <objective>
-Manage the runtime skill surface without reinstall. Reads/writes `/Volumes/Data/ProjectCode/my_soniscope/.claude/.gsd-surface.json`
-(sibling to `/Volumes/Data/ProjectCode/my_soniscope/.claude/.gsd-profile`) and re-stages the active skills directory in place.
-Skill dirs live at `/Volumes/Data/ProjectCode/my_soniscope/.claude/skills/gsd-*/`.
+Manage the runtime skill surface without reinstall. Reads/writes `/Users/bemied/ProjectCode/my_soniscope/.claude/.gsd-surface.json`
+(sibling to `/Users/bemied/ProjectCode/my_soniscope/.claude/.gsd-profile`) and re-stages the active skills directory in place.
+Skill dirs live at `/Users/bemied/ProjectCode/my_soniscope/.claude/skills/gsd-*/`.
 
 Sub-commands: list · status · profile · disable · enable · reset
 </objective>
@@ -123,11 +123,11 @@ Valid cluster names: `core_loop`, `audit_review`, `milestone`, `research_ideate`
 ## runtimeConfigDir resolution
 
 The `runtimeConfigDir` for `applySurface` is the **base Claude config directory**
-(`~/.claude`), NOT the skills sub-directory (`/Volumes/Data/ProjectCode/my_soniscope/.claude/skills`).
+(`~/.claude`), NOT the skills sub-directory (`/Users/bemied/ProjectCode/my_soniscope/.claude/skills`).
 
 This matches `installRuntimeArtifacts` and `uninstallRuntimeArtifacts`, which also
 receive `~/.claude` as `configDir`. The skill dirs themselves live at
-`/Volumes/Data/ProjectCode/my_soniscope/.claude/skills/gsd-*/` because the `claude global` layout has `destSubpath =
+`/Users/bemied/ProjectCode/my_soniscope/.claude/skills/gsd-*/` because the `claude global` layout has `destSubpath =
 'skills'` — they are derived from `configDir`, not the root for it.
 
 ```bash
@@ -141,7 +141,7 @@ SCOPE="global"
 ```
 
 Surface state is stored at `${RUNTIME_CONFIG_DIR}/.gsd-surface.json`
-(i.e. `/Volumes/Data/ProjectCode/my_soniscope/.claude/.gsd-surface.json`).
+(i.e. `/Users/bemied/ProjectCode/my_soniscope/.claude/.gsd-surface.json`).
 
 All paths can be overridden by reading the `CLAUDE_CONFIG_DIR` env var if set.
 
@@ -154,9 +154,9 @@ All paths can be overridden by reading the `CLAUDE_CONFIG_DIR` env var if set.
 - Missing `surface.cjs` → prompt: "Run `npm i -g gsd-core` to reinstall GSD."
 
 <execution_context>
-Surface state file: `/Volumes/Data/ProjectCode/my_soniscope/.claude/.gsd-surface.json`
-Install profile marker: `/Volumes/Data/ProjectCode/my_soniscope/.claude/.gsd-profile`
-Skill dirs: `/Volumes/Data/ProjectCode/my_soniscope/.claude/skills/gsd-*/`
-Engine module: `/Volumes/Data/ProjectCode/my_soniscope/.claude/gsd-core/bin/lib/surface.cjs`
-Cluster definitions: `/Volumes/Data/ProjectCode/my_soniscope/.claude/gsd-core/bin/lib/clusters.cjs`
+Surface state file: `/Users/bemied/ProjectCode/my_soniscope/.claude/.gsd-surface.json`
+Install profile marker: `/Users/bemied/ProjectCode/my_soniscope/.claude/.gsd-profile`
+Skill dirs: `/Users/bemied/ProjectCode/my_soniscope/.claude/skills/gsd-*/`
+Engine module: `/Users/bemied/ProjectCode/my_soniscope/.claude/gsd-core/bin/lib/surface.cjs`
+Cluster definitions: `/Users/bemied/ProjectCode/my_soniscope/.claude/gsd-core/bin/lib/clusters.cjs`
 </execution_context>

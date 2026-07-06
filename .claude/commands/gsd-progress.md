@@ -32,10 +32,10 @@ Three modes:
 </flags>
 
 <execution_context>
-@/Volumes/Data/ProjectCode/my_soniscope/.claude/gsd-core/workflows/progress.md
-@/Volumes/Data/ProjectCode/my_soniscope/.claude/gsd-core/workflows/next.md
-@/Volumes/Data/ProjectCode/my_soniscope/.claude/gsd-core/workflows/do.md
-@/Volumes/Data/ProjectCode/my_soniscope/.claude/gsd-core/references/ui-brand.md
+@/Users/bemied/ProjectCode/my_soniscope/.claude/gsd-core/workflows/progress.md
+@/Users/bemied/ProjectCode/my_soniscope/.claude/gsd-core/workflows/next.md
+@/Users/bemied/ProjectCode/my_soniscope/.claude/gsd-core/workflows/do.md
+@/Users/bemied/ProjectCode/my_soniscope/.claude/gsd-core/references/ui-brand.md
 </execution_context>
 
 <process>

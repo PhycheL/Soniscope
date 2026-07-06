@@ -6,7 +6,7 @@ Output: MILESTONE_SUMMARY written to `.planning/reports/`, presented inline, opt
 </objective>
 
 <execution_context>
-@/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/milestone-summary.md
+@/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/milestone-summary.md
 </execution_context>
 
 <context>

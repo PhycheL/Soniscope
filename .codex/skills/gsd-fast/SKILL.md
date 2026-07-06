@@ -105,7 +105,7 @@ you could describe in one sentence and execute in under 2 minutes.
 </objective>
 
 <execution_context>
-@/Volumes/Data/ProjectCode/my_soniscope/.codex/gsd-core/workflows/fast.md
+@/Users/bemied/ProjectCode/my_soniscope/.codex/gsd-core/workflows/fast.md
 </execution_context>
 
 <process>

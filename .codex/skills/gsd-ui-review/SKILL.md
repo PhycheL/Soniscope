@@ -101,8 +101,8 @@ Output: {phase_num}-UI-REVIEW.md
 </objective>
 
 <execution_context>
-@/Volumes/Data/ProjectCode/my_soniscope/.codex/gsd-core/workflows/ui-review.md
-@/Volumes/Data/ProjectCode/my_soniscope/.codex/gsd-core/references/ui-brand.md
+@/Users/bemied/ProjectCode/my_soniscope/.codex/gsd-core/workflows/ui-review.md
+@/Users/bemied/ProjectCode/my_soniscope/.codex/gsd-core/references/ui-brand.md
 </execution_context>
 
 <context>

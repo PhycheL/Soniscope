@@ -8,7 +8,7 @@ and optionally applies labels or closes non-compliant submissions.
 </objective>
 
 <execution_context>
-@/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/inbox.md
+@/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/inbox.md
 </execution_context>
 
 <context>

@@ -40,7 +40,7 @@ Routes to the update workflow which handles:
 </objective>
 
 <execution_context>
-@/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/update.md
+@/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/update.md
 </execution_context>
 
 <flags>
@@ -59,6 +59,6 @@ Parse the first token of {{GSD_ARGS}}:
 </process>
 
 <execution_context_extended>
-@/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/sync-skills.md
-@/Volumes/Data/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/reapply-patches.md
+@/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/sync-skills.md
+@/Users/bemied/ProjectCode/my_soniscope/.cursor/gsd-core/workflows/reapply-patches.md
 </execution_context_extended>

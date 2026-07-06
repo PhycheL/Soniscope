@@ -102,7 +102,7 @@ Output: Forensic report saved to `.planning/forensics/`, presented inline, with 
 </objective>
 
 <execution_context>
-@/Volumes/Data/ProjectCode/my_soniscope/.codex/gsd-core/workflows/forensics.md
+@/Users/bemied/ProjectCode/my_soniscope/.codex/gsd-core/workflows/forensics.md
 </execution_context>
 
 <context>

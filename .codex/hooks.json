@@ -8,6 +8,14 @@
             "command": "\"/usr/local/bin/node\" \"/Volumes/Data/ProjectCode/my_soniscope/.codex/hooks/gsd-check-update.js\""
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"/usr/local/bin/node\" \"/Users/bemied/ProjectCode/my_soniscope/.codex/hooks/gsd-check-update.js\""
+          }
+        ]
       }
     ],
     "SubagentStart": [
@@ -16,6 +24,15 @@
           {
             "type": "command",
             "command": "\"/usr/local/bin/node\" \"/Volumes/Data/ProjectCode/my_soniscope/.codex/hooks/gsd-context-monitor.js\"",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"/usr/local/bin/node\" \"/Users/bemied/ProjectCode/my_soniscope/.codex/hooks/gsd-context-monitor.js\"",
             "timeout": 10
           }
         ]
@@ -30,6 +47,15 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"/usr/local/bin/node\" \"/Users/bemied/ProjectCode/my_soniscope/.codex/hooks/gsd-context-monitor.js\"",
+            "timeout": 10
+          }
+        ]
       }
     ],
     "PostToolUse": [
@@ -38,6 +64,15 @@
           {
             "type": "command",
             "command": "\"/usr/local/bin/node\" \"/Volumes/Data/ProjectCode/my_soniscope/.codex/hooks/gsd-context-monitor.js\"",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"/usr/local/bin/node\" \"/Users/bemied/ProjectCode/my_soniscope/.codex/hooks/gsd-context-monitor.js\"",
             "timeout": 10
           }
         ]

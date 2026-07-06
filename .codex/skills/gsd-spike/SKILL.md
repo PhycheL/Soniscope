@@ -108,9 +108,9 @@ Does not require prior new-project setup — auto-creates `.planning/spikes/` if
 </objective>
 
 <execution_context>
-@/Volumes/Data/ProjectCode/my_soniscope/.codex/gsd-core/workflows/spike.md
-@/Volumes/Data/ProjectCode/my_soniscope/.codex/gsd-core/workflows/spike-wrap-up.md
-@/Volumes/Data/ProjectCode/my_soniscope/.codex/gsd-core/references/ui-brand.md
+@/Users/bemied/ProjectCode/my_soniscope/.codex/gsd-core/workflows/spike.md
+@/Users/bemied/ProjectCode/my_soniscope/.codex/gsd-core/workflows/spike-wrap-up.md
+@/Users/bemied/ProjectCode/my_soniscope/.codex/gsd-core/references/ui-brand.md
 </execution_context>
 
 <runtime_note>
