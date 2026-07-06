@@ -45,8 +45,13 @@
 **Plans:** 4 plans
 
 Plans:
+**Wave 1**
+
 - [ ] 06-01-PLAN.md — quarantine.py 失败账本纯逻辑 + IO + 告警 + 查询/清除运行器 (Wave 1)
 - [ ] 06-02-PLAN.md — PollConfig.max_fragment_failures 阈值配置 + 恢复扫描账本安全测试 (Wave 1)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 06-03-PLAN.md — poller/pipeline 隔离跳过注入 + 失败递增 + 跨阈值告警 (Wave 2)
 - [ ] 06-04-PLAN.md — quarantine-list/clear-quarantine CLI + Makefile 目标 + docstring 修正 (Wave 2)
 
