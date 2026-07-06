@@ -21,7 +21,7 @@
 <details open>
 <summary>◆ v1.1 上线前修复 (Phases 6-8) — PLANNED</summary>
 
-- [ ] Phase 6: Worker 失败路径隔离与告警 — covers WKR-01/WKR-02/WKR-03 (`F-CODE-02`)
+- [ ] Phase 6: Worker 失败路径隔离与告警 — covers WKR-01/WKR-02/WKR-03 (`F-CODE-02`) — 4 plans
 - [ ] Phase 7: 小程序 uploading 死态恢复 — covers MP-01/MP-02/MP-03 (`F-CODE-06`)
 - [ ] Phase 8: 发布 production ENV 清单 — covers DOC-01/DOC-02 (`F-DOC-03`)
 
@@ -41,6 +41,14 @@
 2. 达到阈值后,同一 OSS object 在后续轮询中被跳过或隔离,不会继续无界下载。
 3. 告警/诊断输出包含 `fragment_id`、原因、attempt count 和下一步处理建议。
 4. pytest 覆盖多轮失败、阈值隔离、告警/诊断状态与既有成功路径幂等跳过。
+
+**Plans:** 4 plans
+
+Plans:
+- [ ] 06-01-PLAN.md — quarantine.py 失败账本纯逻辑 + IO + 告警 + 查询/清除运行器 (Wave 1)
+- [ ] 06-02-PLAN.md — PollConfig.max_fragment_failures 阈值配置 + 恢复扫描账本安全测试 (Wave 1)
+- [ ] 06-03-PLAN.md — poller/pipeline 隔离跳过注入 + 失败递增 + 跨阈值告警 (Wave 2)
+- [ ] 06-04-PLAN.md — quarantine-list/clear-quarantine CLI + Makefile 目标 + docstring 修正 (Wave 2)
 
 ### Phase 7: 小程序 uploading 死态恢复
 
@@ -77,7 +85,7 @@
 | 3. 组件与工具链深潜 | v1.0 | 7/7 | Complete | 2026-07-05 |
 | 4. 文档配置与测试审计 | v1.0 | 9/9 | Complete | 2026-07-05 |
 | 5. 汇总校准与报告组装 | v1.0 | 3/3 | Complete | 2026-07-05 |
-| 6. Worker 失败路径隔离与告警 | v1.1 | 0/0 | Planned | — |
+| 6. Worker 失败路径隔离与告警 | v1.1 | 0/4 | Planned | — |
 | 7. 小程序 uploading 死态恢复 | v1.1 | 0/0 | Planned | — |
 | 8. 发布 production ENV 清单 | v1.1 | 0/0 | Planned | — |
 
