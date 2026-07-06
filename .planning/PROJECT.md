@@ -2,23 +2,27 @@
 
 ## What This Is
 
-SoniScope 是一条个人录音转写流水线:WeChat 小程序录音 → Aliyun FC 3.0 函数(签发 STS 凭证、校验上传)→ OSS 私有桶(唯一数据契约)→ 本地 Python Worker 轮询、ffmpeg 标准化、NLS 云端 ASR 转写。项目处于部署上线阶段;本里程碑不新增功能,而是对现有代码进行一次全面审计,产出结构化审计报告,作为正式对外上线前的把关。
+SoniScope 是一条个人录音转写流水线:WeChat 小程序录音 → Aliyun FC 3.0 函数(签发 STS 凭证、校验上传)→ OSS 私有桶(唯一数据契约)→ 本地 Python Worker 轮询、ffmpeg 标准化、NLS 云端 ASR 转写。项目处于上线前修复阶段;本里程碑由 v1.0 审计报告驱动,优先关闭首批真实用户前必须处理的 PRE-LAUNCH 风险。
 
 ## Core Value
 
-在正式上线前,拿到一份可信、有证据、分级明确的审计报告,准确回答"现有代码哪里不一致、哪里有债务、上线有什么风险"。
+首批真实用户前,关闭会导致静默失败、录音上传死态或误发 development 构建的 PRE-LAUNCH 风险。
+
+## Current Milestone: v1.1 上线前修复
+
+**Goal:** 先关闭审计报告中的全部 PRE-LAUNCH 必做项,让正式上线不再受 F-CODE-02、F-CODE-06、F-DOC-03 阻塞。
+
+**Target features:**
+
+- Worker 对持久性失败对象有失败计数、隔离/跳过名单与显式告警,不再每轮无界重下重处理。
+- 小程序对残留 `uploading` 队列项有启动/onShow 恢复或用户可见手动出口,不再形成无法自救的上传死态。
+- 发布文档强制覆盖 `apps/miniprogram/config.js` 的 `ENV=production` 翻转与真机确认,避免开发者菜单/故障注入误发给最终用户。
 
 ## Current State
 
-v1.0 上线前审计已于 2026-07-06 关闭。里程碑交付物是结构化审计报告与修复 backlog,不是功能代码变更。最终报告给出 **CONDITIONAL GO**:0 BLOCKER、3 PRE-LAUNCH、37 POST-LAUNCH;正式上线前优先处理 F-CODE-02、F-CODE-06、F-DOC-03。
+v1.0 上线前审计已于 2026-07-06 关闭。里程碑交付物是结构化审计报告与修复 backlog,不是功能代码变更。最终报告给出 **CONDITIONAL GO**:0 BLOCKER、3 PRE-LAUNCH、37 POST-LAUNCH。
 
-规划归档位于 `.planning/milestones/`,当前 `.planning/REQUIREMENTS.md` 会在 closeout 后删除,下一里程碑需重新定义需求。
-
-## Next Milestone Goals
-
-- 以 `.planning/audit/REPORT.md` 和 WP-01~09 为输入规划修复里程碑。
-- 先关闭 PRE-LAUNCH 三项:F-CODE-02、F-CODE-06、F-DOC-03。
-- 保留 Do NOT fix 登记表与优点盘点,避免误改 `issue-cedential` 在用域名、`whisper-local` 桩和单键 STS 等已裁定设计。
+v1.1 上线前修复已启动。规划归档位于 `.planning/milestones/`,本轮需求与路线图以 `.planning/audit/REPORT.md` 的 PRE-LAUNCH 必做清单为唯一输入,暂不扩展到其余 POST-LAUNCH 工作包。
 
 ## Requirements
 
@@ -43,16 +47,23 @@ v1.0 上线前审计已于 2026-07-06 关闭。里程碑交付物是结构化审
 
 ### Active
 
-<!-- 本里程碑:审计,仅产出报告,不做修复。 -->
+<!-- 本里程碑:v1.1 上线前修复。 -->
 
-(无 — 本里程碑全部需求已验证)
+- [ ] **WKR-01** Worker 对 `sha256_mismatch`、音频探测失败、标准化失败等持久失败结果记录按 fragment 的失败历史。
+- [ ] **WKR-02** Worker 在超过阈值后跳过/隔离该 fragment,后续轮询不再无界重下同一个失败 OSS 对象。
+- [ ] **WKR-03** Worker 对被隔离的失败 fragment 输出可排障的显式告警与诊断状态。
+- [ ] **MP-01** 小程序自动驱动前能识别 stale `uploading` 队列项并复位到可恢复状态。
+- [ ] **MP-02** 小程序上传列表对 stale `uploading` 项提供用户可见的重试/恢复出口并纳入积压提示。
+- [ ] **MP-03** 小程序 node 测试覆盖 `uploading` 中断恢复行为,同步翻转既有“uploading 不计积压”断言。
+- [ ] **DOC-01** 发布文档在小程序上传/审核前强制要求 `ENV=production`。
+- [ ] **DOC-02** 发布检查清单要求真机确认开发者菜单不可见、故障注入不可用。
 
 ### Out of Scope
 
-- 修复问题 — 本里程碑仅产出报告;修复(含高危)统一留给下一个里程碑,由报告驱动
+- 其余 37 条 POST-LAUNCH 审计发现 — 本里程碑只关闭 PRE-LAUNCH 必做项,避免首批上线前范围扩散
 - 对照 `docs/fc-transcribe-design.md` 的目标契约审计 — 用户明确选择仅审现状一致性;FC 直转切换障碍分析随切换里程碑再做
 - 新功能开发(transcribe-audio FC 函数、多用户等)— 审计里程碑不动功能
-- 安全渗透测试级别的审计 — 重点是契约一致性与质量债务;安全问题若在审计中顺带发现仍记录在报告中,但不是主动审计维度
+- 安全渗透测试级别的审计 — v1.0 审计已完成上线前静态把关,本轮仅实现指定修复
 
 ## Context
 
@@ -65,13 +76,14 @@ v1.0 上线前审计已于 2026-07-06 关闭。里程碑交付物是结构化审
 - Phase 3(组件与工具链深潜)已完成(2026-07-05):COVERAGE.md 63 对象(47 CODE + 16 TOOL)全落格封版;新发现 F-CODE-01~08(MEDIUM 2:无界重下载循环、uploading 卡死态)+ F-TOOL-01~08(MEDIUM 2:过期预签名 URL 曾入库、mypy 门禁结构性恒红);258 条扫描命中三态销号(确认 15/误报 243),14 条假设回填(累计 14/25,余 11 条留 Phase 4),D14-1~6 全部裁定,HANDOFF-PHASE4.md 封版(DOC 3 + TEST 3),零 diff 红线全程成立,验证 13/13 通过
 - Phase 5(汇总校准与报告组装)已完成(2026-07-05,里程碑最后一个 phase):CALIBRATION.md 经用户 approve-all 批准落账(严重度/工作量零调整、真重复零并入、聚类 CL-01~05、工作包 WP-01~09、判定准则 B/P/PL 定稿,40 条判定 BLOCKER 0 / PRE-LAUNCH 3 / POST-LAUNCH 37 → 总判定 CONDITIONAL GO,必做 F-CODE-02/F-CODE-06/F-DOC-03);REPORT.md + 附录 A/B 零新判断组装,8/8 机械门禁实跑照录,零 diff 红线全程成立,验证 14/14 通过
 - v1.0 里程碑已归档(2026-07-06):ROADMAP、REQUIREMENTS、MILESTONE-AUDIT 已复制到 `.planning/milestones/`,`.planning/MILESTONES.md` 记录 shipped 摘要,`STATE.md` 转为 awaiting next milestone。
+- v1.1 里程碑从 `.planning/audit/REPORT.md` 的 PRE-LAUNCH 必做清单启动(2026-07-06):`F-CODE-02` 由 WP-03 承载,`F-CODE-06` 由 WP-04 承载,`F-DOC-03` 由 WP-07 承载。本轮只取这些工作包中与 PRE-LAUNCH 直接相关的最小闭环,不顺带消化包内全部 POST-LAUNCH 成员。
 
 ## Constraints
 
-- **产出形态**: 仅审计报告,不改代码 — 用户明确要求修复留给下一个里程碑
-- **报告标准**: 每个发现必须有严重度分级、文件/行号证据、修复建议与工作量估计 — 报告要能直接驱动下个里程碑
-- **审计基准**: 契约一致性以三处实现的现状互相对照为准,不引入目标态设计 — 用户明确选择
-- **技术栈**: Python 3.11+(mypy-strict/ruff)与小程序 JS 双语言仓库 — 审计工具与判断标准需分别适配
+- **范围**: 只修全部 PRE-LAUNCH 三项 — 首批真实用户前必须完成;其余 POST-LAUNCH 不在本轮默认范围
+- **证据来源**: `.planning/audit/REPORT.md`、`findings/code.md`、`findings/docs-config.md` 为修复输入 — 不重新解释已批准的审计判定
+- **安全红线**: 保留 Do NOT fix 登记表 — 不误改 `issue-cedential` 在用域名、`whisper-local` 桩、单键 STS 和 handler 同名豁免
+- **技术栈**: Python 3.11+(mypy strict/ruff)与小程序 JS 双语言仓库 — 修复必须同步更新对应 pytest/node 测试
 
 ## Key Decisions
 
@@ -80,6 +92,7 @@ v1.0 上线前审计已于 2026-07-06 关闭。里程碑交付物是结构化审
 | 仅产出审计报告,不做修复 | 上线前先看全貌,修复由报告统一排期,避免边审边改污染基线 | ✓ Good — v1.0 成功产出报告与修复 backlog,功能代码未被审计过程污染 |
 | 契约审计仅以现状为基准 | FC 直转切换是独立里程碑,目标态对照届时再做,本次聚焦当前一致性 | ✓ Good — 当前主链路 FC↔Worker 零漂移,目标态差距保留给后续切换里程碑 |
 | 审计范围覆盖全仓库四类代码 | 上线把关需要完整视图:主体代码、脚本工具、文档配置、测试 | ✓ Good — 40 条发现按 CODE/CONTRACT/DOC/TEST/TOOL 汇总,足以驱动修复里程碑 |
+| v1.1 只取 PRE-LAUNCH 必做项 | 先清除正式上线阻塞风险,避免把 37 条 POST-LAUNCH 债务拖入首批上线前关键路径 | — Pending |
 
 ## Evolution
 
@@ -99,4 +112,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-06 after v1.0 milestone closeout*
+*Last updated: 2026-07-06 after v1.1 milestone start*
