@@ -1,4 +1,4 @@
-# SoniScope — 上线前代码审计里程碑
+# SoniScope — Project State
 
 ## What This Is
 
@@ -7,6 +7,18 @@ SoniScope 是一条个人录音转写流水线:WeChat 小程序录音 → Aliyun
 ## Core Value
 
 在正式上线前,拿到一份可信、有证据、分级明确的审计报告,准确回答"现有代码哪里不一致、哪里有债务、上线有什么风险"。
+
+## Current State
+
+v1.0 上线前审计已于 2026-07-06 关闭。里程碑交付物是结构化审计报告与修复 backlog,不是功能代码变更。最终报告给出 **CONDITIONAL GO**:0 BLOCKER、3 PRE-LAUNCH、37 POST-LAUNCH;正式上线前优先处理 F-CODE-02、F-CODE-06、F-DOC-03。
+
+规划归档位于 `.planning/milestones/`,当前 `.planning/REQUIREMENTS.md` 会在 closeout 后删除,下一里程碑需重新定义需求。
+
+## Next Milestone Goals
+
+- 以 `.planning/audit/REPORT.md` 和 WP-01~09 为输入规划修复里程碑。
+- 先关闭 PRE-LAUNCH 三项:F-CODE-02、F-CODE-06、F-DOC-03。
+- 保留 Do NOT fix 登记表与优点盘点,避免误改 `issue-cedential` 在用域名、`whisper-local` 桩和单键 STS 等已裁定设计。
 
 ## Requirements
 
@@ -52,6 +64,7 @@ SoniScope 是一条个人录音转写流水线:WeChat 小程序录音 → Aliyun
 - Phase 2(契约抽取与漂移分析)已完成(2026-07-05):CONTRACT-MATRIX.md 51 行封版,FC↔Worker 主链零漂移;判定分布:潜伏 2(MEDIUM)/覆盖洞 3(LOW)/良性 1(INFO)/活跃失配 0;F-CON-01~06 入台账,CONTRACT-TEST-RECIPE.md 产出,6 条 D14 重复逻辑移交 Phase 3,验证 5/5 通过
 - Phase 3(组件与工具链深潜)已完成(2026-07-05):COVERAGE.md 63 对象(47 CODE + 16 TOOL)全落格封版;新发现 F-CODE-01~08(MEDIUM 2:无界重下载循环、uploading 卡死态)+ F-TOOL-01~08(MEDIUM 2:过期预签名 URL 曾入库、mypy 门禁结构性恒红);258 条扫描命中三态销号(确认 15/误报 243),14 条假设回填(累计 14/25,余 11 条留 Phase 4),D14-1~6 全部裁定,HANDOFF-PHASE4.md 封版(DOC 3 + TEST 3),零 diff 红线全程成立,验证 13/13 通过
 - Phase 5(汇总校准与报告组装)已完成(2026-07-05,里程碑最后一个 phase):CALIBRATION.md 经用户 approve-all 批准落账(严重度/工作量零调整、真重复零并入、聚类 CL-01~05、工作包 WP-01~09、判定准则 B/P/PL 定稿,40 条判定 BLOCKER 0 / PRE-LAUNCH 3 / POST-LAUNCH 37 → 总判定 CONDITIONAL GO,必做 F-CODE-02/F-CODE-06/F-DOC-03);REPORT.md + 附录 A/B 零新判断组装,8/8 机械门禁实跑照录,零 diff 红线全程成立,验证 14/14 通过
+- v1.0 里程碑已归档(2026-07-06):ROADMAP、REQUIREMENTS、MILESTONE-AUDIT 已复制到 `.planning/milestones/`,`.planning/MILESTONES.md` 记录 shipped 摘要,`STATE.md` 转为 awaiting next milestone。
 
 ## Constraints
 
@@ -64,9 +77,9 @@ SoniScope 是一条个人录音转写流水线:WeChat 小程序录音 → Aliyun
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| 仅产出审计报告,不做修复 | 上线前先看全貌,修复由报告统一排期,避免边审边改污染基线 | — Pending |
-| 契约审计仅以现状为基准 | FC 直转切换是独立里程碑,目标态对照届时再做,本次聚焦当前一致性 | — Pending |
-| 审计范围覆盖全仓库四类代码 | 上线把关需要完整视图:主体代码、脚本工具、文档配置、测试 | — Pending |
+| 仅产出审计报告,不做修复 | 上线前先看全貌,修复由报告统一排期,避免边审边改污染基线 | ✓ Good — v1.0 成功产出报告与修复 backlog,功能代码未被审计过程污染 |
+| 契约审计仅以现状为基准 | FC 直转切换是独立里程碑,目标态对照届时再做,本次聚焦当前一致性 | ✓ Good — 当前主链路 FC↔Worker 零漂移,目标态差距保留给后续切换里程碑 |
+| 审计范围覆盖全仓库四类代码 | 上线把关需要完整视图:主体代码、脚本工具、文档配置、测试 | ✓ Good — 40 条发现按 CODE/CONTRACT/DOC/TEST/TOOL 汇总,足以驱动修复里程碑 |
 
 ## Evolution
 
@@ -86,4 +99,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-05 after Phase 5 completion (milestone complete)*
+*Last updated: 2026-07-06 after v1.0 milestone closeout*
