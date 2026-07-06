@@ -113,6 +113,15 @@
 - **F-CON-04(verify-upload 校验 sha256)** — POST-LAUNCH,独立工作包,不在 v1.1。
 - **F-CODE-03(孤儿 `*.tmp` 清理)/ F-CODE-04(`.env` 无界向上搜索)** — 同为 POST-LAUNCH Worker 债务,不在本 phase。
 - **账本自动过期/TTL 重试策略** — 明确否决(D-06),若未来运维反馈手动清除负担过重再评估。
+
+### FC 直转迁移(`docs/fc-transcribe-design.md`)时的隔离复用与新增面
+
+> 背景:分析确认 F-CODE-02 的**问题内核不在具体代码行,而在"用『完成标记缺失』做幂等 + 无界重处理 + 无计数/阈值/告警"这个模式**。FC 直转迁移会删除本 phase 改动的 `poller.py` 下载校验循环与 `audio.py._archive_failed`(§3.6/§5.5 退役音频下载+ffmpeg+audio.wav 主干),但该模式在新架构原样复活。属独立里程碑(REQUIREMENTS.md Out of Scope),此处仅登记,不在 v1.1 动手。
+
+- **对账补转循环 = F-CODE-02 同构重现**:`docs/fc-transcribe-design.md` §3.6 role #1 "现有 poller 骨架降频复用",对 `recordings/` 减 `transcripts/` 做差集补转。持久失败音频(NLS 永远转不出)永远缺 `transcripts/<date>/<id>.md`(§3.3 步骤 2 的完成标记),因而每个对账周期被重新 invoke FC → 无界循环,且带云计费放大器(每次 invoke = FC 驻留 + 一次 NLS SubmitTask;§3.3 的 FC 异步 3 次重试是**每次 invoke 清零重来**,无跨周期全局 attempt 计数)。§3.6 仅一句"持续失败的记入失败清单",无阈值/排除/告警/解隔离出口。
+- **迁移时的复用点**:本 phase 的隔离抽象(按 fragment_id 失败计数账本 + config 阈值 + 从工作集排除 + 显式告警 + clear-quarantine CLI)正是 §3.6 那句"失败清单"缺失的机制。迁移只需把隔离判定的输入从 `plan_downloads` 的下载集**平移**到 `recordings−transcripts` 差集——同一个纯逻辑判定函数换输入。**为此本 phase 落地时应有意把隔离判定写成与工作集解耦的纯函数(判据:attempt ≥ 阈值 → 排除),而非硬编进 poller 下载路径**,否则会随 poller 一起被删。(动机补注 D-10 与 code_context "隔离跳过注入点"。)
+- **迁移时新增的两个隔离面(本 phase 不覆盖)**:① FC 异步调用的失败 Destination / 死信是否接告警(§3.2 仅"便于观测",未接告警);② NLS filetrans 侧的持久失败(损坏/不支持格式音频)——现状 ffmpeg 失败在 Worker,迁移后变成 FC 无状态函数内的 NLS 转写失败,失败历史需回写 OSS(如 `transcripts/failed/` 旁账本)或由对账层统一持有。
+- **迁移前需先对齐的文档张力(不影响 v1.1)**:`docs/fc-transcribe-design.md` 开头称"已决策,部署阶段立即实施",与 `.planning/PROJECT.md` / `REQUIREMENTS.md` 将 FC 直转列为 Out of Scope、另开里程碑的口径冲突;启动迁移里程碑前先对齐"是否立即实施"。
 </deferred>
 
 ---
